@@ -3,26 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Vectorcity 27.0 — Terrain Architect Studio</title>
+  <title>Topomapper</title>
 
   <!-- Libs -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/earcut@2.2.4/dist/earcut.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-  <script src="https://unpkg.com/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
 
   <style>
     :root {
-      /* Apple iOS Design tokens */
-      --color-bg: #F2F2F7;
-      --color-panel: rgba(255, 255, 255, 0.98);
-      --color-primary: #007AFF;
-      --color-primary-hover: #0056B3;
-      --color-text: #1C1C1E;
-      --color-text-sec: #8E8E93;
-      --color-border: rgba(60, 60, 67, 0.12);
+      /* Dark mode tokens */
+      --color-bg: #0B0F14;
+      --color-panel: rgba(20, 24, 32, 0.98);
+      --color-primary: #4C8DFF;
+      --color-primary-hover: #346FE0;
+      --color-text: #F5F7FB;
+      --color-text-sec: #9AA3B2;
+      --color-border: rgba(255, 255, 255, 0.08);
       --radius-ios: 22px;
       --sidebar-w: 400px;
       --blur: blur(40px);
@@ -37,21 +34,21 @@
 
     /* MAP AREA */
     .viewport { position: relative; flex: 1; height: 100%; }
-    #map { width: 100%; height: 100%; z-index: 0; background: #D1D1D6; }
+    #map { width: 100%; height: 100%; z-index: 0; background: #0A0D12; }
 
     /* SIDEBAR (iOS Floating Panel) */
     .sidebar {
       position: absolute; top: 16px; left: 16px; bottom: 16px; width: var(--sidebar-w);
       z-index: 1000; background: var(--color-panel); backdrop-filter: var(--blur);
-      -webkit-backdrop-filter: var(--blur); border: 1px solid rgba(255,255,255,0.6);
-      border-radius: var(--radius-ios); box-shadow: 0 15px 45px rgba(0,0,0,0.12);
+      -webkit-backdrop-filter: var(--blur); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius-ios); box-shadow: 0 20px 55px rgba(0,0,0,0.45);
       display: flex; flex-direction: column; overflow: hidden;
     }
 
     .sidebar-header {
       padding: 24px; border-bottom: 1px solid var(--color-border);
       display: flex; align-items: center; justify-content: space-between;
-      background: rgba(255,255,255,0.4);
+      background: rgba(16, 20, 28, 0.8);
     }
     .brand { font-weight: 800; font-size: 24px; letter-spacing: -0.8px; color: var(--color-text); text-decoration: none; display: flex; align-items: center; gap: 10px; }
     .scroll-content { flex: 1; overflow-y: auto; padding: 24px; }
@@ -62,52 +59,52 @@
 
     input, select {
       width: 100%; padding: 12px 14px; border-radius: 12px;
-      border: 1px solid transparent; background: rgba(118, 118, 128, 0.1);
+      border: 1px solid transparent; background: rgba(118, 118, 128, 0.18);
       font-size: 15px; color: var(--color-text); transition: 0.2s;
     }
-    input:focus, select:focus { background: #fff; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(0,122,255,0.1); }
+    input:focus, select:focus { background: rgba(255,255,255,0.12); border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(76,141,255,0.25); }
     .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
     /* SEARCH */
     .search-container { position: relative; }
     .suggestions {
-      position: absolute; top: 100%; left: 0; right: 0; background: rgba(255,255,255,0.98);
+      position: absolute; top: 100%; left: 0; right: 0; background: rgba(18,22,30,0.98);
       backdrop-filter: blur(15px); border-radius: 14px; margin-top: 8px; padding: 6px; z-index: 2000;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.15); border: 1px solid var(--color-border); display: none;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.45); border: 1px solid var(--color-border); display: none;
     }
-    .suggestion-item { padding: 12px; font-size: 14px; border-radius: 10px; cursor: pointer; border-bottom: 1px solid #f2f2f7; }
-    .suggestion-item:hover { background: #f2f2f7; color: var(--color-primary); }
+    .suggestion-item { padding: 12px; font-size: 14px; border-radius: 10px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .suggestion-item:hover { background: rgba(255,255,255,0.06); color: var(--color-primary); }
 
     /* LAYER LIST & CUSTOMIZER */
     .layer-list { display: flex; flex-direction: column; gap: 8px; }
     .layer-item {
-      background: rgba(255,255,255,0.5); border-radius: 16px;
-      border: 1px solid rgba(0,0,0,0.04); transition: 0.2s; overflow: hidden;
+      background: rgba(255,255,255,0.04); border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.08); transition: 0.2s; overflow: hidden;
     }
-    .layer-item.open { background: white; border-color: rgba(0,122,255,0.2); }
+    .layer-item.open { background: rgba(255,255,255,0.08); border-color: rgba(76,141,255,0.5); }
     .layer-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; }
     .layer-info { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; }
     .chevron { transition: transform 0.3s; width: 14px; height: 14px; opacity: 0.4; }
     .layer-item.open .chevron { transform: rotate(180deg); opacity: 1; color: var(--color-primary); }
-    .layer-body { display: none; padding: 0 18px 18px 18px; background: white; }
+    .layer-body { display: none; padding: 0 18px 18px 18px; background: rgba(10,12,18,0.7); }
     .layer-item.open .layer-body { display: block; }
 
     /* CUSTOMIZER CONTROLS */
     .cust-row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; gap: 10px; }
-    .color-dot { width: 32px; height: 32px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.1); position: relative; overflow: hidden; cursor: pointer; }
+    .color-dot { width: 32px; height: 32px; border-radius: 50%; border: 3px solid rgba(15,18,25,0.9); box-shadow: 0 2px 10px rgba(0,0,0,0.35); position: relative; overflow: hidden; cursor: pointer; }
     .color-dot input { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; opacity: 0; cursor: pointer; }
-    input[type=range] { flex: 1; height: 4px; border-radius: 2px; background: #d1d1d6; -webkit-appearance: none; }
-    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.15); border: 0.5px solid #eee; }
+    input[type=range] { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); -webkit-appearance: none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #F5F7FB; box-shadow: 0 2px 8px rgba(0,0,0,0.35); border: 0.5px solid rgba(0,0,0,0.3); }
 
     /* IOS SWITCH */
     .ios-switch {
       position: relative; width: 44px; height: 26px;
-      background: #E9E9EA; border-radius: 20px; cursor: pointer; transition: 0.3s;
+      background: rgba(255,255,255,0.18); border-radius: 20px; cursor: pointer; transition: 0.3s;
     }
     .ios-switch::after {
       content: ''; position: absolute; top: 2px; left: 2px;
-      width: 22px; height: 22px; background: #fff; border-radius: 50%;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.15); transition: 0.3s cubic-bezier(0.3, 1.5, 0.7, 1);
+      width: 22px; height: 22px; background: #F5F7FB; border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.45); transition: 0.3s cubic-bezier(0.3, 1.5, 0.7, 1);
     }
     .ios-switch.on { background: #34C759; }
     .ios-switch.on::after { transform: translateX(18px); }
@@ -116,14 +113,14 @@
     .btn-main {
       width: 100%; padding: 18px; border-radius: 16px; border: none;
       font-weight: 700; font-size: 17px; cursor: pointer; transition: 0.2s;
-      background: var(--color-primary); color: #fff; box-shadow: 0 10px 20px rgba(0,122,255,0.25);
+      background: var(--color-primary); color: #fff; box-shadow: 0 12px 24px rgba(76,141,255,0.25);
     }
     .btn-main:hover { transform: translateY(-2px); background: var(--color-primary-hover); }
 
     /* VIEWFINDER Overlay */
     .viewfinder-wrapper { position: absolute; inset: 0; pointer-events: none; z-index: 500; }
     .vf-mask { fill: rgba(0,0,0,0.35); }
-    .vf-stroke { fill: none; stroke: #fff; stroke-width: 2.5; filter: drop-shadow(0 0 5px rgba(0,0,0,0.4)); }
+    .vf-stroke { fill: none; stroke: #fff; stroke-width: 2.5; filter: drop-shadow(0 0 7px rgba(0,0,0,0.6)); }
     .vf-badge {
       position: absolute;
       transform: translate(-50%, -50%); /* Centered on the bottom line */
@@ -136,25 +133,25 @@
 
     /* MODAL SHEETS */
     .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(10px);
+      position: fixed; inset: 0; background: rgba(5,8,12,0.65); backdrop-filter: blur(10px);
       z-index: 2000; display: none; align-items: center; justify-content: center; opacity: 0; transition: 0.3s;
     }
     .modal-overlay.open { display: flex; opacity: 1; }
     .modal-card {
-      width: 95vw; height: 92vh; background: #fff; border-radius: 32px;
-      display: flex; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.3);
+      width: 95vw; height: 92vh; background: #0F141C; border-radius: 32px;
+      display: flex; overflow: hidden; box-shadow: 0 40px 120px rgba(0,0,0,0.6);
     }
-    .preview-stage { flex: 1; background: #F2F2F7; display: flex; align-items: center; justify-content: center; padding: 40px; overflow: auto; }
-    .export-side { width: 400px; background: #fff; border-left: 1px solid var(--color-border); padding: 40px; display: flex; flex-direction: column; gap: 30px; overflow-y: auto; }
+    .preview-stage { flex: 1; background: #0B0F14; display: flex; align-items: center; justify-content: center; padding: 40px; overflow: auto; }
+    .export-side { width: 400px; background: #121821; border-left: 1px solid var(--color-border); padding: 40px; display: flex; flex-direction: column; gap: 30px; overflow-y: auto; }
 
     /* LOADER */
     .loader {
       position: fixed; top: 30px; left: 50%; transform: translateX(-50%);
-      background: #fff; padding: 14px 28px; border-radius: 40px; z-index: 9999; display: none; align-items: center; gap: 12px;
-      font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid var(--color-border);
+      background: #121821; padding: 14px 28px; border-radius: 40px; z-index: 9999; display: none; align-items: center; gap: 12px;
+      font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.45); border: 1px solid var(--color-border);
     }
     .loader.active { display: flex; }
-    .spinner { width: 20px; height: 20px; border: 3px solid #E5E5EA; border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.8s infinite linear; }
+    .spinner { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.2); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.8s infinite linear; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -166,7 +163,7 @@
   <div class="sidebar-header">
     <a href="#" class="brand">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--color-primary)"><path d="M12 2l-5.5 9h11z"/><path d="M12 22l5.5-9h-11z"/></svg>
-      Vectorcity
+      Topomapper
     </a>
   </div>
   <div class="scroll-content">
@@ -195,16 +192,29 @@
     </div>
 
     <div class="group">
-      <label>Layers & Design</label>
-      <div id="layerList" class="layer-list"></div>
+      <label>Contour Settings</label>
+      <div class="layer-item open">
+        <div class="layer-head">
+          <div class="layer-info">
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+            <span>Contour Lines</span>
+          </div>
+        </div>
+        <div class="layer-body">
+          <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#D7E3FF"><input type="color" id="contourColor" value="#D7E3FF"></div></div>
+          <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
+          <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="8" max="60" step="2" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
+          <div class="cust-row"><label style="margin:0">Detail</label><input type="range" id="contourDetail" min="0.6" max="2" step="0.1" value="1"><span id="contourDetailVal" style="font-size:11px;width:36px;text-align:right;">1.0</span></div>
+        </div>
+      </div>
     </div>
 
     <div class="group">
       <div class="layer-item" style="padding: 10px 14px; display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:600; font-size:14px;">Terrain (3D Profiling)</span>
-        <div class="ios-switch" id="terrainToggle"></div>
+        <span style="font-weight:600; font-size:14px;">Auto-Scale Contours</span>
+        <div class="ios-switch on" id="autoScaleToggle"></div>
       </div>
-      <p style="font-size:11px; color:var(--color-text-sec); margin-top:8px;">Enable for high-res elevation data. Includes 2D contour lines.</p>
+      <p style="font-size:11px; color:var(--color-text-sec); margin-top:8px;">Keeps line spacing readable while preserving detail.</p>
     </div>
 
     <button id="btnGen" class="btn-main">Generate Preview</button>
@@ -240,9 +250,9 @@
       </div>
 
       <div class="group">
-        <label>3D Print (3MF Assembly)</label>
+        <label>3D Print (3MF Terrain)</label>
         <p style="font-size:13px; color:var(--color-text-sec); margin-bottom:12px; line-height:1.5;">
-          Individual heights: Buildings are highest, followed by highways, roads and water. Everything sinks to Z=0.
+          Creates a watertight relief mesh based on elevation data. Contours remain 2D for vector exports.
         </p>
         <div class="input-grid">
            <div><label>Socket (mm)</label><input type="text" value="2.0" disabled></div>
@@ -263,7 +273,7 @@
           <input type="range" id="pngResRange" min="500" max="5000" step="100" value="2000">
           <span id="pngResVal" style="font-size:12px; font-weight:700; width:60px;">2000px</span>
         </div>
-        <button id="btnPNG" class="btn-main" style="background:#D1D1D6; color:#000;">Save PNG</button>
+        <button id="btnPNG" class="btn-main" style="background:#2B3440; color:#F5F7FB;">Save PNG</button>
       </div>
     </div>
   </div>
@@ -274,37 +284,23 @@
   // --- STATE ---
   const state = {
     wMm: 200, hMm: 140, shape: 'rect',
-    layers: {
-      buildings: { name:'Buildings', on:true, color:'#808080', width: 0.25, custom: false, aci: 1 },
-      highways: { name:'Highways', on:true, color:'#000000', width: 0.45, custom: false, aci: 7 },
-      roads: { name:'Roads', on:true, color:'#444444', width: 0.25, custom: false, aci: 7 },
-      water: { name:'Water', on:true, color:'#CCCCCC', width: 0.35, custom: false, aci: 5 },
-      coast: { name:'Coast', on:true, color:'#D1D1D6', width: 0.3, custom: false, aci: 4 },
-      rail: { name:'Rail', on:true, color:'#666666', width: 0.3, custom: false, aci: 2 },
-      green: { name:'Green', on:true, color:'#EEEEEE', width: 0.15, custom: false, aci: 3 }
+    contour: {
+      density: 24,
+      detail: 1,
+      width: 0.2,
+      color: '#D7E3FF',
+      autoScale: true
     },
-    useTerrain: false, bbox: null, geo: null, terrainData: null
+    bbox: null,
+    terrainData: null,
+    contourSegments: []
   };
-
-  const overpassEndpoints = [
-    "https://overpass-api.de/api/interpreter",
-    "https://lz4.overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter"
-  ];
 
   const $ = id => document.getElementById(id);
   const msg = t => { $('loaderText').innerText=t; $('loader').classList.add('active'); };
   const idle = () => $('loader').classList.remove('active');
 
   // --- HELPERS: SCALING & INTERPOLATION ---
-  function getAutoWidth(key) {
-    if(!state.layers[key]) return 0.2;
-    if(state.layers[key].custom) return state.layers[key].width;
-    const z = map.getZoom();
-    const base = (key==='roads'||key==='highways') ? 0.45 : (key==='rail'? 0.35 : 0.25);
-    return Math.max(0.08, base / Math.pow(1.15, (16 - z)));
-  }
-
   function getZInterpolated(nx, ny) {
     if(!state.terrainData) return 0;
     const T = state.terrainData;
@@ -326,6 +322,16 @@
     const qx = Math.abs(dx) / (state.wMm / 2);
     const qy = Math.abs(dy) / (state.hMm / 2);
     return qx + qy * 0.577 <= 1;
+  }
+
+  function getContourLevels() {
+    if(!state.terrainData || state.terrainData.delta <= 0) return [];
+    const desired = Math.max(4, Math.round(state.contour.density * state.contour.detail));
+    const minSpacing = state.contour.autoScale ? Math.max(1.2, state.contour.width * 8) : 0;
+    const maxLines = minSpacing ? Math.max(4, Math.floor(Math.min(state.wMm, state.hMm) / minSpacing)) : desired;
+    const lineCount = Math.max(4, Math.min(desired, maxLines));
+    const interval = state.terrainData.delta / lineCount;
+    return Array.from({length: lineCount - 1}, (_, i) => interval * (i + 1));
   }
 
   function getContourSegments(level, widthMm, heightMm) {
@@ -416,7 +422,7 @@
 
   // --- MAP & SEARCH ---
   const map = L.map('map', { zoomControl:false, preferCanvas:true }).setView([48.137, 11.575], 14);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom:19 }).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19 }).addTo(map);
 
   let timer;
   let activeSearch = null;
@@ -454,37 +460,36 @@
   });
 
   // --- UI CONSTRUCTION ---
-  const updateLayerList = () => {
-    const list = $('layerList'); list.innerHTML = '';
-    Object.keys(state.layers).forEach(k => {
-      const L = state.layers[k];
-      const div = document.createElement('div');
-      div.className = `layer-item`;
-      div.innerHTML = `
-        <div class="layer-head">
-          <div class="layer-info">
-            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
-            <span>${L.name}</span>
-          </div>
-          <div class="ios-switch ${L.on?'on':''}"></div>
-        </div>
-        <div class="layer-body">
-          <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:${L.color}"><input type="color" value="${L.color}"></div></div>
-          <div class="cust-row"><label style="margin:0">Width</label><input type="range" min="0.05" max="4" step="0.05" value="${L.width}"><span style="font-size:11px;width:30px;text-align:right;">${L.width}</span></div>
-        </div>`;
-
-      const head = div.querySelector('.layer-head');
-      const sw = div.querySelector('.ios-switch');
-      sw.onclick = (e) => { e.stopPropagation(); L.on = !L.on; sw.classList.toggle('on', L.on); if(state.geo) renderSVG(); };
-      head.onclick = () => div.classList.toggle('open');
-      div.querySelector('input[type=color]').oninput = (e) => { L.color = e.target.value; L.custom = true; e.target.parentElement.style.background = L.color; if(state.geo) renderSVG(); };
-      div.querySelector('input[type=range]').oninput = (e) => { L.width = parseFloat(e.target.value); L.custom = true; e.target.nextElementSibling.innerText = L.width; if(state.geo) renderSVG(); };
-      list.appendChild(div);
-    });
+  document.querySelector('.layer-head').onclick = (e) => {
+    const item = e.currentTarget.closest('.layer-item');
+    item.classList.toggle('open');
   };
-  updateLayerList();
 
-  $('terrainToggle').onclick = function() { state.useTerrain = !state.useTerrain; this.classList.toggle('on'); };
+  $('contourColor').oninput = (e) => {
+    state.contour.color = e.target.value;
+    e.target.parentElement.style.background = state.contour.color;
+    if(state.terrainData) renderSVG();
+  };
+
+  $('contourWidth').oninput = (e) => {
+    state.contour.width = parseFloat(e.target.value);
+    $('contourWidthVal').innerText = state.contour.width.toFixed(2).replace(/\.00$/, '');
+    if(state.terrainData) renderSVG();
+  };
+
+  $('contourDensity').oninput = (e) => {
+    state.contour.density = parseInt(e.target.value, 10);
+    $('contourDensityVal').innerText = state.contour.density;
+    if(state.terrainData) renderSVG();
+  };
+
+  $('contourDetail').oninput = (e) => {
+    state.contour.detail = parseFloat(e.target.value);
+    $('contourDetailVal').innerText = state.contour.detail.toFixed(1);
+    if(state.terrainData) renderSVG();
+  };
+
+  $('autoScaleToggle').onclick = function() { state.contour.autoScale = !state.contour.autoScale; this.classList.toggle('on'); if(state.terrainData) renderSVG(); };
   $('pngResRange').oninput = (e) => { $('pngResVal').innerText = e.target.value + 'px'; };
 
   $('shapeSel').onchange = (e) => {
@@ -526,47 +531,34 @@
 
   // --- GENERATION PIPELINE ---
   $('btnGen').onclick = async () => {
-    msg('Fetching OSM Data...');
+    msg('Fetching Elevation Data...');
     const {sw, ne} = state.bbox;
-    const box = `${sw.lat-0.001},${sw.lng-0.001},${ne.lat+0.001},${ne.lng+0.001}`;
-    let q = `[out:json][timeout:90];(`;
-    q += `way["building"](${box});relation["building"](${box});`;
-    q += `way["natural"="water"](${box});relation["natural"="water"](${box});way["waterway"](${box});relation["waterway"](${box});`;
-    q += `way["highway"](${box});way["railway"](${box});way["natural"="coastline"](${box});way["landuse"="grass"](${box});way["leisure"="park"](${box});`;
-    q += `);(._;>;);out body;`;
-
-    let osm = null, ep = 0;
-    while(ep < overpassEndpoints.length && !osm) {
-      try {
-        const r = await fetch(overpassEndpoints[ep], {method:'POST', body:'data='+encodeURIComponent(q)});
-        const txt = await r.text();
-        if(txt.startsWith('<')) throw 'E';
-        osm = JSON.parse(txt);
-      } catch(e){ ep++; }
+    await fetchTerrain(sw, ne);
+    if(!state.terrainData) {
+      idle();
+      alert('Elevation data unavailable. Try a smaller area or try again.');
+      return;
     }
-    if(!osm) { idle(); alert('API Limit or Timeout. Try a smaller area.'); return; }
-
-    if(state.useTerrain) { msg('Smoothing High-Res Terrain...'); await fetchTerrain(sw, ne); }
-    else state.terrainData = null;
-
-    msg('Building Geometry...');
-    setTimeout(() => {
-        try { processGeo(osm); idle(); $('modal').classList.add('open'); } catch(err) {
-            idle(); alert("Geometry processing error."); console.error(err);
-        }
-    }, 100);
+    renderSVG();
+    idle();
+    $('modal').classList.add('open');
   };
 
   async function fetchTerrain(sw, ne) {
     try {
-      const rows=160, cols=160; const locs=[];
+      const base = 120;
+      const scaled = Math.round(base * Math.min(2, Math.max(0.6, state.contour.detail)));
+      const rows = Math.max(80, Math.min(200, scaled));
+      const cols = rows;
+      const locs=[];
       const dLat = (ne.lat-sw.lat)/(rows-1), dLon = (ne.lng-sw.lng)/(cols-1);
       for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) locs.push({latitude:sw.lat+r*dLat, longitude:sw.lng+c*dLon});
       const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locations:locs})});
       const j = await res.json();
       let h = j.results.map(x=>x.elevation);
-      // Heavy 8-pass Smoothing
-      for(let i=0; i<8; i++) h = smoothPass(h, rows, cols);
+      // Smooth based on detail: higher detail keeps more variation.
+      const smoothPasses = Math.round(6 - (state.contour.detail * 2));
+      for(let i=0; i<Math.max(2, smoothPasses); i++) h = smoothPass(h, rows, cols);
       let min=Infinity, max=-Infinity; h.forEach(v => { if(v<min) min=v; if(v>max) max=v; });
       state.terrainData = { rows, cols, h: h.map(z=>z-min), min, max, delta: max-min };
     } catch(e) { state.terrainData = null; }
@@ -586,115 +578,29 @@
     return out;
   }
 
-  function processGeo(osm) {
-    const {wMm, hMm} = state, geojson = osmtogeojson(osm), {sw, ne} = state.bbox;
-    const mapDist = map.distance(sw, {lat: sw.lat, lng: ne.lng});
-    const mToMm = wMm / mapDist;
-
-    const proj = (lon,lat) => [(lon-sw.lng)/(ne.lng-sw.lng)*wMm, hMm - ((lat-sw.lat)/(ne.lat-sw.lat)*hMm)];
-    let mask;
-    if(['rect','sq','din_l','din_p'].includes(state.shape)) mask = turf.polygon([[[0,0],[wMm,0],[wMm,hMm],[0,hMm],[0,0]]]);
-    else {
-      const r=wMm/2, pts=[], steps=64;
-      if(state.shape==='circle') for(let i=0;i<=steps;i++){const a=i/steps*Math.PI*2; pts.push([r+r*Math.cos(a), r+r*Math.sin(a)]);}
-      else for(let i=0;i<=6;i++){const a=i*Math.PI/3-Math.PI/6; pts.push([r+r*Math.cos(a), r+r*Math.sin(a)]);}
-      pts.push(pts[0]); mask=turf.polygon([pts]);
-    }
-
-    const layers = { buildings:[], roads:[], highways:[], water:[], green:[], coast:[], rail:[], contours:[] };
-
-    geojson.features.forEach(f => {
-      if(!f.geometry) return;
-      const t = f.properties||{};
-      turf.rewind(f, {mutate: true});
-      const transform = c => typeof c[0]==='number' ? proj(c[0],c[1]) : c.map(transform);
-
-      let type=null, h=0, isInfra=false;
-      if(t.building) { type='buildings'; h = t.height ? parseFloat(t.height) : (t['building:levels'] ? t['building:levels']*3.0 : 10); }
-      else if(t.highway) { if(['motorway','trunk','primary'].includes(t.highway)) type='highways'; else type='roads'; isInfra=true; }
-      else if(t.railway) { type='rail'; isInfra=true; }
-      else if(t.natural==='water'||t.waterway) type='water';
-      else if(t.natural==='coastline') type='coast';
-      else if(t.landuse==='grass'||t.leisure==='park') type='green';
-
-      if(!type || !state.layers[type]) return;
-
-      try {
-        if(isInfra && f.geometry.type.includes('Line')) {
-           const uiW = state.layers[type].width;
-           const widthM = (uiW / mToMm);
-           const buf = turf.buffer(f, widthM, {units:'meters'});
-           if(buf) {
-             const bufProj = JSON.parse(JSON.stringify(buf)); bufProj.geometry.coordinates = transform(buf.geometry.coordinates);
-             const c = turf.intersect(mask, bufProj);
-             if(c) {
-               const g = c.geometry;
-               const polys = g.type==='Polygon' ? [g.coordinates] : g.coordinates;
-               polys.forEach(r => layers[type].push({pts:r[0], h:0, type:'poly'}));
-             }
-           }
-        } else if(f.geometry.type.includes('Line')) {
-           const buf = turf.buffer(f, 4, {units:'meters'});
-           if(buf) {
-             const bufProj = JSON.parse(JSON.stringify(buf)); bufProj.geometry.coordinates = transform(buf.geometry.coordinates);
-             const c = turf.intersect(mask, bufProj);
-             if(c) {
-               const g = c.geometry;
-               const polys = g.type==='Polygon' ? [g.coordinates] : g.coordinates;
-               polys.forEach(r => layers[type].push({pts:r[0], h:0, type:'poly'}));
-             }
-           }
-        } else {
-          const cleanF = turf.buffer(f, 0, {units:'meters'});
-          if(!cleanF) return;
-          const fProj = JSON.parse(JSON.stringify(cleanF)); fProj.geometry.coordinates = transform(cleanF.geometry.coordinates);
-          const c = turf.intersect(mask, fProj);
-          if(c) {
-              const g=c.geometry;
-              if(g.type==='Polygon') layers[type].push({pts:g.coordinates[0], h});
-              else if(g.type==='MultiPolygon') g.coordinates.forEach(p=>layers[type].push({pts:p[0], h}));
-          }
-        }
-      } catch(e){}
-    });
-    state.geo = layers;
-    renderSVG();
-  }
-
   function renderSVG() {
     const {wMm, hMm} = state;
     let svg = `<svg id="prevSvg" width="${wMm}mm" height="${hMm}mm" viewBox="0 0 ${wMm} ${hMm}" xmlns="http://www.w3.org/2000/svg">`;
-    svg += `<rect width="100%" height="100%" fill="#fff"/>`;
-    svg += `<rect x="0.5" y="0.5" width="${wMm - 1}" height="${hMm - 1}" fill="none" stroke="#E5E5EA" stroke-width="0.5" />`;
+    svg += `<rect width="100%" height="100%" fill="#0B0F14"/>`;
+    svg += `<rect x="0.5" y="0.5" width="${wMm - 1}" height="${hMm - 1}" fill="none" stroke="#243041" stroke-width="0.5" />`;
 
+    state.contourSegments = [];
     if(state.terrainData && state.terrainData.delta > 0) {
-      const lines = 10;
-      svg += `<g id="contours" stroke="#E5E5EA" stroke-width="0.15" fill="none">`;
-      for(let i=1; i<lines; i++) {
-        const level = (state.terrainData.delta / lines) * i;
+      const levels = getContourLevels();
+      svg += `<g id="contours" stroke="${state.contour.color}" stroke-width="${state.contour.width}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+      levels.forEach(level => {
         const segments = getContourSegments(level, wMm, hMm);
         if(segments.length) {
+          state.contourSegments.push(...segments);
           const path = segments.map(seg => `M ${seg[0][0].toFixed(1)} ${seg[0][1].toFixed(1)} L ${seg[1][0].toFixed(1)} ${seg[1][1].toFixed(1)}`).join(' ');
           svg += `<path d="${path}" />`;
         }
-      }
+      });
       svg += `</g>`;
-    }
-
-    const draw = (arr, type) => { if(!arr) return;
-      const style = state.layers[type];
-      arr.forEach(o => {
-        const d = `M ${o.pts.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L ')} Z`;
-        svg += `<path d="${d}" fill="${style.color}" stroke="none" fill-rule="evenodd"/>`;
-    });};
-    const order = ['green','coast','water','rail','roads','highways','buildings'];
-    order.forEach(k => { if(state.layers[k] && state.layers[k].on) draw(state.geo[k], k); });
-
-    const hasShapes = order.some(k => state.geo[k] && state.geo[k].length);
-    if(!hasShapes) {
+    } else {
       const cx = wMm / 2;
       const cy = hMm / 2;
-      svg += `<text x="${cx}" y="${cy}" text-anchor="middle" font-family="SF Pro Text, Segoe UI, Roboto, sans-serif" font-size="6" fill="#8E8E93">No features found. Try zooming in or moving the map.</text>`;
+      svg += `<text x="${cx}" y="${cy}" text-anchor="middle" font-family="SF Pro Text, Segoe UI, Roboto, sans-serif" font-size="6" fill="#9AA3B2">Elevation data missing. Try generating again.</text>`;
     }
     svg += `</svg>`;
     $('previewArea').innerHTML = svg;
@@ -702,17 +608,18 @@
 
   $('btnDXF').onclick = () => {
     let dxf = "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
-    const writeP = (l, pts, aci) => {
-      dxf += `0\nLWPOLYLINE\n8\n${l}\n62\n${aci}\n90\n${pts.length}\n70\n1\n`;
+    const writeSeg = (l, pts, aci) => {
+      dxf += `0\nLWPOLYLINE\n8\n${l}\n62\n${aci}\n90\n${pts.length}\n70\n0\n`;
       pts.forEach(p => dxf += `10\n${p[0].toFixed(4)}\n20\n${(state.hMm - p[1]).toFixed(4)}\n`);
     };
-    Object.keys(state.geo).forEach(k => {
-      const aci = state.layers[k] ? state.layers[k].aci : 7;
-      state.geo[k].forEach(o=>writeP(k.toUpperCase(), o.pts, aci));
-    });
-    writeP('FRAME', [[0,0],[state.wMm,0],[state.wMm,state.hMm],[0,state.hMm],[0,0]], 6);
+    if(!state.contourSegments.length) {
+      alert('Generate contours first.');
+      return;
+    }
+    state.contourSegments.forEach(seg => writeSeg('CONTOURS', seg, 7));
+    writeSeg('FRAME', [[0,0],[state.wMm,0],[state.wMm,state.hMm],[0,state.hMm],[0,0]], 6);
     dxf += "0\nENDSEC\n0\nEOF";
-    save(new Blob([dxf], {type:'application/dxf'}), 'Vectorcity.dxf');
+    save(new Blob([dxf], {type:'application/dxf'}), 'Topomapper.dxf');
   };
 
   $('btnPNG').onclick = () => {
@@ -720,21 +627,23 @@
     const w = state.wMm >= state.hMm ? e : Math.round(e/r), h = state.wMm >= state.hMm ? Math.round(e*r) : e;
     const s = new XMLSerializer().serializeToString($('prevSvg'));
     const img = new Image(), cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-    img.onload = () => { const ctx = cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h); cv.toBlob(b => save(b, 'Vectorcity.png')); };
+    img.onload = () => { const ctx = cv.getContext('2d'); ctx.fillStyle='#0B0F14'; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h); cv.toBlob(b => save(b, 'Topomapper.png')); };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
   };
 
   $('btn3MF').onclick = async () => {
+    if(!state.terrainData) {
+      alert('Generate contours first.');
+      return;
+    }
     msg('Generating Assembly...'); await new Promise(r=>setTimeout(r,100));
     const zip = new JSZip(), targetH = +$('targetH').value;
-    const mapDist = map.distance(state.bbox.sw, {lat: state.bbox.sw.lat, lng: state.bbox.ne.lng});
-    const xyScale = state.wMm / mapDist;
     let zScale = state.terrainData && state.terrainData.delta > 0 ? targetH / state.terrainData.delta : 1;
     const objs = []; let objId = 1;
 
     // 1. Terrain Mesh (Watertight)
     const res = 140, tm = { v:[], t:[] }, idxMap = new Map();
-    const isIn = (x,y) => { if(['rect','din_l','din_p','sq'].includes(state.shape)) return true; const dx=x-state.wMm/2, dy=y-hMm/2; return (dx*dx+dy*dy)<=(state.wMm/2)**2; };
+    const isIn = (x,y) => { if(['rect','din_l','din_p','sq'].includes(state.shape)) return true; const dx=x-state.wMm/2, dy=y-state.hMm/2; return (dx*dx+dy*dy)<=(state.wMm/2)**2; };
     for(let r=0;r<=res;r++) for(let c=0;c<=res;c++) {
       const x=c/res*state.wMm, y=r/res*state.hMm; if(!isIn(x,y)) continue;
       const z=2.0 + (getZInterpolated(c/res, r/res) * zScale);
@@ -753,41 +662,6 @@
     }
     objs.push({id:objId++, name:'Terrain', mesh:tm});
 
-    // 2. Extrusions (Hierarchical Heights)
-    const extrudeSmart = (arr, name, typeKey) => {
-      const m = {v:[], t:[]}; let vo=0;
-      arr.forEach(item => {
-        let ring = item.pts;
-        if(!ring || ring.length < 3) return;
-        const f=[]; ring.forEach(p=>f.push(p[0],p[1])); const ix = earcut(f,null,2);
-        const len = ring.length;
-
-        let extraH = 0.5; // default roads
-        if(typeKey === 'highways') extraH = 0.8;
-        if(typeKey === 'rail') extraH = 0.6;
-        if(typeKey === 'water') extraH = 0.1;
-        if(typeKey === 'green') extraH = 0.05;
-
-        ring.forEach(p => m.v.push([p[0],p[1],0])); // Sinking bottom for mechanical strength
-        ring.forEach(p => {
-          const zT = 2.0 + (getZInterpolated(p[0]/state.wMm, p[1]/state.hMm) * zScale);
-          const zTop = item.h ? zT+(item.h*xyScale) : zT + extraH;
-          m.v.push([p[0],p[1],zTop]);
-        });
-        for(let i=0;i<ix.length;i+=3) m.t.push([vo+len+ix[i], vo+len+ix[i+1], vo+len+ix[i+2]]);
-        for(let i=0;i<len-1;i++){ const b1=vo+i, b2=vo+i+1, t1=vo+len+i, t2=vo+len+i+1; m.t.push([b1,b2,t1],[b2,t2,t1]); }
-        vo += len*2;
-      });
-      if(m.v.length) objs.push({id:objId++, name, mesh:m});
-    };
-
-    if(state.layers.buildings.on) extrudeSmart(state.geo.buildings, 'Buildings', 'buildings');
-    if(state.layers.highways.on) extrudeSmart(state.geo.highways, 'Highways', 'highways');
-    if(state.layers.roads.on) extrudeSmart(state.geo.roads, 'Roads', 'roads');
-    if(state.layers.rail.on) extrudeSmart(state.geo.rail, 'Railways', 'rail');
-    if(state.layers.water.on) extrudeSmart(state.geo.water, 'Water', 'water');
-    if(state.layers.green.on) extrudeSmart(state.geo.green, 'Vegetation', 'green');
-
     let resXml='', buildXml='';
     objs.forEach(o => {
       let vS='', tS=''; o.mesh.v.forEach(v=> vS+=`<vertex x="${v[0].toFixed(3)}" y="${v[1].toFixed(3)}" z="${v[2].toFixed(3)}" />`);
@@ -799,13 +673,13 @@
     zip.file("3D/3dmodel.model", xml);
     zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>`);
     zip.folder("_rels").file(".rels", `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rel1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" Target="3D/3dmodel.model"/></Relationships>`);
-    save(await zip.generateAsync({type:"blob"}), 'Vectorcity_Project_V27.3mf');
+    save(await zip.generateAsync({type:"blob"}), 'Topomapper_Terrain.3mf');
     idle();
   };
 
   $('btnDownload').onclick = () => {
     const html = '<!doctype html>\n' + document.documentElement.outerHTML;
-    save(new Blob([html], { type: 'text/html' }), 'vectorcity.html');
+    save(new Blob([html], { type: 'text/html' }), 'topomapper.html');
   };
 
   window.closeModal = () => $('modal').classList.remove('open');
