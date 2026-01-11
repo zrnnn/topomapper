@@ -94,11 +94,12 @@
     /* LAYER LIST & CUSTOMIZER */
     .layer-list { display: flex; flex-direction: column; gap: 8px; }
     .layer-item {
-      background: rgba(255,255,255,0.04); border-radius: 16px;
-      border: 1px solid rgba(255,255,255,0.08); transition: 0.2s; overflow: hidden;
+      background: rgba(255,255,255,0.09); border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.16); transition: 0.2s; overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
     }
-    .layer-item:hover { border-color: rgba(255,255,255,0.18); transform: translateY(-1px); }
-    .layer-item.open { background: rgba(255,255,255,0.08); border-color: rgba(76,141,255,0.5); }
+    .layer-item:hover { border-color: rgba(255,255,255,0.28); transform: translateY(-1px); }
+    .layer-item.open { background: rgba(255,255,255,0.14); border-color: rgba(76,141,255,0.6); }
     .layer-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; }
     .layer-info { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; }
     .chevron { transition: transform 0.3s; width: 14px; height: 14px; opacity: 0.4; }
@@ -159,8 +160,12 @@
       width: 95vw; height: 92vh; background: #0F141C; border-radius: 32px;
       display: flex; overflow: hidden; box-shadow: 0 40px 120px rgba(0,0,0,0.6);
     }
-    .preview-stage { flex: 1; background: #0B0F14; display: flex; align-items: center; justify-content: center; padding: 40px; overflow: auto; }
-    #previewArea svg { width: auto; height: auto; max-width: 100%; max-height: 100%; }
+    .preview-stage {
+      flex: 1; background: #0B0F14; display: flex; align-items: stretch; justify-content: stretch;
+      padding: clamp(16px, 2vw, 40px); overflow: hidden;
+    }
+    #previewArea { flex: 1; display: flex; align-items: center; justify-content: center; }
+    #previewArea svg { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
     .export-side { width: 400px; background: #121821; border-left: 1px solid var(--color-border); padding: 40px; display: flex; flex-direction: column; gap: 30px; overflow-y: auto; }
 
     /* LOADER */
@@ -232,6 +237,7 @@
           <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
           <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="8" max="60" step="2" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
           <div class="cust-row"><label style="margin:0">Detail</label><input type="range" id="contourDetail" min="0.6" max="2" step="0.1" value="1"><span id="contourDetailVal" style="font-size:11px;width:36px;text-align:right;">1.0</span></div>
+          <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="4" step="1" value="1"><span id="contourSmoothVal" style="font-size:11px;width:36px;text-align:right;">1</span></div>
         </div>
       </div>
     </div>
@@ -337,7 +343,8 @@
       detail: 1,
       width: 0.2,
       color: '#D7E3FF',
-      autoScale: true
+      autoScale: true,
+      smooth: 1
     },
     theme: {
       preset: 'dark',
@@ -346,7 +353,7 @@
     },
     bbox: null,
     terrainData: null,
-    contourSegments: []
+    contourPaths: []
   };
 
   const $ = id => document.getElementById(id);
@@ -471,6 +478,92 @@
       }
     }
     return segments;
+  }
+
+  function buildPolylines(segments, precision = 2) {
+    const keyFor = (p) => `${p[0].toFixed(precision)},${p[1].toFixed(precision)}`;
+    const endpointMap = new Map();
+    const used = new Array(segments.length).fill(false);
+    segments.forEach((seg, i) => {
+      [0,1].forEach(end => {
+        const key = keyFor(seg[end]);
+        if(!endpointMap.has(key)) endpointMap.set(key, []);
+        endpointMap.get(key).push({ index: i, end });
+      });
+    });
+
+    const takeNext = (key) => {
+      const list = endpointMap.get(key);
+      if(!list) return null;
+      for(const item of list) {
+        if(!used[item.index]) return item;
+      }
+      return null;
+    };
+
+    const lines = [];
+    for(let i = 0; i < segments.length; i++) {
+      if(used[i]) continue;
+      used[i] = true;
+      const base = segments[i];
+      const line = [base[0], base[1]];
+
+      let advanced = true;
+      while(advanced) {
+        advanced = false;
+        const tailKey = keyFor(line[line.length - 1]);
+        const next = takeNext(tailKey);
+        if(next && next.index !== i) {
+          used[next.index] = true;
+          const seg = segments[next.index];
+          const nextPoint = next.end === 0 ? seg[1] : seg[0];
+          line.push(nextPoint);
+          advanced = true;
+        }
+      }
+
+      advanced = true;
+      while(advanced) {
+        advanced = false;
+        const headKey = keyFor(line[0]);
+        const next = takeNext(headKey);
+        if(next && next.index !== i) {
+          used[next.index] = true;
+          const seg = segments[next.index];
+          const nextPoint = next.end === 0 ? seg[1] : seg[0];
+          line.unshift(nextPoint);
+          advanced = true;
+        }
+      }
+      lines.push(line);
+    }
+    return lines;
+  }
+
+  function smoothPolyline(points, iterations) {
+    if(points.length < 3 || iterations <= 0) return points;
+    const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const isClosed = dist(points[0], points[points.length - 1]) < 0.01;
+    let pts = isClosed ? points.slice(0, -1) : points.slice();
+
+    for(let i = 0; i < iterations; i++) {
+      const nextPts = [];
+      for(let p = 0; p < pts.length - 1; p++) {
+        const a = pts[p];
+        const b = pts[p + 1];
+        nextPts.push([0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]]);
+        nextPts.push([0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]]);
+      }
+      if(isClosed) {
+        const a = pts[pts.length - 1];
+        const b = pts[0];
+        nextPts.push([0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]]);
+        nextPts.push([0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]]);
+      }
+      pts = nextPts;
+    }
+    if(isClosed) pts.push(pts[0]);
+    return pts;
   }
 
   // --- MAP & SEARCH ---
@@ -626,6 +719,12 @@
     if(state.terrainData) renderSVG();
   };
 
+  $('contourSmooth').oninput = (e) => {
+    state.contour.smooth = parseInt(e.target.value, 10);
+    $('contourSmoothVal').innerText = state.contour.smooth;
+    if(state.terrainData) renderSVG();
+  };
+
   $('autoScaleToggle').onclick = function() { state.contour.autoScale = !state.contour.autoScale; this.classList.toggle('on'); if(state.terrainData) renderSVG(); };
   $('pngResRange').oninput = (e) => { $('pngResVal').innerText = e.target.value + 'px'; };
 
@@ -734,17 +833,21 @@
     svg += `<rect width="100%" height="100%" fill="${state.theme.background}"/>`;
     svg += `<rect x="0.5" y="0.5" width="${wMm - 1}" height="${hMm - 1}" fill="none" stroke="rgba(36,48,65,0.6)" stroke-width="0.5" />`;
 
-    state.contourSegments = [];
+    state.contourPaths = [];
     if(state.terrainData && state.terrainData.delta > 0) {
       const levels = getContourLevels();
       svg += `<g id="contours" stroke="${state.contour.color}" stroke-width="${state.contour.width}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
       levels.forEach(level => {
         const segments = getContourSegments(level, wMm, hMm);
-        if(segments.length) {
-          state.contourSegments.push(...segments);
-          const path = segments.map(seg => `M ${seg[0][0].toFixed(1)} ${seg[0][1].toFixed(1)} L ${seg[1][0].toFixed(1)} ${seg[1][1].toFixed(1)}`).join(' ');
+        if(!segments.length) return;
+        const polylines = buildPolylines(segments);
+        polylines.forEach(line => {
+          const smoothed = state.contour.smooth ? smoothPolyline(line, state.contour.smooth) : line;
+          if(smoothed.length < 2) return;
+          state.contourPaths.push(smoothed);
+          const path = smoothed.map((pt, idx) => `${idx ? 'L' : 'M'} ${pt[0].toFixed(2)} ${pt[1].toFixed(2)}`).join(' ');
           svg += `<path d="${path}" />`;
-        }
+        });
       });
       svg += `</g>`;
     } else {
@@ -758,16 +861,21 @@
 
   $('btnDXF').onclick = () => {
     let dxf = "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
-    const writeSeg = (l, pts, aci) => {
-      dxf += `0\nLWPOLYLINE\n8\n${l}\n62\n${aci}\n90\n${pts.length}\n70\n0\n`;
-      pts.forEach(p => dxf += `10\n${p[0].toFixed(4)}\n20\n${(state.hMm - p[1]).toFixed(4)}\n`);
+    const writePolyline = (l, pts, aci) => {
+      if(pts.length < 2) return;
+      const first = pts[0];
+      const last = pts[pts.length - 1];
+      const closed = Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.01;
+      const outPts = closed ? pts.slice(0, -1) : pts;
+      dxf += `0\nLWPOLYLINE\n8\n${l}\n62\n${aci}\n90\n${outPts.length}\n70\n${closed ? 1 : 0}\n`;
+      outPts.forEach(p => dxf += `10\n${p[0].toFixed(4)}\n20\n${(state.hMm - p[1]).toFixed(4)}\n`);
     };
-    if(!state.contourSegments.length) {
+    if(!state.contourPaths.length) {
       alert('Generate contours first.');
       return;
     }
-    state.contourSegments.forEach(seg => writeSeg('CONTOURS', seg, 7));
-    writeSeg('FRAME', [[0,0],[state.wMm,0],[state.wMm,state.hMm],[0,state.hMm],[0,0]], 6);
+    state.contourPaths.forEach(path => writePolyline('CONTOURS', path, 7));
+    writePolyline('FRAME', [[0,0],[state.wMm,0],[state.wMm,state.hMm],[0,state.hMm],[0,0]], 6);
     dxf += "0\nENDSEC\n0\nEOF";
     save(new Blob([dxf], {type:'application/dxf'}), 'Topomapper.dxf');
   };
