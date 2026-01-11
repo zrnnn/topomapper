@@ -22,6 +22,7 @@
       --color-border: rgba(255, 255, 255, 0.08);
       --radius-ios: 22px;
       --sidebar-w: 400px;
+      --header-h: 72px;
       --blur: blur(40px);
     }
 
@@ -32,18 +33,31 @@
       background: var(--color-bg); color: var(--color-text); height: 100vh; overflow: hidden; display: flex;
     }
 
+    /* HEADER */
+    .top-header {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--header-h);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px; z-index: 1200;
+      background: linear-gradient(180deg, rgba(8,11,16,0.95), rgba(8,11,16,0.55));
+      border-bottom: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px);
+    }
+    .top-brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 20px; letter-spacing: -0.6px; text-decoration: none; color: var(--color-text); }
+    .top-badge { font-size: 12px; padding: 6px 12px; border-radius: 999px; background: rgba(76,141,255,0.18); color: var(--color-primary); border: 1px solid rgba(76,141,255,0.3); }
+
     /* MAP AREA */
     .viewport { position: relative; flex: 1; height: 100%; }
-    #map { width: 100%; height: 100%; z-index: 0; background: #0A0D12; }
+    #map { width: 100%; height: 100%; z-index: 0; background: #0A0D12; filter: contrast(1.25) saturate(1.2) brightness(1.08); transition: filter 0.3s ease; }
 
     /* SIDEBAR (iOS Floating Panel) */
     .sidebar {
-      position: absolute; top: 16px; left: 16px; bottom: 16px; width: var(--sidebar-w);
+      position: absolute; top: calc(var(--header-h) + 12px); left: 16px; bottom: 16px; width: var(--sidebar-w);
       z-index: 1000; background: var(--color-panel); backdrop-filter: var(--blur);
       -webkit-backdrop-filter: var(--blur); border: 1px solid rgba(255,255,255,0.08);
       border-radius: var(--radius-ios); box-shadow: 0 20px 55px rgba(0,0,0,0.45);
       display: flex; flex-direction: column; overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
+    .sidebar:hover { transform: translateY(-2px); box-shadow: 0 26px 65px rgba(0,0,0,0.5); }
 
     .sidebar-header {
       padding: 24px; border-bottom: 1px solid var(--color-border);
@@ -59,10 +73,12 @@
 
     input, select {
       width: 100%; padding: 12px 14px; border-radius: 12px;
-      border: 1px solid transparent; background: rgba(118, 118, 128, 0.18);
-      font-size: 15px; color: var(--color-text); transition: 0.2s;
+      border: 1px solid transparent; background: rgba(118, 118, 128, 0.28);
+      font-size: 15px; color: var(--color-text); transition: 0.2s; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
     }
+    select option { background: #0f141c; color: var(--color-text); }
     input:focus, select:focus { background: rgba(255,255,255,0.12); border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(76,141,255,0.25); }
+    input:hover, select:hover { border-color: rgba(255,255,255,0.18); }
     .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
     /* SEARCH */
@@ -81,6 +97,7 @@
       background: rgba(255,255,255,0.04); border-radius: 16px;
       border: 1px solid rgba(255,255,255,0.08); transition: 0.2s; overflow: hidden;
     }
+    .layer-item:hover { border-color: rgba(255,255,255,0.18); transform: translateY(-1px); }
     .layer-item.open { background: rgba(255,255,255,0.08); border-color: rgba(76,141,255,0.5); }
     .layer-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; }
     .layer-info { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; }
@@ -116,6 +133,7 @@
       background: var(--color-primary); color: #fff; box-shadow: 0 12px 24px rgba(76,141,255,0.25);
     }
     .btn-main:hover { transform: translateY(-2px); background: var(--color-primary-hover); }
+    .btn-main:active { transform: translateY(0); }
 
     /* VIEWFINDER Overlay */
     .viewfinder-wrapper { position: absolute; inset: 0; pointer-events: none; z-index: 500; }
@@ -142,6 +160,7 @@
       display: flex; overflow: hidden; box-shadow: 0 40px 120px rgba(0,0,0,0.6);
     }
     .preview-stage { flex: 1; background: #0B0F14; display: flex; align-items: center; justify-content: center; padding: 40px; overflow: auto; }
+    #previewArea svg { width: auto; height: auto; max-width: 100%; max-height: 100%; }
     .export-side { width: 400px; background: #121821; border-left: 1px solid var(--color-border); padding: 40px; display: flex; flex-direction: column; gap: 30px; overflow-y: auto; }
 
     /* LOADER */
@@ -158,6 +177,14 @@
 <body>
 
 <div id="loader" class="loader"><div class="spinner"></div><span id="loaderText">Loading...</span></div>
+
+<header class="top-header">
+  <a class="top-brand" href="#">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--color-primary)"><path d="M12 2l-5.5 9h11z"/><path d="M12 22l5.5-9h-11z"/></svg>
+    Topomapper
+  </a>
+  <span class="top-badge">Live Terrain Studio</span>
+</header>
 
 <div class="sidebar">
   <div class="sidebar-header">
@@ -205,6 +232,27 @@
           <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
           <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="8" max="60" step="2" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
           <div class="cust-row"><label style="margin:0">Detail</label><input type="range" id="contourDetail" min="0.6" max="2" step="0.1" value="1"><span id="contourDetailVal" style="font-size:11px;width:36px;text-align:right;">1.0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <label>Color Preset</label>
+      <select id="presetSel" style="margin-bottom:12px;">
+        <option value="dark">Dark (Negative)</option>
+        <option value="bright">Bright (Positive)</option>
+        <option value="custom">Custom</option>
+      </select>
+      <div id="customPreset" style="display:none;">
+        <div class="cust-row">
+          <label style="margin:0">Background</label>
+          <div class="color-dot" id="bgColorDot" style="background:#0B0F14"><input type="color" id="bgColorPicker" value="#0B0F14"></div>
+          <input type="text" id="bgColorText" placeholder="#0B0F14 or rgb(11,15,20)" style="flex:1">
+        </div>
+        <div class="cust-row">
+          <label style="margin:0">Contour Lines</label>
+          <div class="color-dot" id="lineColorDot" style="background:#D7E3FF"><input type="color" id="lineColorPicker" value="#D7E3FF"></div>
+          <input type="text" id="lineColorText" placeholder="#D7E3FF or rgb(215,227,255)" style="flex:1">
         </div>
       </div>
     </div>
@@ -290,6 +338,11 @@
       width: 0.2,
       color: '#D7E3FF',
       autoScale: true
+    },
+    theme: {
+      preset: 'dark',
+      background: '#0B0F14',
+      line: '#D7E3FF'
     },
     bbox: null,
     terrainData: null,
@@ -465,9 +518,93 @@
     item.classList.toggle('open');
   };
 
+  const presets = {
+    dark: { background: '#0B0F14', line: '#D7E3FF' },
+    bright: { background: '#F5F2EB', line: '#10141B' }
+  };
+
+  const parseColorInput = (value) => {
+    const v = value.trim();
+    if(!v) return null;
+    const tester = new Option().style;
+    tester.color = v;
+    return tester.color ? tester.color : null;
+  };
+
+  const rgbToHex = (rgb) => {
+    const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if(!match) return null;
+    const toHex = (n) => n.toString(16).padStart(2, '0');
+    return `#${toHex(parseInt(match[1], 10))}${toHex(parseInt(match[2], 10))}${toHex(parseInt(match[3], 10))}`.toUpperCase();
+  };
+
+  const applyTheme = () => {
+    $('previewArea').style.background = state.theme.background;
+    state.contour.color = state.theme.line;
+    $('contourColor').value = state.contour.color;
+    $('contourColor').parentElement.style.background = state.contour.color;
+    if(state.terrainData) renderSVG();
+  };
+
+  const syncCustomField = (value, pickerId, textId, dotId) => {
+    const parsed = parseColorInput(value);
+    if(!parsed) return;
+    const hex = parsed.startsWith('rgb') ? rgbToHex(parsed) : parsed;
+    if(hex) $(pickerId).value = hex;
+    $(textId).value = value;
+    $(dotId).style.background = parsed;
+  };
+
+  $('presetSel').onchange = (e) => {
+    const preset = e.target.value;
+    state.theme.preset = preset;
+    $('customPreset').style.display = preset === 'custom' ? 'block' : 'none';
+    if(preset === 'custom') {
+      state.theme.background = $('bgColorPicker').value;
+      state.theme.line = $('lineColorPicker').value;
+    } else {
+      state.theme.background = presets[preset].background;
+      state.theme.line = presets[preset].line;
+    }
+    applyTheme();
+  };
+
+  $('bgColorPicker').oninput = (e) => {
+    state.theme.background = e.target.value;
+    $('bgColorDot').style.background = state.theme.background;
+    $('bgColorText').value = state.theme.background;
+    if(state.theme.preset === 'custom') applyTheme();
+  };
+  $('lineColorPicker').oninput = (e) => {
+    state.theme.line = e.target.value;
+    $('lineColorDot').style.background = state.theme.line;
+    $('lineColorText').value = state.theme.line;
+    if(state.theme.preset === 'custom') applyTheme();
+  };
+  $('bgColorText').onchange = (e) => {
+    const parsed = parseColorInput(e.target.value);
+    if(!parsed) return;
+    state.theme.background = parsed.startsWith('rgb') ? parsed : e.target.value;
+    syncCustomField(parsed, 'bgColorPicker', 'bgColorText', 'bgColorDot');
+    if(state.theme.preset === 'custom') applyTheme();
+  };
+  $('lineColorText').onchange = (e) => {
+    const parsed = parseColorInput(e.target.value);
+    if(!parsed) return;
+    state.theme.line = parsed.startsWith('rgb') ? parsed : e.target.value;
+    syncCustomField(parsed, 'lineColorPicker', 'lineColorText', 'lineColorDot');
+    if(state.theme.preset === 'custom') applyTheme();
+  };
+
   $('contourColor').oninput = (e) => {
     state.contour.color = e.target.value;
     e.target.parentElement.style.background = state.contour.color;
+    if(state.theme.preset === 'custom') {
+      state.theme.line = state.contour.color;
+      $('lineColorPicker').value = state.contour.color;
+      $('lineColorText').value = state.contour.color;
+      $('lineColorDot').style.background = state.contour.color;
+    }
     if(state.terrainData) renderSVG();
   };
 
@@ -499,17 +636,30 @@
   };
   ['dimW','dimH'].forEach(id => $(id).oninput = updateVf);
 
+  $('presetSel').value = state.theme.preset;
+  $('bgColorText').value = state.theme.background;
+  $('lineColorText').value = state.theme.line;
+  $('bgColorDot').style.background = state.theme.background;
+  $('lineColorDot').style.background = state.theme.line;
+  $('customPreset').style.display = state.theme.preset === 'custom' ? 'block' : 'none';
+  applyTheme();
+
   function updateVf() {
     state.wMm = +$('dimW').value; state.hMm = +$('dimH').value;
     if(['sq','circle','hex'].includes(state.shape)) { state.hMm = state.wMm; $('dimH').value = state.wMm; }
     if(state.shape === 'din_l') { state.hMm = Math.round(state.wMm / 1.414); $('dimH').value = state.hMm; }
     if(state.shape === 'din_p') { state.hMm = Math.round(state.wMm * 1.414); $('dimH').value = state.hMm; }
 
-    const winW = window.innerWidth, winH = window.innerHeight, sideW = 400;
-    const availW = Math.max(0, winW - sideW - 40);
-    const cx = sideW + 20 + availW / 2;
-    const cy = winH / 2;
-    const ratio = state.hMm / state.wMm, targetW = availW * 0.7, targetH = winH * 0.7;
+    const winW = window.innerWidth, winH = window.innerHeight;
+    const sideW = document.querySelector('.sidebar')?.offsetWidth || 400;
+    const headerH = document.querySelector('.top-header')?.offsetHeight || 0;
+    const pad = 24;
+    const availW = Math.max(0, winW - sideW - pad * 2);
+    const availH = Math.max(0, winH - headerH - pad * 2);
+    const cx = sideW + pad + availW / 2;
+    const cy = headerH + pad + availH / 2;
+    const ratio = state.hMm / state.wMm;
+    const targetW = availW * 0.78, targetH = availH * 0.78;
     let pxW, pxH;
     if(targetW*ratio <= targetH) { pxW=targetW; pxH=pxW*ratio; } else { pxH=targetH; pxW=pxH/ratio; }
     const hw = pxW/2, hh = pxH/2;
@@ -580,9 +730,9 @@
 
   function renderSVG() {
     const {wMm, hMm} = state;
-    let svg = `<svg id="prevSvg" width="${wMm}mm" height="${hMm}mm" viewBox="0 0 ${wMm} ${hMm}" xmlns="http://www.w3.org/2000/svg">`;
-    svg += `<rect width="100%" height="100%" fill="#0B0F14"/>`;
-    svg += `<rect x="0.5" y="0.5" width="${wMm - 1}" height="${hMm - 1}" fill="none" stroke="#243041" stroke-width="0.5" />`;
+    let svg = `<svg id="prevSvg" width="${wMm}mm" height="${hMm}mm" viewBox="0 0 ${wMm} ${hMm}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
+    svg += `<rect width="100%" height="100%" fill="${state.theme.background}"/>`;
+    svg += `<rect x="0.5" y="0.5" width="${wMm - 1}" height="${hMm - 1}" fill="none" stroke="rgba(36,48,65,0.6)" stroke-width="0.5" />`;
 
     state.contourSegments = [];
     if(state.terrainData && state.terrainData.delta > 0) {
@@ -627,7 +777,7 @@
     const w = state.wMm >= state.hMm ? e : Math.round(e/r), h = state.wMm >= state.hMm ? Math.round(e*r) : e;
     const s = new XMLSerializer().serializeToString($('prevSvg'));
     const img = new Image(), cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-    img.onload = () => { const ctx = cv.getContext('2d'); ctx.fillStyle='#0B0F14'; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h); cv.toBlob(b => save(b, 'Topomapper.png')); };
+    img.onload = () => { const ctx = cv.getContext('2d'); ctx.fillStyle=state.theme.background; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h); cv.toBlob(b => save(b, 'Topomapper.png')); };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
   };
 
