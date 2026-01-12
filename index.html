@@ -323,7 +323,14 @@
       overflow: hidden;
       gap: 16px;
     }
-    #previewArea { flex: 1; display: flex; align-items: center; justify-content: center; padding: 10%; }
+    #previewArea {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(8px, 2.5vw, 24px);
+    }
     #previewArea svg { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
     .preview-controls {
       position: absolute;
@@ -335,6 +342,11 @@
       gap: 10px;
       pointer-events: auto;
     }
+    .preview-controls .btn-secondary {
+      width: auto;
+      background: #1b2330;
+      border-color: rgba(255,255,255,0.18);
+    }
     .btn-secondary.preview-toggle {
       min-width: 220px;
       display: inline-flex;
@@ -342,9 +354,18 @@
       align-items: center;
       gap: 8px;
     }
+    .btn-secondary.icon-button {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      font-size: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
     .btn-secondary.preview-toggle.is-on {
       border-color: rgba(76,141,255,0.5);
-      background: rgba(76,141,255,0.12);
+      background: #25385f;
       color: var(--color-primary);
     }
     .export-side { width: 400px; background: #121821; border-left: 1px solid var(--color-border); padding: 40px; display: flex; flex-direction: column; gap: 30px; overflow-y: auto; }
@@ -427,9 +448,9 @@
     <div class="preview-stage">
       <div id="previewArea"></div>
       <div class="preview-controls">
-        <button id="undoStep2" class="btn-secondary" type="button" aria-label="Undo last change">Undo</button>
+        <button id="undoStep2" class="btn-secondary icon-button" type="button" aria-label="Undo last change" title="Undo">&#8630;</button>
         <button id="refreshPreview" class="btn-secondary preview-toggle" type="button">Auto Preview On</button>
-        <button id="redoStep2" class="btn-secondary" type="button" aria-label="Redo last change">Redo</button>
+        <button id="redoStep2" class="btn-secondary icon-button" type="button" aria-label="Redo last change" title="Redo">&#8631;</button>
       </div>
     </div>
     <div class="export-side">
