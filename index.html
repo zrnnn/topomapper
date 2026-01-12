@@ -171,6 +171,21 @@
     }
     .btn-main:hover { transform: translateY(-2px); background: var(--color-primary-hover); }
     .btn-main:active { transform: translateY(0); }
+    .btn-secondary {
+      width: 100%;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.06);
+      color: var(--color-text);
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.2s ease;
+      box-shadow: none;
+    }
+    .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
+    .btn-secondary:disabled { cursor: not-allowed; opacity: 0.45; }
 
     .info-pill {
       display: inline-flex;
@@ -333,6 +348,13 @@
 
       <div class="step-content active" data-step="2">
         <div class="group">
+          <label>Preview</label>
+          <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
+            The preview updates only when you refresh.
+          </p>
+          <button id="refreshPreview" class="btn-secondary" disabled>Refresh Preview</button>
+        </div>
+        <div class="group">
           <label>Design Preset</label>
           <select id="presetSel" style="margin-top:6px;">
             <option value="dark">Dark (Negative)</option>
@@ -375,7 +397,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Label Color</label><div class="color-dot" id="labelColorDot" style="background:#1E232B"><input type="color" id="labelColor" value="#1E232B"></div></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="labelOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="labelOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="labelOpacity" min="0" max="100" step="1" value="85"><span id="labelOpacityVal" style="font-size:11px;width:36px;text-align:right;">85%</span></div>
                 <div class="cust-row"><label style="margin:0">Font Size</label><input type="range" id="labelSize" min="0.2" max="1.5" step="0.1" value="0.32"><span id="labelSizeVal" style="font-size:11px;width:36px;text-align:right;">0.32</span></div>
                 <div class="cust-row"><label style="margin:0">Typeface</label>
                   <select id="labelFont">
@@ -402,7 +424,7 @@
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" id="roadColorDot" style="background:#C9A75A"><input type="color" id="roadColor" value="#C9A75A"></div></div>
                 <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="roadWidth" min="0.05" max="0.6" step="0.05" value="0.35"><span id="roadWidthVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="roadOpacity" min="0.1" max="1" step="0.05" value="0.75"><span id="roadOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.75</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="roadOpacity" min="0" max="100" step="1" value="75"><span id="roadOpacityVal" style="font-size:11px;width:36px;text-align:right;">75%</span></div>
               </div>
             </div>
             <div class="layer-item" data-layer="rivers" draggable="true" style="margin-top:10px;">
@@ -421,7 +443,7 @@
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Line Color</label><div class="color-dot" id="riverColorDot" style="background:#7DB5D3"><input type="color" id="riverColor" value="#7DB5D3"></div></div>
                 <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="riverWidth" min="0.05" max="0.6" step="0.05" value="0.4"><span id="riverWidthVal" style="font-size:11px;width:36px;text-align:right;">0.4</span></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="riverOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="riverOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="riverOpacity" min="0" max="100" step="1" value="85"><span id="riverOpacityVal" style="font-size:11px;width:36px;text-align:right;">85%</span></div>
               </div>
             </div>
             <div class="layer-item" data-layer="water" draggable="true" style="margin-top:10px;">
@@ -439,7 +461,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="waterAreaColorDot" style="background:#7DB5D3"><input type="color" id="waterAreaColor" value="#7DB5D3"></div></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="waterAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.45"><span id="waterAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.45</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="waterAreaOpacity" min="0" max="100" step="1" value="45"><span id="waterAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">45%</span></div>
               </div>
             </div>
             <div class="layer-item" data-layer="green" draggable="true" style="margin-top:10px;">
@@ -457,7 +479,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="greenAreaColorDot" style="background:#7FAE8A"><input type="color" id="greenAreaColor" value="#7FAE8A"></div></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="greenAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.15"><span id="greenAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.15</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="greenAreaOpacity" min="0" max="100" step="1" value="15"><span id="greenAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">15%</span></div>
               </div>
             </div>
             <div class="layer-item open" data-layer="contours" draggable="true" style="margin-top:10px;">
@@ -477,7 +499,7 @@
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#10141B"><input type="color" id="contourColor" value="#10141B"></div></div>
                 <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
                 <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="8" max="60" step="2" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="contourOpacity" min="0.1" max="1" step="0.05" value="0.8"><span id="contourOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.8</span></div>
+          <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="contourOpacity" min="0" max="100" step="1" value="80"><span id="contourOpacityVal" style="font-size:11px;width:36px;text-align:right;">80%</span></div>
                 <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="4" step="1" value="1"><span id="contourSmoothVal" style="font-size:11px;width:36px;text-align:right;">1</span></div>
               </div>
             </div>
@@ -503,8 +525,18 @@
               </div>
               <div class="cust-row">
                 <label style="margin:0">Fill Opacity</label>
-                <input type="range" id="pngGradOpacity" min="0.1" max="1" step="0.05" value="0.9">
-                <span id="pngGradOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.9</span>
+                <input type="range" id="pngGradOpacity" min="0" max="100" step="1" value="90">
+                <span id="pngGradOpacityVal" style="font-size:11px;width:36px;text-align:right;">90%</span>
+              </div>
+              <div class="cust-row">
+                <label style="margin:0">Gradient Shift</label>
+                <input type="range" id="pngGradShift" min="-50" max="50" step="1" value="0">
+                <span id="pngGradShiftVal" style="font-size:11px;width:44px;text-align:right;">0%</span>
+              </div>
+              <div class="cust-row">
+                <label style="margin:0">Gradient Scale</label>
+                <input type="range" id="pngGradScale" min="50" max="150" step="1" value="100">
+                <span id="pngGradScaleVal" style="font-size:11px;width:44px;text-align:right;">100%</span>
               </div>
               <div class="gradient-preview" id="pngGradientPreview"></div>
               <div class="info-pill" id="pngRangeInfo" style="margin-top:10px;">Range: --</div>
@@ -558,12 +590,14 @@
       width: 0.2,
       color: '#10141B',
       smooth: 1,
-      opacity: 0.8
+      opacity: 80
     },
     png: {
       layered: false,
       scheme: 'color',
-      gradientOpacity: 0.9,
+      gradientOpacity: 90,
+      gradientShift: 0,
+      gradientScale: 100,
       reliefStrength: 0.48,
       reliefWarm: '#F3A15F',
       reliefShadow: '#0A1624'
@@ -574,23 +608,25 @@
       line: '#10141B'
     },
     mapFeatures: {
-      waterAreas: { enabled: true, color: '#7DB5D3', opacity: 0.45 },
-      rivers: { enabled: true, color: '#7DB5D3', width: 0.4, opacity: 0.85 },
-      greenAreas: { enabled: true, color: '#7FAE8A', opacity: 0.15 },
-      roads: { enabled: false, color: '#C9A75A', width: 0.35, opacity: 0.75 },
-      labels: { enabled: false, color: '#1E232B', size: 0.32, font: 'system', opacity: 0.85 }
+      waterAreas: { enabled: true, color: '#7DB5D3', opacity: 45 },
+      rivers: { enabled: true, color: '#7DB5D3', width: 0.4, opacity: 85 },
+      greenAreas: { enabled: true, color: '#7FAE8A', opacity: 15 },
+      roads: { enabled: false, color: '#C9A75A', width: 0.35, opacity: 75 },
+      labels: { enabled: false, color: '#1E232B', size: 0.32, font: 'system', opacity: 85 }
     },
     layerOrder: ['labels', 'roads', 'rivers', 'water', 'green', 'contours'],
     bbox: null,
     terrainData: null,
     contourPaths: [],
     osmData: null,
-    osmStatus: { loaded: false, error: null, tiles: 1, ignored: false }
+    osmStatus: { loaded: false, error: null, tiles: 1, ignored: false },
+    previewDirty: false
   };
 
   const $ = id => document.getElementById(id);
   const msg = t => { $('loaderText').innerText=t; $('loader').classList.add('active'); };
   const idle = () => $('loader').classList.remove('active');
+  const refreshPreviewBtn = $('refreshPreview');
 
   // --- HELPERS: SCALING & INTERPOLATION ---
   function getZInterpolated(nx, ny) {
@@ -703,7 +739,7 @@
     if(scheme === 'mono') {
       return ['#FFFFFF', '#E6E6E6', '#CCCCCC', '#B3B3B3', '#999999', '#7F7F7F', '#666666', '#4D4D4D', '#333333'];
     }
-    return [
+    const stops = [
       '#0F3E63',
       '#1F5C83',
       '#3B7EA6',
@@ -715,10 +751,30 @@
       '#B18D5B',
       '#8E6C45'
     ];
+    const waterColor = state.mapFeatures?.waterAreas?.color;
+    const greenColor = state.mapFeatures?.greenAreas?.color;
+    if(waterColor && greenColor) {
+      stops[0] = waterColor;
+      stops[1] = gradientColor(waterColor, greenColor, 0.55);
+      stops[2] = greenColor;
+    } else if(waterColor) {
+      stops[0] = waterColor;
+      stops[1] = gradientColor(waterColor, stops[2], 0.5);
+    } else if(greenColor) {
+      stops[0] = gradientColor(greenColor, stops[0], 0.6);
+      stops[1] = greenColor;
+    }
+    return stops;
+  };
+
+  const getScaledGradientT = (t) => {
+    const scale = Math.max(0.5, Math.min(1.5, (state.png.gradientScale ?? 100) / 100));
+    const shift = Math.max(-0.5, Math.min(0.5, (state.png.gradientShift ?? 0) / 100));
+    return clamp((t - 0.5) / scale + 0.5 + shift, 0, 1);
   };
 
   const getHypsometricBandColor = (t, scheme, bandCount) => {
-    const clamped = clamp(t, 0, 1);
+    const clamped = getScaledGradientT(t);
     const bandIndex = Math.min(bandCount - 1, Math.floor(clamped * bandCount));
     const stops = getHypsometricStops(scheme);
     if(bandCount <= 1) return colorToRgb(stops[0]);
@@ -780,7 +836,7 @@
 
   function getLayeredPreviewDataUrl() {
     if(!state.terrainData) return null;
-    const alpha = Math.round(255 * clamp(state.png.gradientOpacity ?? 1, 0, 1));
+    const alpha = Math.round(255 * clamp(toUnitOpacity(state.png.gradientOpacity), 0, 1));
     const ratio = state.hMm / state.wMm;
     const target = 320;
     let w = target;
@@ -1358,7 +1414,7 @@
           container.insertBefore(draggedItem, item);
         }
         state.layerOrder = Array.from(container.children).filter(el => el.dataset.layer).map(el => el.dataset.layer);
-        if(state.terrainData) renderSVG();
+        markPreviewDirty();
       });
     });
   };
@@ -1377,6 +1433,12 @@
   if(toExport) toExport.addEventListener('click', () => setStep('3'));
   const backToStyle = $('backToStyle');
   if(backToStyle) backToStyle.addEventListener('click', () => setStep('2'));
+  if(refreshPreviewBtn) {
+    refreshPreviewBtn.addEventListener('click', () => {
+      if(!state.terrainData) return;
+      renderSVG();
+    });
+  }
 
   const presets = {
     dark: {
@@ -1429,12 +1491,36 @@
     return `#${toHex(parseInt(match[1], 10))}${toHex(parseInt(match[2], 10))}${toHex(parseInt(match[3], 10))}`.toUpperCase();
   };
 
+  const toPercent = (value) => {
+    const parsed = parseFloat(value);
+    if(Number.isNaN(parsed)) return 0;
+    return Math.min(100, Math.max(0, parsed));
+  };
+
+  const formatPercent = (value) => `${Math.round(value)}%`;
+  const toUnitOpacity = (value) => Math.min(1, Math.max(0, value / 100));
+  const formatSignedPercent = (value) => {
+    const rounded = Math.round(value);
+    return `${rounded > 0 ? '+' : ''}${rounded}%`;
+  };
+
+  const updateRefreshButton = () => {
+    if(!refreshPreviewBtn) return;
+    refreshPreviewBtn.disabled = !state.terrainData || !state.previewDirty;
+  };
+
+  const markPreviewDirty = () => {
+    if(!state.terrainData) return;
+    state.previewDirty = true;
+    updateRefreshButton();
+  };
+
   const applyTheme = () => {
     $('previewArea').style.background = state.theme.background;
     state.contour.color = state.theme.line;
     $('contourColor').value = state.contour.color;
     $('contourColor').parentElement.style.background = state.contour.color;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   const syncWaterColors = (color) => {
@@ -1543,130 +1629,130 @@
     $('lineColorPicker').value = state.contour.color;
     $('lineColorText').value = state.contour.color;
     $('lineColorDot').style.background = state.contour.color;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   $('contourWidth').oninput = (e) => {
     state.contour.width = parseFloat(e.target.value);
     $('contourWidthVal').innerText = state.contour.width.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   $('contourDensity').oninput = (e) => {
     state.contour.density = parseInt(e.target.value, 10);
     $('contourDensityVal').innerText = state.contour.density;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   $('contourOpacity').oninput = (e) => {
-    state.contour.opacity = parseFloat(e.target.value);
-    $('contourOpacityVal').innerText = state.contour.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.contour.opacity = toPercent(e.target.value);
+    $('contourOpacityVal').innerText = formatPercent(state.contour.opacity);
+    markPreviewDirty();
   };
 
   $('contourSmooth').oninput = (e) => {
     state.contour.smooth = parseInt(e.target.value, 10);
     $('contourSmoothVal').innerText = state.contour.smooth;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   $('contourToggle').onclick = function() {
     state.contour.enabled = !state.contour.enabled;
     this.classList.toggle('on', state.contour.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   $('waterAreaToggle').onclick = function() {
     state.mapFeatures.waterAreas.enabled = !state.mapFeatures.waterAreas.enabled;
     this.classList.toggle('on', state.mapFeatures.waterAreas.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('waterAreaColor').oninput = (e) => {
     syncWaterColors(e.target.value);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('waterAreaOpacity').oninput = (e) => {
-    state.mapFeatures.waterAreas.opacity = parseFloat(e.target.value);
-    $('waterAreaOpacityVal').innerText = state.mapFeatures.waterAreas.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.mapFeatures.waterAreas.opacity = toPercent(e.target.value);
+    $('waterAreaOpacityVal').innerText = formatPercent(state.mapFeatures.waterAreas.opacity);
+    markPreviewDirty();
   };
   $('riverToggle').onclick = function() {
     state.mapFeatures.rivers.enabled = !state.mapFeatures.rivers.enabled;
     this.classList.toggle('on', state.mapFeatures.rivers.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('riverColor').oninput = (e) => {
     syncWaterColors(e.target.value);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('riverWidth').oninput = (e) => {
     state.mapFeatures.rivers.width = parseFloat(e.target.value);
     $('riverWidthVal').innerText = state.mapFeatures.rivers.width.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('riverOpacity').oninput = (e) => {
-    state.mapFeatures.rivers.opacity = parseFloat(e.target.value);
-    $('riverOpacityVal').innerText = state.mapFeatures.rivers.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.mapFeatures.rivers.opacity = toPercent(e.target.value);
+    $('riverOpacityVal').innerText = formatPercent(state.mapFeatures.rivers.opacity);
+    markPreviewDirty();
   };
   $('greenAreaToggle').onclick = function() {
     state.mapFeatures.greenAreas.enabled = !state.mapFeatures.greenAreas.enabled;
     this.classList.toggle('on', state.mapFeatures.greenAreas.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('greenAreaColor').oninput = (e) => {
     state.mapFeatures.greenAreas.color = e.target.value;
     $('greenAreaColorDot').style.background = state.mapFeatures.greenAreas.color;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('greenAreaOpacity').oninput = (e) => {
-    state.mapFeatures.greenAreas.opacity = parseFloat(e.target.value);
-    $('greenAreaOpacityVal').innerText = state.mapFeatures.greenAreas.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.mapFeatures.greenAreas.opacity = toPercent(e.target.value);
+    $('greenAreaOpacityVal').innerText = formatPercent(state.mapFeatures.greenAreas.opacity);
+    markPreviewDirty();
   };
   $('roadToggle').onclick = function() {
     state.mapFeatures.roads.enabled = !state.mapFeatures.roads.enabled;
     this.classList.toggle('on', state.mapFeatures.roads.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('roadColor').oninput = (e) => {
     state.mapFeatures.roads.color = e.target.value;
     $('roadColorDot').style.background = state.mapFeatures.roads.color;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('roadWidth').oninput = (e) => {
     state.mapFeatures.roads.width = parseFloat(e.target.value);
     $('roadWidthVal').innerText = state.mapFeatures.roads.width.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('roadOpacity').oninput = (e) => {
-    state.mapFeatures.roads.opacity = parseFloat(e.target.value);
-    $('roadOpacityVal').innerText = state.mapFeatures.roads.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.mapFeatures.roads.opacity = toPercent(e.target.value);
+    $('roadOpacityVal').innerText = formatPercent(state.mapFeatures.roads.opacity);
+    markPreviewDirty();
   };
   $('labelToggle').onclick = function() {
     state.mapFeatures.labels.enabled = !state.mapFeatures.labels.enabled;
     this.classList.toggle('on', state.mapFeatures.labels.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('labelColor').oninput = (e) => {
     state.mapFeatures.labels.color = e.target.value;
     $('labelColorDot').style.background = state.mapFeatures.labels.color;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('labelOpacity').oninput = (e) => {
-    state.mapFeatures.labels.opacity = parseFloat(e.target.value);
-    $('labelOpacityVal').innerText = state.mapFeatures.labels.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.mapFeatures.labels.opacity = toPercent(e.target.value);
+    $('labelOpacityVal').innerText = formatPercent(state.mapFeatures.labels.opacity);
+    markPreviewDirty();
   };
   $('labelSize').oninput = (e) => {
     state.mapFeatures.labels.size = parseFloat(e.target.value);
     $('labelSizeVal').innerText = state.mapFeatures.labels.size.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('labelFont').onchange = (e) => {
     state.mapFeatures.labels.font = e.target.value;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   const buildHypsometricPreview = (scheme) => {
     const stops = getHypsometricStops(scheme);
@@ -1700,18 +1786,28 @@
     $('pngLayerOptions').style.display = state.png.layered ? 'block' : 'none';
     updateGradientPreview();
     updatePngRangeInfo();
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   $('pngScheme').onchange = (e) => {
     state.png.scheme = e.target.value;
     updateGradientPreview();
-    if(state.png.layered && state.terrainData) renderSVG();
+    if(state.png.layered) markPreviewDirty();
   };
   $('pngGradOpacity').oninput = (e) => {
-    state.png.gradientOpacity = parseFloat(e.target.value);
-    $('pngGradOpacityVal').innerText = state.png.gradientOpacity.toFixed(2).replace(/\.00$/, '');
-    if(state.png.layered && state.terrainData) renderSVG();
+    state.png.gradientOpacity = toPercent(e.target.value);
+    $('pngGradOpacityVal').innerText = formatPercent(state.png.gradientOpacity);
+    if(state.png.layered) markPreviewDirty();
+  };
+  $('pngGradShift').oninput = (e) => {
+    state.png.gradientShift = parseFloat(e.target.value);
+    $('pngGradShiftVal').innerText = formatSignedPercent(state.png.gradientShift);
+    if(state.png.layered) markPreviewDirty();
+  };
+  $('pngGradScale').oninput = (e) => {
+    state.png.gradientScale = parseFloat(e.target.value);
+    $('pngGradScaleVal').innerText = formatPercent(state.png.gradientScale);
+    if(state.png.layered) markPreviewDirty();
   };
 
   $('shapeSel').onchange = (e) => {
@@ -1728,42 +1824,46 @@
   $('lineColorDot').style.background = state.theme.line;
   $('contourToggle').classList.toggle('on', state.contour.enabled);
   $('contourOpacity').value = state.contour.opacity;
-  $('contourOpacityVal').innerText = state.contour.opacity.toFixed(2).replace(/\.00$/, '');
+  $('contourOpacityVal').innerText = formatPercent(state.contour.opacity);
   $('waterAreaToggle').classList.toggle('on', state.mapFeatures.waterAreas.enabled);
   $('waterAreaColor').value = state.mapFeatures.waterAreas.color;
   $('waterAreaColorDot').style.background = state.mapFeatures.waterAreas.color;
   $('waterAreaOpacity').value = state.mapFeatures.waterAreas.opacity;
-  $('waterAreaOpacityVal').innerText = state.mapFeatures.waterAreas.opacity.toFixed(2).replace(/\.00$/, '');
+  $('waterAreaOpacityVal').innerText = formatPercent(state.mapFeatures.waterAreas.opacity);
   $('riverToggle').classList.toggle('on', state.mapFeatures.rivers.enabled);
   $('riverColor').value = state.mapFeatures.rivers.color;
   $('riverColorDot').style.background = state.mapFeatures.rivers.color;
   $('riverWidth').value = state.mapFeatures.rivers.width;
   $('riverWidthVal').innerText = state.mapFeatures.rivers.width.toFixed(2).replace(/\.00$/, '');
   $('riverOpacity').value = state.mapFeatures.rivers.opacity;
-  $('riverOpacityVal').innerText = state.mapFeatures.rivers.opacity.toFixed(2).replace(/\.00$/, '');
+  $('riverOpacityVal').innerText = formatPercent(state.mapFeatures.rivers.opacity);
   $('greenAreaToggle').classList.toggle('on', state.mapFeatures.greenAreas.enabled);
   $('greenAreaColor').value = state.mapFeatures.greenAreas.color;
   $('greenAreaColorDot').style.background = state.mapFeatures.greenAreas.color;
   $('greenAreaOpacity').value = state.mapFeatures.greenAreas.opacity;
-  $('greenAreaOpacityVal').innerText = state.mapFeatures.greenAreas.opacity.toFixed(2).replace(/\.00$/, '');
+  $('greenAreaOpacityVal').innerText = formatPercent(state.mapFeatures.greenAreas.opacity);
   $('roadToggle').classList.toggle('on', state.mapFeatures.roads.enabled);
   $('roadColor').value = state.mapFeatures.roads.color;
   $('roadColorDot').style.background = state.mapFeatures.roads.color;
   $('roadWidth').value = state.mapFeatures.roads.width;
   $('roadWidthVal').innerText = state.mapFeatures.roads.width.toFixed(2).replace(/\.00$/, '');
   $('roadOpacity').value = state.mapFeatures.roads.opacity;
-  $('roadOpacityVal').innerText = state.mapFeatures.roads.opacity.toFixed(2).replace(/\.00$/, '');
+  $('roadOpacityVal').innerText = formatPercent(state.mapFeatures.roads.opacity);
   $('labelToggle').classList.toggle('on', state.mapFeatures.labels.enabled);
   $('labelColor').value = state.mapFeatures.labels.color;
   $('labelColorDot').style.background = state.mapFeatures.labels.color;
   $('labelOpacity').value = state.mapFeatures.labels.opacity;
-  $('labelOpacityVal').innerText = state.mapFeatures.labels.opacity.toFixed(2).replace(/\.00$/, '');
+  $('labelOpacityVal').innerText = formatPercent(state.mapFeatures.labels.opacity);
   $('labelSize').value = state.mapFeatures.labels.size;
   $('labelSizeVal').innerText = state.mapFeatures.labels.size.toFixed(2).replace(/\.00$/, '');
   $('labelFont').value = state.mapFeatures.labels.font;
   $('pngScheme').value = state.png.scheme;
   $('pngGradOpacity').value = state.png.gradientOpacity;
-  $('pngGradOpacityVal').innerText = state.png.gradientOpacity.toFixed(2).replace(/\.00$/, '');
+  $('pngGradOpacityVal').innerText = formatPercent(state.png.gradientOpacity);
+  $('pngGradShift').value = state.png.gradientShift;
+  $('pngGradShiftVal').innerText = formatSignedPercent(state.png.gradientShift);
+  $('pngGradScale').value = state.png.gradientScale;
+  $('pngGradScaleVal').innerText = formatPercent(state.png.gradientScale);
   $('pngLayerToggle').classList.toggle('on', state.png.layered);
   $('pngLayerOptions').style.display = state.png.layered ? 'block' : 'none';
   if(layerStack) {
@@ -1775,6 +1875,7 @@
   updateGradientPreview();
   applyTheme();
   updateMapDataStatus();
+  updateRefreshButton();
 
   function updateVf() {
     state.wMm = +$('dimW').value; state.hMm = +$('dimH').value;
@@ -1892,7 +1993,7 @@
     const layers = {
       green: () => {
         if(!state.osmData || !state.mapFeatures.greenAreas.enabled || !state.osmData.greenPolygons.length) return '';
-        let out = `<g id="greenAreas" fill="${state.mapFeatures.greenAreas.color}" fill-opacity="${state.mapFeatures.greenAreas.opacity}">`;
+        let out = `<g id="greenAreas" fill="${state.mapFeatures.greenAreas.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.greenAreas.opacity)}">`;
         state.osmData.greenPolygons.forEach((poly) => {
           const d = pathFromCoords(poly, true);
           if(d) out += `<path d="${d}"/>`;
@@ -1901,7 +2002,7 @@
       },
       water: () => {
         if(!state.osmData || !state.mapFeatures.waterAreas.enabled || !state.osmData.waterPolygons.length) return '';
-        let out = `<g id="waterAreas" fill="${state.mapFeatures.waterAreas.color}" fill-opacity="${state.mapFeatures.waterAreas.opacity}">`;
+        let out = `<g id="waterAreas" fill="${state.mapFeatures.waterAreas.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.waterAreas.opacity)}">`;
         state.osmData.waterPolygons.forEach((poly) => {
           const d = pathFromCoords(poly, true);
           if(d) out += `<path d="${d}"/>`;
@@ -1910,7 +2011,7 @@
       },
       rivers: () => {
         if(!state.osmData || !state.mapFeatures.rivers.enabled || !state.osmData.waterLines.length) return '';
-        let out = `<g id="rivers" stroke="${state.mapFeatures.rivers.color}" stroke-width="${state.mapFeatures.rivers.width}" stroke-opacity="${state.mapFeatures.rivers.opacity}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        let out = `<g id="rivers" stroke="${state.mapFeatures.rivers.color}" stroke-width="${state.mapFeatures.rivers.width}" stroke-opacity="${toUnitOpacity(state.mapFeatures.rivers.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
         state.osmData.waterLines.forEach((line) => {
           const d = pathFromCoords(line, false);
           if(d) out += `<path d="${d}"/>`;
@@ -1919,7 +2020,7 @@
       },
       roads: () => {
         if(!state.osmData || !state.mapFeatures.roads.enabled || !state.osmData.roadLines.length) return '';
-        let out = `<g id="roads" stroke="${state.mapFeatures.roads.color}" stroke-width="${state.mapFeatures.roads.width}" stroke-opacity="${state.mapFeatures.roads.opacity}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        let out = `<g id="roads" stroke="${state.mapFeatures.roads.color}" stroke-width="${state.mapFeatures.roads.width}" stroke-opacity="${toUnitOpacity(state.mapFeatures.roads.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
         state.osmData.roadLines.forEach((line) => {
           const d = pathFromCoords(line, false);
           if(d) out += `<path d="${d}"/>`;
@@ -1935,7 +2036,7 @@
           return `<text x="${cx}" y="${cy}" text-anchor="middle" font-family="SF Pro Text, Segoe UI, Roboto, sans-serif" font-size="6" fill="#9AA3B2">Elevation data missing. Try generating again.</text>`;
         }
         const levels = getContourLevels();
-        let out = `<g id="contours" stroke="${state.contour.color}" stroke-width="${state.contour.width}" stroke-opacity="${state.contour.opacity}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        let out = `<g id="contours" stroke="${state.contour.color}" stroke-width="${state.contour.width}" stroke-opacity="${toUnitOpacity(state.contour.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
         levels.forEach(level => {
           const segments = getContourSegments(level, wMm, hMm);
           if(!segments.length) return;
@@ -1959,7 +2060,7 @@
         };
         const fontFamily = fontFamilies[state.mapFeatures.labels.font] || fontFamilies.system;
         const halo = state.theme.background;
-        let out = `<g id="placeLabels" font-family="${fontFamily}" font-size="${state.mapFeatures.labels.size}mm" text-anchor="middle" fill="${state.mapFeatures.labels.color}" fill-opacity="${state.mapFeatures.labels.opacity}" paint-order="stroke">`;
+        let out = `<g id="placeLabels" font-family="${fontFamily}" font-size="${state.mapFeatures.labels.size}mm" text-anchor="middle" fill="${state.mapFeatures.labels.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.labels.opacity)}" paint-order="stroke">`;
         state.osmData.places.forEach((place) => {
           const [x, y] = projectToSvg(place.lat, place.lon);
           out += `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" stroke="${halo}" stroke-width="0.6">${place.name}</text>`;
@@ -1986,6 +2087,8 @@
     const svg = buildSvgMarkup({ includeBackground: true, includeGradient: true, includeFrame: true });
     $('previewArea').innerHTML = svg;
     updatePngRangeInfo();
+    state.previewDirty = false;
+    updateRefreshButton();
   }
 
   const polygonArea = (poly) => {
@@ -2256,7 +2359,7 @@
       alert('Generate contours first.');
       return;
     }
-    const alpha = Math.round(255 * clamp(state.png.gradientOpacity ?? 1, 0, 1));
+    const alpha = Math.round(255 * clamp(toUnitOpacity(state.png.gradientOpacity), 0, 1));
     const e = +$('pngResRange').value;
     const r = state.hMm / state.wMm;
     const w = state.wMm >= state.hMm ? e : Math.round(e / r);
