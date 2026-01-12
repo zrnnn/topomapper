@@ -79,6 +79,38 @@
     input:hover, select:hover { border-color: rgba(255,255,255,0.18); }
     .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
+    .sidebar input,
+    .sidebar select {
+      background: rgba(118, 118, 128, 0.2);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+    }
+    .sidebar input:focus,
+    .sidebar select:focus {
+      border-color: rgba(255,255,255,0.2);
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+    }
+    .sidebar .btn-main {
+      background: #2A3342;
+      color: #E8EDF7;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: none;
+    }
+    .sidebar .btn-main:hover { background: #323C4D; }
+
+    .sidebar-footer {
+      margin-top: 18px;
+      font-size: 11px;
+      color: var(--color-text-sec);
+      text-align: center;
+    }
+    .sidebar-footer a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .sidebar-footer a:hover {
+      color: var(--color-primary);
+    }
+
     /* SEARCH */
     .search-container { position: relative; }
     .suggestions {
@@ -426,6 +458,9 @@
     </div>
 
     <button id="btnGen" class="btn-main">Generate Preview</button>
+    <div class="sidebar-footer">
+      © <a href="https://github.com/topomapper" target="_blank" rel="noreferrer">Topomapper</a>
+    </div>
   </div>
 </div>
 
@@ -565,7 +600,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" id="roadColorDot" style="background:#C9A75A"><input type="color" id="roadColor" value="#C9A75A"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="roadWidth" min="0.05" max="5" step="0.05" value="0.2"><input type="number" id="roadWidthInput" class="width-input" min="0.05" max="5" step="0.05" value="0.2"></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="roadWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="roadWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
                 <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="roadOpacity" min="0" max="100" step="1" value="75"><span id="roadOpacityVal" style="font-size:11px;width:46px;text-align:right;">75%</span></div>
               </div>
             </div>
@@ -590,7 +625,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Line Color</label><div class="color-dot" id="riverColorDot" style="background:#7DB5D3"><input type="color" id="riverColor" value="#7DB5D3"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="riverWidth" min="0.05" max="5" step="0.05" value="0.2"><input type="number" id="riverWidthInput" class="width-input" min="0.05" max="5" step="0.05" value="0.2"></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="riverWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="riverWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
                 <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="riverOpacity" min="0" max="100" step="1" value="85"><span id="riverOpacityVal" style="font-size:11px;width:46px;text-align:right;">85%</span></div>
               </div>
             </div>
@@ -663,8 +698,8 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#10141B"><input type="color" id="contourColor" value="#10141B"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="contourWidth" min="0.05" max="5" step="0.05" value="0.2"><input type="number" id="contourWidthInput" class="width-input" min="0.05" max="5" step="0.05" value="0.2"></div>
-                <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="5" max="350" step="5" value="24"><span id="contourDensityVal" style="font-size:11px;width:40px;text-align:right;">24</span></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="contourWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="contourWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
+                <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="5" max="250" step="5" value="24"><span id="contourDensityVal" style="font-size:11px;width:40px;text-align:right;">24</span></div>
           <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="contourOpacity" min="0" max="100" step="1" value="80"><span id="contourOpacityVal" style="font-size:11px;width:46px;text-align:right;">80%</span></div>
                 <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="5" step="1" value="4"><span id="contourSmoothVal" style="font-size:11px;width:40px;text-align:right;">4</span></div>
               </div>
@@ -973,7 +1008,7 @@
   const clampLineWidth = (value) => {
     const parsed = parseFloat(value);
     if(Number.isNaN(parsed)) return 0.2;
-    return clamp(parsed, 0.05, 5);
+    return clamp(parsed, 0.1, 2);
   };
   const formatMm = (value) => `${value.toFixed(2)} mm`;
   function smoothstep(t) {
@@ -1489,6 +1524,7 @@
       way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service"](${bbox});
       relation["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service"](${bbox});
       node["place"~"city|town|village|suburb|hamlet|neighbourhood"](${bbox});
+      node["natural"="peak"]["name"](${bbox});
     );
     out geom;`;
 
@@ -1497,7 +1533,7 @@
     greenPolygons: [],
     waterLines: [],
     roadLines: [],
-    places: []
+    labels: []
   });
 
   const parseOverpassElements = (elements, target) => {
@@ -1506,19 +1542,33 @@
     const greenNatural = new Set(['wood', 'grassland']);
     const waterLinesSet = new Set(['river', 'stream', 'canal']);
     const waterAreaSet = new Set(['sea', 'ocean']);
+    const getMidpoint = (geometry) => {
+      if(!Array.isArray(geometry) || !geometry.length) return null;
+      return geometry[Math.floor(geometry.length / 2)];
+    };
 
     const toSvgCoords = (geometry) => geometry.map(p => projectToSvg(p.lat, p.lon));
 
     elements.forEach((el) => {
       const tags = el.tags || {};
       if(el.type === 'node' && tags.name && tags.place) {
-        target.places.push({ name: tags.name, lat: el.lat, lon: el.lon, place: tags.place });
+        target.labels.push({ name: tags.name, lat: el.lat, lon: el.lon, place: tags.place, kind: 'place' });
+        return;
+      }
+      if(el.type === 'node' && tags.name && tags.natural === 'peak') {
+        target.labels.push({ name: tags.name, lat: el.lat, lon: el.lon, kind: 'peak' });
         return;
       }
       if(el.type === 'way' && Array.isArray(el.geometry)) {
         const coords = toSvgCoords(el.geometry);
         if(tags.waterway && waterLinesSet.has(tags.waterway)) {
           target.waterLines.push(coords);
+          if(tags.name) {
+            const mid = getMidpoint(el.geometry);
+            if(mid) {
+              target.labels.push({ name: tags.name, lat: mid.lat, lon: mid.lon, kind: 'river' });
+            }
+          }
           return;
         }
         if(tags.highway) {
@@ -1601,8 +1651,19 @@
         parseOverpassElements(data.elements || [], osmData);
       }
       const placeRank = { city: 1, town: 2, village: 3, suburb: 4, neighbourhood: 5, hamlet: 6 };
-      osmData.places.sort((a, b) => (placeRank[a.place] || 99) - (placeRank[b.place] || 99));
-      osmData.places = osmData.places.slice(0, 28);
+      const labelRank = { peak: 2, river: 6 };
+      const unique = new Map();
+      osmData.labels.forEach((label) => {
+        const key = `${label.name}-${label.lat}-${label.lon}-${label.kind || label.place || 'label'}`;
+        if(!unique.has(key)) unique.set(key, label);
+      });
+      osmData.labels = Array.from(unique.values());
+      osmData.labels.sort((a, b) => {
+        const rankA = a.place ? (placeRank[a.place] || 99) : (labelRank[a.kind] || 99);
+        const rankB = b.place ? (placeRank[b.place] || 99) : (labelRank[b.kind] || 99);
+        return rankA - rankB;
+      });
+      osmData.labels = osmData.labels.slice(0, 36);
       return osmData;
     };
 
@@ -1630,7 +1691,7 @@
   }
 
   // --- MAP & SEARCH ---
-  const map = L.map('map', { zoomControl:false, preferCanvas:true }).setView([48.137, 11.575], 14);
+  const map = L.map('map', { zoomControl:false, preferCanvas:true }).setView([27.9881, 86.925], 12);
   L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
     maxZoom: 17,
     attribution: '&copy; OpenTopoMap contributors &copy; OpenStreetMap'
@@ -2063,16 +2124,19 @@
 
   const getLabelSize = (place) => {
     const base = state.mapFeatures.labels.size;
-    if(!state.mapFeatures.labels.scaleByRank || !place?.place) return base;
+    if(!state.mapFeatures.labels.scaleByRank || !(place?.place || place?.kind)) return base;
     const scaleMap = {
-      city: 1.5,
-      town: 1.3,
-      village: 1.15,
-      suburb: 1.1,
-      neighbourhood: 1.05,
-      hamlet: 1
+      city: 3,
+      town: 2.6,
+      village: 2.3,
+      suburb: 2.2,
+      neighbourhood: 2.1,
+      hamlet: 2,
+      peak: 2.4,
+      river: 1.8
     };
-    return base * (scaleMap[place.place] || 1);
+    const key = place.place || place.kind;
+    return base * (scaleMap[key] || 1);
   };
 
   const getOverlayAlignmentStatus = () => {
@@ -2112,7 +2176,7 @@
     }
     if(state.osmStatus?.loaded && state.osmData) {
       const tilesLabel = state.osmStatus.tiles > 1 ? ` · ${state.osmStatus.tiles} tiles` : '';
-      showMapNotice(`Map data loaded: Water ${state.osmData.waterPolygons.length}, Rivers ${state.osmData.waterLines.length}, Roads ${state.osmData.roadLines.length}, Green ${state.osmData.greenPolygons.length}, Labels ${state.osmData.places.length}${tilesLabel}${alignmentLabel}`);
+      showMapNotice(`Map data loaded: Water ${state.osmData.waterPolygons.length}, Rivers ${state.osmData.waterLines.length}, Roads ${state.osmData.roadLines.length}, Green ${state.osmData.greenPolygons.length}, Labels ${state.osmData.labels.length}${tilesLabel}${alignmentLabel}`);
       return;
     }
     if(state.osmStatus?.error) {
@@ -2585,8 +2649,14 @@
       const rows = 120;
       const cols = rows;
       const locs=[];
-      const dLat = (ne.lat-sw.lat)/(rows-1), dLon = (ne.lng-sw.lng)/(cols-1);
-      for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) locs.push({latitude:sw.lat+r*dLat, longitude:sw.lng+c*dLon});
+      const dLat = (ne.lat - sw.lat) / (rows - 1);
+      const dLon = (ne.lng - sw.lng) / (cols - 1);
+      for(let r=0;r<rows;r++) {
+        const lat = ne.lat - r * dLat;
+        for(let c=0;c<cols;c++) {
+          locs.push({ latitude: lat, longitude: sw.lng + c * dLon });
+        }
+      }
       const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locations:locs})});
       const j = await res.json();
       let h = j.results.map(x=>x.elevation);
@@ -2697,7 +2767,7 @@
         return out + `</g>`;
       },
       labels: () => {
-        if(!state.osmData || !state.mapFeatures.labels.enabled || !state.osmData.places.length) return '';
+        if(!state.osmData || !state.mapFeatures.labels.enabled || !state.osmData.labels.length) return '';
         const fontFamilies = {
           system: 'Inter, SF Pro Text, Segoe UI, Roboto, sans-serif',
           serif: 'Merriweather, Georgia, Times New Roman, serif',
@@ -2712,7 +2782,7 @@
         const fontWeight = state.mapFeatures.labels.weight || 'normal';
         const fontStyle = state.mapFeatures.labels.style || 'normal';
         let out = `<g id="placeLabels" font-family="${fontFamily}" text-anchor="middle" fill="${state.mapFeatures.labels.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.labels.opacity)}" paint-order="stroke" font-weight="${fontWeight}" font-style="${fontStyle}">`;
-        state.osmData.places.forEach((place) => {
+        state.osmData.labels.forEach((place) => {
           const [x, y] = projectToSvg(place.lat, place.lon);
           const size = getLabelSize(place);
           const stroke = haloEnabled ? ` stroke="${haloColor}" stroke-width="0.6"` : ' stroke="none" stroke-width="0"';
@@ -2964,8 +3034,8 @@
           clipPolylineToPolygon(line, clipPoly).forEach(seg => writePolyline('ROADS', seg, state.mapFeatures.roads.color, false));
         });
       }
-      if(state.mapFeatures.labels.enabled && state.osmData.places?.length) {
-        state.osmData.places.forEach((place) => {
+      if(state.mapFeatures.labels.enabled && state.osmData.labels?.length) {
+        state.osmData.labels.forEach((place) => {
           const [x, y] = projectToSvg(place.lat, place.lon);
           const inside = clipPolygon([[x, y], [x + 0.01, y], [x + 0.01, y + 0.01]], clipPoly).length;
           if(!inside) return;
