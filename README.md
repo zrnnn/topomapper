@@ -46,3 +46,4 @@ If the repo name changes, update `paths.base` in `svelte.config.js`.
 - Core app logic is in `src/lib/topomapper.js`.
 - Global styles are in `src/app.css`.
 - Static assets (logo/icon) are in `static/assets`.
+- Contour styling includes a "Bold Every Nth" slider (0-20, default 10). Set to 0 to disable emphasis; the selected interval doubles the stroke width of the matching contour lines.
