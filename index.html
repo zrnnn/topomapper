@@ -42,7 +42,10 @@
       border-bottom: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px);
     }
     .top-brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 20px; letter-spacing: -0.6px; text-decoration: none; color: var(--color-text); }
-    .top-badge { font-size: 12px; padding: 6px 12px; border-radius: 999px; background: rgba(76,141,255,0.18); color: var(--color-primary); border: 1px solid rgba(76,141,255,0.3); }
+    .top-logo { width: 34px; height: 34px; object-fit: contain; }
+    .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: var(--color-text-sec); }
+    .status-pill.ok { color: #9BE2B7; border-color: rgba(155,226,183,0.4); background: rgba(155,226,183,0.12); }
+    .status-pill.error { color: #FF9A9A; border-color: rgba(255,154,154,0.4); background: rgba(255,154,154,0.12); }
 
     /* MAP AREA */
     .viewport { position: relative; flex: 1; height: 100%; }
@@ -245,16 +248,9 @@
 
 <header class="top-header">
   <a class="top-brand" href="#">
-    <svg width="32" height="32" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-      <rect x="6" y="6" width="36" height="36" rx="12" fill="rgba(76,141,255,0.18)" stroke="rgba(76,141,255,0.6)" stroke-width="1.5"/>
-      <path d="M12 18c4-6 20-8 24-2" stroke="var(--color-primary)" stroke-width="2.2" fill="none"/>
-      <path d="M12 24c5-5 19-6 24-1" stroke="rgba(76,141,255,0.75)" stroke-width="2" fill="none"/>
-      <path d="M12 30c6-4 18-4 24 1" stroke="rgba(76,141,255,0.55)" stroke-width="1.8" fill="none"/>
-      <path d="M16 36c4-2 12-2 16 1" stroke="rgba(76,141,255,0.4)" stroke-width="1.6" fill="none"/>
-    </svg>
+    <img class="top-logo" src="assets/logo.png" alt="Topomapper logo">
     Topomapper
   </a>
-  <span class="top-badge">Live Terrain Studio</span>
 </header>
 
 <div class="sidebar">
@@ -362,6 +358,7 @@
           <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
             Grab the handle to move layers. Items higher in the list render above the ones below.
           </p>
+          <div id="mapDataStatus" class="status-pill" style="margin-top:10px;">Map data: --</div>
           <div id="layerStack" class="layer-list">
             <div class="layer-item" data-layer="labels" draggable="true">
               <div class="layer-head drag-ready">
@@ -377,7 +374,7 @@
                 </div>
               </div>
               <div class="layer-body">
-                <div class="cust-row"><label style="margin:0">Label Color</label><div class="color-dot" id="labelColorDot" style="background:#F5F7FB"><input type="color" id="labelColor" value="#F5F7FB"></div></div>
+                <div class="cust-row"><label style="margin:0">Label Color</label><div class="color-dot" id="labelColorDot" style="background:#1E232B"><input type="color" id="labelColor" value="#1E232B"></div></div>
                 <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="labelOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="labelOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
                 <div class="cust-row"><label style="margin:0">Font Size</label><input type="range" id="labelSize" min="0.2" max="1.5" step="0.1" value="0.32"><span id="labelSizeVal" style="font-size:11px;width:36px;text-align:right;">0.32</span></div>
                 <div class="cust-row"><label style="margin:0">Typeface</label>
@@ -403,7 +400,7 @@
                 </div>
               </div>
               <div class="layer-body">
-                <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" id="roadColorDot" style="background:#E7C36E"><input type="color" id="roadColor" value="#E7C36E"></div></div>
+                <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" id="roadColorDot" style="background:#C9A75A"><input type="color" id="roadColor" value="#C9A75A"></div></div>
                 <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="roadWidth" min="0.05" max="0.6" step="0.05" value="0.35"><span id="roadWidthVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
                 <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="roadOpacity" min="0.1" max="1" step="0.05" value="0.75"><span id="roadOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.75</span></div>
               </div>
@@ -422,8 +419,8 @@
                 </div>
               </div>
               <div class="layer-body">
-                <div class="cust-row"><label style="margin:0">Line Color</label><div class="color-dot" id="riverColorDot" style="background:#6BB4FF"><input type="color" id="riverColor" value="#6BB4FF"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="riverWidth" min="0.05" max="0.6" step="0.05" value="0.25"><span id="riverWidthVal" style="font-size:11px;width:36px;text-align:right;">0.25</span></div>
+                <div class="cust-row"><label style="margin:0">Line Color</label><div class="color-dot" id="riverColorDot" style="background:#7DB5D3"><input type="color" id="riverColor" value="#7DB5D3"></div></div>
+                <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="riverWidth" min="0.05" max="0.6" step="0.05" value="0.4"><span id="riverWidthVal" style="font-size:11px;width:36px;text-align:right;">0.4</span></div>
                 <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="riverOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="riverOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
               </div>
             </div>
@@ -441,7 +438,7 @@
                 </div>
               </div>
               <div class="layer-body">
-                <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="waterAreaColorDot" style="background:#4C86A8"><input type="color" id="waterAreaColor" value="#4C86A8"></div></div>
+                <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="waterAreaColorDot" style="background:#7DB5D3"><input type="color" id="waterAreaColor" value="#7DB5D3"></div></div>
                 <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="waterAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.45"><span id="waterAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.45</span></div>
               </div>
             </div>
@@ -459,8 +456,8 @@
                 </div>
               </div>
               <div class="layer-body">
-                <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="greenAreaColorDot" style="background:#4E7E5A"><input type="color" id="greenAreaColor" value="#4E7E5A"></div></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="greenAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.35"><span id="greenAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
+                <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="greenAreaColorDot" style="background:#7FAE8A"><input type="color" id="greenAreaColor" value="#7FAE8A"></div></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="greenAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.15"><span id="greenAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.15</span></div>
               </div>
             </div>
             <div class="layer-item open" data-layer="contours" draggable="true" style="margin-top:10px;">
@@ -472,38 +469,40 @@
                   <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
                   <span>Contour Lines</span>
                 </div>
+                <div class="layer-actions">
+                  <div class="ios-switch on" id="contourToggle"></div>
+                </div>
               </div>
               <div class="layer-body">
-                <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#D7E3FF"><input type="color" id="contourColor" value="#D7E3FF"></div></div>
+                <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#10141B"><input type="color" id="contourColor" value="#10141B"></div></div>
                 <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
                 <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="8" max="60" step="2" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="contourOpacity" min="0.1" max="1" step="0.05" value="0.9"><span id="contourOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.9</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="contourOpacity" min="0.1" max="1" step="0.05" value="0.8"><span id="contourOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.8</span></div>
                 <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="4" step="1" value="1"><span id="contourSmoothVal" style="font-size:11px;width:36px;text-align:right;">1</span></div>
               </div>
             </div>
           </div>
         </div>
         <div class="group">
-          <label>Gradient Fill (PNG)</label>
+          <label>Hypsometric Fill (PNG)</label>
           <div class="layer-item" style="padding: 12px 14px; display:flex; flex-direction:column; gap:10px;">
             <div class="toggle-row">
-              <span style="font-weight:600; font-size:14px;">Layered Gradient Fills</span>
+              <span style="font-weight:600; font-size:14px;">Layered Height Bands</span>
               <div class="ios-switch" id="pngLayerToggle"></div>
             </div>
             <p style="font-size:11px; color:var(--color-text-sec); margin:0; line-height:1.4;">
-              Fills each contour level with a relief-style gradient and hillshade projection based on the lowest/highest points in the frame.
+              Fills each contour band with stepped colors and hillshade based on the lowest/highest points in the frame.
             </p>
             <div id="pngLayerOptions" style="display:none;">
               <div class="cust-row">
-                <label style="margin:0">Start Color (Low)</label>
-                <div class="color-dot" id="pngGradStartDot" style="background:#0B1B2C"><input type="color" id="pngGradStart" value="#0B1B2C"></div>
+                <label style="margin:0">Color Scheme</label>
+                <select id="pngScheme">
+                  <option value="color" selected>Topographic Color</option>
+                  <option value="mono">Topographic Mono</option>
+                </select>
               </div>
               <div class="cust-row">
-                <label style="margin:0">End Color (High)</label>
-                <div class="color-dot" id="pngGradEndDot" style="background:#7CA6C7"><input type="color" id="pngGradEnd" value="#7CA6C7"></div>
-              </div>
-              <div class="cust-row">
-                <label style="margin:0">Gradient Opacity</label>
+                <label style="margin:0">Fill Opacity</label>
                 <input type="range" id="pngGradOpacity" min="0.1" max="1" step="0.05" value="0.9">
                 <span id="pngGradOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.9</span>
               </div>
@@ -554,38 +553,39 @@
   const state = {
     wMm: 200, hMm: 140, shape: 'rect',
     contour: {
+      enabled: true,
       density: 24,
       width: 0.2,
-      color: '#D7E3FF',
+      color: '#10141B',
       smooth: 1,
-      opacity: 0.9
+      opacity: 0.8
     },
     png: {
       layered: false,
-      gradientStart: '#0B1B2C',
-      gradientEnd: '#7CA6C7',
+      scheme: 'color',
       gradientOpacity: 0.9,
       reliefStrength: 0.48,
       reliefWarm: '#F3A15F',
       reliefShadow: '#0A1624'
     },
     theme: {
-      preset: 'dark',
-      background: '#141A22',
-      line: '#D7E3FF'
+      preset: 'bright',
+      background: '#F5F2EB',
+      line: '#10141B'
     },
     mapFeatures: {
-      waterAreas: { enabled: true, color: '#4C86A8', opacity: 0.45 },
-      rivers: { enabled: true, color: '#6BB4FF', width: 0.25, opacity: 0.85 },
-      greenAreas: { enabled: true, color: '#4E7E5A', opacity: 0.35 },
-      roads: { enabled: false, color: '#E7C36E', width: 0.35, opacity: 0.75 },
-      labels: { enabled: false, color: '#F5F7FB', size: 0.32, font: 'system', opacity: 0.85 }
+      waterAreas: { enabled: true, color: '#7DB5D3', opacity: 0.45 },
+      rivers: { enabled: true, color: '#7DB5D3', width: 0.4, opacity: 0.85 },
+      greenAreas: { enabled: true, color: '#7FAE8A', opacity: 0.15 },
+      roads: { enabled: false, color: '#C9A75A', width: 0.35, opacity: 0.75 },
+      labels: { enabled: false, color: '#1E232B', size: 0.32, font: 'system', opacity: 0.85 }
     },
     layerOrder: ['labels', 'roads', 'rivers', 'water', 'green', 'contours'],
     bbox: null,
     terrainData: null,
     contourPaths: [],
-    osmData: null
+    osmData: null,
+    osmStatus: { loaded: false, error: null, tiles: 1, ignored: false }
   };
 
   const $ = id => document.getElementById(id);
@@ -699,6 +699,38 @@
     };
   }
 
+  const getHypsometricStops = (scheme) => {
+    if(scheme === 'mono') {
+      return ['#FFFFFF', '#E6E6E6', '#CCCCCC', '#B3B3B3', '#999999', '#7F7F7F', '#666666', '#4D4D4D', '#333333'];
+    }
+    return [
+      '#0F3E63',
+      '#1F5C83',
+      '#3B7EA6',
+      '#6AA1C2',
+      '#9EC3D9',
+      '#BFD9B3',
+      '#9FBE7E',
+      '#CBB878',
+      '#B18D5B',
+      '#8E6C45'
+    ];
+  };
+
+  const getHypsometricBandColor = (t, scheme, bandCount) => {
+    const clamped = clamp(t, 0, 1);
+    const bandIndex = Math.min(bandCount - 1, Math.floor(clamped * bandCount));
+    const stops = getHypsometricStops(scheme);
+    if(bandCount <= 1) return colorToRgb(stops[0]);
+    const scaled = bandIndex / (bandCount - 1);
+    const stopIndex = scaled * (stops.length - 1);
+    const low = Math.floor(stopIndex);
+    const high = Math.min(stops.length - 1, low + 1);
+    const mixT = stopIndex - low;
+    const base = gradientColor(stops[low], stops[high], mixT);
+    return base;
+  };
+
   function mixColor(base, overlay, t) {
     const tt = clamp(t, 0, 1);
     return {
@@ -761,12 +793,13 @@
     if(!range) return null;
     const boundaries = [range.minNorm, ...getContourLevels(range.minNorm, range.maxNorm), range.maxNorm];
     if(boundaries.length < 2) return null;
+    const bandCount = Math.max(2, boundaries.length - 1);
     const bandColors = [];
     for(let i=0; i<boundaries.length - 1; i++) {
       const midNorm = (boundaries[i] + boundaries[i + 1]) / 2;
       const height = state.terrainData.min + midNorm;
       const t = range.maxZ === range.minZ ? 0 : (height - range.minZ) / (range.maxZ - range.minZ);
-      bandColors.push(gradientColor(state.png.gradientStart, state.png.gradientEnd, t));
+      bandColors.push(getHypsometricBandColor(t, state.png.scheme, bandCount));
     }
     const cv = document.createElement('canvas');
     cv.width = w;
@@ -1063,106 +1096,166 @@
     return `M 0,0 H ${w} V ${h} H 0 Z`;
   }
 
-  async function fetchMapFeatures(sw, ne) {
-    try {
-      const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
-      const query = `[out:json][timeout:25];
-      (
-        way["natural"="water"](${bbox});
-        way["waterway"="riverbank"](${bbox});
-        relation["natural"="water"](${bbox});
-        relation["waterway"="riverbank"](${bbox});
-        way["waterway"~"river|stream|canal"](${bbox});
-        way["landuse"~"forest|grass|meadow|recreation_ground"](${bbox});
-        way["leisure"~"park|garden"](${bbox});
-        way["natural"~"wood|grassland"](${bbox});
-        relation["landuse"~"forest|grass|meadow|recreation_ground"](${bbox});
-        relation["leisure"~"park|garden"](${bbox});
-        relation["natural"~"wood|grassland"](${bbox});
-        way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service"](${bbox});
-        relation["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service"](${bbox});
-        node["place"~"city|town|village|suburb|hamlet|neighbourhood"](${bbox});
-      );
-      out geom;`;
-      const res = await fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `data=${encodeURIComponent(query)}`
-      });
-      const data = await res.json();
-      const waterPolygons = [];
-      const greenPolygons = [];
-      const waterLines = [];
-      const roadLines = [];
-      const places = [];
+  const overpassServers = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.nchc.org.tw/api/interpreter'
+  ];
 
-      const greenLanduse = new Set(['forest', 'grass', 'meadow', 'recreation_ground']);
-      const greenLeisure = new Set(['park', 'garden']);
-      const greenNatural = new Set(['wood', 'grassland']);
-      const waterLinesSet = new Set(['river', 'stream', 'canal']);
+  const buildOverpassQuery = (bbox) => `[out:json][timeout:25];
+    (
+      way["natural"="water"](${bbox});
+      way["water"~"sea|ocean"](${bbox});
+      way["waterway"="riverbank"](${bbox});
+      relation["natural"="water"](${bbox});
+      relation["water"~"sea|ocean"](${bbox});
+      relation["waterway"="riverbank"](${bbox});
+      way["waterway"~"river|stream|canal"](${bbox});
+      way["landuse"~"forest|grass|meadow|recreation_ground"](${bbox});
+      way["leisure"~"park|garden"](${bbox});
+      way["natural"~"wood|grassland"](${bbox});
+      relation["landuse"~"forest|grass|meadow|recreation_ground"](${bbox});
+      relation["leisure"~"park|garden"](${bbox});
+      relation["natural"~"wood|grassland"](${bbox});
+      way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service"](${bbox});
+      relation["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service"](${bbox});
+      node["place"~"city|town|village|suburb|hamlet|neighbourhood"](${bbox});
+    );
+    out geom;`;
 
-      const toSvgCoords = (geometry) => geometry.map(p => projectToSvg(p.lat, p.lon));
+  const buildEmptyOsmData = () => ({
+    waterPolygons: [],
+    greenPolygons: [],
+    waterLines: [],
+    roadLines: [],
+    places: []
+  });
 
-      data.elements.forEach((el) => {
-        const tags = el.tags || {};
-        if(el.type === 'node' && tags.name && tags.place) {
-          places.push({ name: tags.name, lat: el.lat, lon: el.lon, place: tags.place });
+  const parseOverpassElements = (elements, target) => {
+    const greenLanduse = new Set(['forest', 'grass', 'meadow', 'recreation_ground']);
+    const greenLeisure = new Set(['park', 'garden']);
+    const greenNatural = new Set(['wood', 'grassland']);
+    const waterLinesSet = new Set(['river', 'stream', 'canal']);
+    const waterAreaSet = new Set(['sea', 'ocean']);
+
+    const toSvgCoords = (geometry) => geometry.map(p => projectToSvg(p.lat, p.lon));
+
+    elements.forEach((el) => {
+      const tags = el.tags || {};
+      if(el.type === 'node' && tags.name && tags.place) {
+        target.places.push({ name: tags.name, lat: el.lat, lon: el.lon, place: tags.place });
+        return;
+      }
+      if(el.type === 'way' && Array.isArray(el.geometry)) {
+        const coords = toSvgCoords(el.geometry);
+        if(tags.waterway && waterLinesSet.has(tags.waterway)) {
+          target.waterLines.push(coords);
           return;
         }
-        if(el.type === 'way' && Array.isArray(el.geometry)) {
-          const coords = toSvgCoords(el.geometry);
-          if(tags.waterway && waterLinesSet.has(tags.waterway)) {
-            waterLines.push(coords);
-            return;
-          }
-          if(tags.highway) {
-            roadLines.push(coords);
-            return;
-          }
-          const isWater = tags.natural === 'water' || tags.waterway === 'riverbank';
-          const isGreen = greenLanduse.has(tags.landuse) || greenLeisure.has(tags.leisure) || greenNatural.has(tags.natural);
-          if(isWater) {
-            waterPolygons.push(normalizeRing(coords));
-            return;
-          }
-          if(isGreen) {
-            greenPolygons.push(normalizeRing(coords));
-          }
+        if(tags.highway) {
+          target.roadLines.push(coords);
           return;
         }
-        if(el.type === 'relation' && Array.isArray(el.members)) {
-          const relationSegments = el.members
-            .filter(m => m.role === 'outer' && Array.isArray(m.geometry))
+        const isWater = tags.natural === 'water' || tags.waterway === 'riverbank' || waterAreaSet.has(tags.water);
+        const isGreen = greenLanduse.has(tags.landuse) || greenLeisure.has(tags.leisure) || greenNatural.has(tags.natural);
+        if(isWater) {
+          target.waterPolygons.push(normalizeRing(coords));
+          return;
+        }
+        if(isGreen) {
+          target.greenPolygons.push(normalizeRing(coords));
+        }
+        return;
+      }
+      if(el.type === 'relation' && Array.isArray(el.members)) {
+        const relationSegments = el.members
+          .filter(m => m.role === 'outer' && Array.isArray(m.geometry))
+          .map(m => toSvgCoords(m.geometry));
+        const relationPolys = joinLineSegments(relationSegments);
+        const isWater = tags.natural === 'water' || tags.waterway === 'riverbank' || waterAreaSet.has(tags.water);
+        const isGreen = greenLanduse.has(tags.landuse) || greenLeisure.has(tags.leisure) || greenNatural.has(tags.natural);
+        if(isWater) {
+          target.waterPolygons.push(...(relationPolys.length ? relationPolys : relationSegments.map(normalizeRing)));
+        }
+        if(isGreen) {
+          target.greenPolygons.push(...(relationPolys.length ? relationPolys : relationSegments.map(normalizeRing)));
+        }
+        if(tags.highway) {
+          const relationLines = el.members
+            .filter(m => Array.isArray(m.geometry))
             .map(m => toSvgCoords(m.geometry));
-          const relationPolys = joinLineSegments(relationSegments);
-          const isWater = tags.natural === 'water' || tags.waterway === 'riverbank';
-          const isGreen = greenLanduse.has(tags.landuse) || greenLeisure.has(tags.leisure) || greenNatural.has(tags.natural);
-          if(isWater) {
-            waterPolygons.push(...(relationPolys.length ? relationPolys : relationSegments.map(normalizeRing)));
-          }
-          if(isGreen) {
-            greenPolygons.push(...(relationPolys.length ? relationPolys : relationSegments.map(normalizeRing)));
-          }
-          if(tags.highway) {
-            const relationLines = el.members
-              .filter(m => Array.isArray(m.geometry))
-              .map(m => toSvgCoords(m.geometry));
-            roadLines.push(...relationLines);
-          }
+          target.roadLines.push(...relationLines);
         }
-      });
+      }
+    });
+  };
 
+  const fetchOverpass = async (query) => {
+    let lastError = null;
+    for(const server of overpassServers) {
+      try {
+        const res = await fetch(server, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `data=${encodeURIComponent(query)}`
+        });
+        if(!res.ok) {
+          throw new Error(`Overpass error ${res.status}`);
+        }
+        return await res.json();
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError || new Error('Overpass error');
+  };
+
+  const getTiledBboxes = (sw, ne) => {
+    const midLat = (sw.lat + ne.lat) / 2;
+    const midLng = (sw.lng + ne.lng) / 2;
+    return [
+      { sw: { lat: sw.lat, lng: sw.lng }, ne: { lat: midLat, lng: midLng } },
+      { sw: { lat: sw.lat, lng: midLng }, ne: { lat: midLat, lng: ne.lng } },
+      { sw: { lat: midLat, lng: sw.lng }, ne: { lat: ne.lat, lng: midLng } },
+      { sw: { lat: midLat, lng: midLng }, ne: { lat: ne.lat, lng: ne.lng } }
+    ];
+  };
+
+  async function fetchMapFeatures(sw, ne) {
+    state.osmStatus = { loaded: false, error: null, tiles: 1, ignored: false };
+    const attemptFetch = async (bboxes) => {
+      const osmData = buildEmptyOsmData();
+      for(const bbox of bboxes) {
+        const bboxStr = `${bbox.sw.lat},${bbox.sw.lng},${bbox.ne.lat},${bbox.ne.lng}`;
+        const data = await fetchOverpass(buildOverpassQuery(bboxStr));
+        parseOverpassElements(data.elements || [], osmData);
+      }
       const placeRank = { city: 1, town: 2, village: 3, suburb: 4, neighbourhood: 5, hamlet: 6 };
-      places.sort((a, b) => (placeRank[a.place] || 99) - (placeRank[b.place] || 99));
-      state.osmData = {
-        waterPolygons,
-        greenPolygons,
-        waterLines,
-        roadLines,
-        places: places.slice(0, 28)
-      };
-    } catch(e) {
-      state.osmData = { waterPolygons: [], greenPolygons: [], waterLines: [], roadLines: [], places: [] };
+      osmData.places.sort((a, b) => (placeRank[a.place] || 99) - (placeRank[b.place] || 99));
+      osmData.places = osmData.places.slice(0, 28);
+      return osmData;
+    };
+
+    try {
+      state.osmData = await attemptFetch([{ sw, ne }]);
+      state.osmStatus.loaded = true;
+      state.osmStatus.tiles = 1;
+      updateMapDataStatus();
+      return true;
+    } catch (err) {
+      try {
+        const tiledBboxes = getTiledBboxes(sw, ne);
+        state.osmData = await attemptFetch(tiledBboxes);
+        state.osmStatus.loaded = true;
+        state.osmStatus.tiles = tiledBboxes.length;
+        updateMapDataStatus();
+        return true;
+      } catch (tileErr) {
+        state.osmData = buildEmptyOsmData();
+        state.osmStatus.error = 'Straßen, Flüsse oder Flächen konnten nicht geladen werden. Bitte wähle einen kleineren Ausschnitt oder versuche es erneut.';
+        updateMapDataStatus();
+        return false;
+      }
     }
   }
 
@@ -1291,7 +1384,7 @@
       line: '#D7E3FF',
       mapFeatures: {
         waterAreas: '#4C86A8',
-        rivers: '#6BB4FF',
+        rivers: '#4C86A8',
         greenAreas: '#4E7E5A',
         roads: '#E7C36E',
         labels: '#F5F7FB'
@@ -1302,7 +1395,7 @@
       line: '#10141B',
       mapFeatures: {
         waterAreas: '#7DB5D3',
-        rivers: '#4D95D8',
+        rivers: '#7DB5D3',
         greenAreas: '#7FAE8A',
         roads: '#C9A75A',
         labels: '#1E232B'
@@ -1313,7 +1406,7 @@
       line: '#D6D6D6',
       mapFeatures: {
         waterAreas: '#5A5A5A',
-        rivers: '#AFAFAF',
+        rivers: '#5A5A5A',
         greenAreas: '#444444',
         roads: '#8C8C8C',
         labels: '#F2F2F2'
@@ -1344,14 +1437,18 @@
     if(state.terrainData) renderSVG();
   };
 
+  const syncWaterColors = (color) => {
+    state.mapFeatures.waterAreas.color = color;
+    state.mapFeatures.rivers.color = color;
+    $('waterAreaColor').value = color;
+    $('waterAreaColorDot').style.background = color;
+    $('riverColor').value = color;
+    $('riverColorDot').style.background = color;
+  };
+
   const applyPresetMapFeatures = (preset) => {
     if(!preset?.mapFeatures) return;
-    state.mapFeatures.waterAreas.color = preset.mapFeatures.waterAreas;
-    $('waterAreaColor').value = state.mapFeatures.waterAreas.color;
-    $('waterAreaColorDot').style.background = state.mapFeatures.waterAreas.color;
-    state.mapFeatures.rivers.color = preset.mapFeatures.rivers;
-    $('riverColor').value = state.mapFeatures.rivers.color;
-    $('riverColorDot').style.background = state.mapFeatures.rivers.color;
+    syncWaterColors(preset.mapFeatures.waterAreas);
     state.mapFeatures.greenAreas.color = preset.mapFeatures.greenAreas;
     $('greenAreaColor').value = state.mapFeatures.greenAreas.color;
     $('greenAreaColorDot').style.background = state.mapFeatures.greenAreas.color;
@@ -1361,6 +1458,30 @@
     state.mapFeatures.labels.color = preset.mapFeatures.labels;
     $('labelColor').value = state.mapFeatures.labels.color;
     $('labelColorDot').style.background = state.mapFeatures.labels.color;
+  };
+
+  const updateMapDataStatus = () => {
+    const statusEl = $('mapDataStatus');
+    if(!statusEl) return;
+    if(!state.osmStatus) {
+      statusEl.textContent = 'Map data: --';
+      statusEl.className = 'status-pill';
+      return;
+    }
+    if(state.osmStatus.loaded && state.osmData) {
+      const tilesLabel = state.osmStatus.tiles > 1 ? ` · ${state.osmStatus.tiles} tiles` : '';
+      statusEl.textContent = `Map data loaded: Water ${state.osmData.waterPolygons.length}, Rivers ${state.osmData.waterLines.length}, Roads ${state.osmData.roadLines.length}, Green ${state.osmData.greenPolygons.length}, Labels ${state.osmData.places.length}${tilesLabel}`;
+      statusEl.className = 'status-pill ok';
+      return;
+    }
+    if(state.osmStatus.error) {
+      const suffix = state.osmStatus.ignored ? ' (ignored)' : '';
+      statusEl.textContent = `Map data missing${suffix}: ${state.osmStatus.error}`;
+      statusEl.className = 'status-pill error';
+      return;
+    }
+    statusEl.textContent = 'Map data: --';
+    statusEl.className = 'status-pill';
   };
 
   const syncCustomField = (value, pickerId, textId, dotId) => {
@@ -1449,14 +1570,19 @@
     if(state.terrainData) renderSVG();
   };
 
+  $('contourToggle').onclick = function() {
+    state.contour.enabled = !state.contour.enabled;
+    this.classList.toggle('on', state.contour.enabled);
+    if(state.terrainData) renderSVG();
+  };
+
   $('waterAreaToggle').onclick = function() {
     state.mapFeatures.waterAreas.enabled = !state.mapFeatures.waterAreas.enabled;
     this.classList.toggle('on', state.mapFeatures.waterAreas.enabled);
     if(state.terrainData) renderSVG();
   };
   $('waterAreaColor').oninput = (e) => {
-    state.mapFeatures.waterAreas.color = e.target.value;
-    $('waterAreaColorDot').style.background = state.mapFeatures.waterAreas.color;
+    syncWaterColors(e.target.value);
     if(state.terrainData) renderSVG();
   };
   $('waterAreaOpacity').oninput = (e) => {
@@ -1470,8 +1596,7 @@
     if(state.terrainData) renderSVG();
   };
   $('riverColor').oninput = (e) => {
-    state.mapFeatures.rivers.color = e.target.value;
-    $('riverColorDot').style.background = state.mapFeatures.rivers.color;
+    syncWaterColors(e.target.value);
     if(state.terrainData) renderSVG();
   };
   $('riverWidth').oninput = (e) => {
@@ -1543,8 +1668,19 @@
     state.mapFeatures.labels.font = e.target.value;
     if(state.terrainData) renderSVG();
   };
+  const buildHypsometricPreview = (scheme) => {
+    const stops = getHypsometricStops(scheme);
+    const step = 100 / stops.length;
+    const segments = stops.map((color, idx) => {
+      const start = (idx * step).toFixed(2);
+      const end = ((idx + 1) * step).toFixed(2);
+      return `${color} ${start}%, ${color} ${end}%`;
+    });
+    return `linear-gradient(90deg, ${segments.join(', ')})`;
+  };
+
   const updateGradientPreview = () => {
-    $('pngGradientPreview').style.background = `linear-gradient(90deg, ${state.png.gradientStart}, ${state.png.gradientEnd})`;
+    $('pngGradientPreview').style.background = buildHypsometricPreview(state.png.scheme);
   };
 
   const updatePngRangeInfo = () => {
@@ -1567,15 +1703,8 @@
     if(state.terrainData) renderSVG();
   };
 
-  $('pngGradStart').oninput = (e) => {
-    state.png.gradientStart = e.target.value;
-    $('pngGradStartDot').style.background = state.png.gradientStart;
-    updateGradientPreview();
-    if(state.png.layered && state.terrainData) renderSVG();
-  };
-  $('pngGradEnd').oninput = (e) => {
-    state.png.gradientEnd = e.target.value;
-    $('pngGradEndDot').style.background = state.png.gradientEnd;
+  $('pngScheme').onchange = (e) => {
+    state.png.scheme = e.target.value;
     updateGradientPreview();
     if(state.png.layered && state.terrainData) renderSVG();
   };
@@ -1597,6 +1726,7 @@
   $('lineColorText').value = state.theme.line;
   $('bgColorDot').style.background = state.theme.background;
   $('lineColorDot').style.background = state.theme.line;
+  $('contourToggle').classList.toggle('on', state.contour.enabled);
   $('contourOpacity').value = state.contour.opacity;
   $('contourOpacityVal').innerText = state.contour.opacity.toFixed(2).replace(/\.00$/, '');
   $('waterAreaToggle').classList.toggle('on', state.mapFeatures.waterAreas.enabled);
@@ -1631,8 +1761,7 @@
   $('labelSize').value = state.mapFeatures.labels.size;
   $('labelSizeVal').innerText = state.mapFeatures.labels.size.toFixed(2).replace(/\.00$/, '');
   $('labelFont').value = state.mapFeatures.labels.font;
-  $('pngGradStartDot').style.background = state.png.gradientStart;
-  $('pngGradEndDot').style.background = state.png.gradientEnd;
+  $('pngScheme').value = state.png.scheme;
   $('pngGradOpacity').value = state.png.gradientOpacity;
   $('pngGradOpacityVal').innerText = state.png.gradientOpacity.toFixed(2).replace(/\.00$/, '');
   $('pngLayerToggle').classList.toggle('on', state.png.layered);
@@ -1645,6 +1774,7 @@
   }
   updateGradientPreview();
   applyTheme();
+  updateMapDataStatus();
 
   function updateVf() {
     state.wMm = +$('dimW').value; state.hMm = +$('dimH').value;
@@ -1688,13 +1818,22 @@
     const {sw, ne} = state.bbox;
     await fetchTerrain(sw, ne);
     msg('Fetching Map Features...');
-    await fetchMapFeatures(sw, ne);
+    const mapOk = await fetchMapFeatures(sw, ne);
     if(!state.terrainData) {
       renderSVG();
       idle();
       $('modal').classList.add('open');
       alert('Elevation data unavailable. Try a smaller area or try again.');
       return;
+    }
+    if(!mapOk) {
+      idle();
+      const proceed = confirm('Kartendaten (Straßen, Flüsse, Wasser/Grünflächen) konnten nicht geladen werden.\n\nMöchtest du trotzdem fortfahren?\nAbbrechen, um einen neuen Ausschnitt zu wählen.');
+      if(!proceed) {
+        return;
+      }
+      state.osmStatus.ignored = true;
+      updateMapDataStatus();
     }
     renderSVG();
     idle();
@@ -1789,6 +1928,7 @@
       },
       contours: () => {
         state.contourPaths = [];
+        if(!state.contour.enabled) return '';
         if(!state.terrainData || state.terrainData.delta <= 0) {
           const cx = wMm / 2;
           const cy = hMm / 2;
@@ -1848,6 +1988,151 @@
     updatePngRangeInfo();
   }
 
+  const polygonArea = (poly) => {
+    let sum = 0;
+    for(let i = 0; i < poly.length - 1; i++) {
+      sum += poly[i][0] * poly[i + 1][1] - poly[i + 1][0] * poly[i][1];
+    }
+    return sum / 2;
+  };
+
+  const getClipPolygon = () => {
+    const w = state.wMm;
+    const h = state.hMm;
+    if(['rect','din_l','din_p','sq'].includes(state.shape)) {
+      return [[0,0],[w,0],[w,h],[0,h]];
+    }
+    if(state.shape === 'hex') {
+      const r = w / 2;
+      const cx = w / 2;
+      const cy = h / 2;
+      const pts = [];
+      for(let i=0; i<6; i++) {
+        const a = i * Math.PI / 3 - Math.PI / 6;
+        pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+      }
+      return pts;
+    }
+    if(state.shape === 'circle') {
+      const r = w / 2;
+      const cx = w / 2;
+      const cy = h / 2;
+      const pts = [];
+      const steps = 48;
+      for(let i=0; i<steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+      }
+      return pts;
+    }
+    return [[0,0],[w,0],[w,h],[0,h]];
+  };
+
+  const clipPolygon = (subject, clip) => {
+    let output = subject.slice();
+    const isInside = (pt, edgeStart, edgeEnd) => {
+      return (edgeEnd[0] - edgeStart[0]) * (pt[1] - edgeStart[1]) - (edgeEnd[1] - edgeStart[1]) * (pt[0] - edgeStart[0]) >= 0;
+    };
+    const lineIntersection = (s, e, cp1, cp2) => {
+      const dc = [cp1[0] - cp2[0], cp1[1] - cp2[1]];
+      const dp = [s[0] - e[0], s[1] - e[1]];
+      const n1 = cp1[0] * cp2[1] - cp1[1] * cp2[0];
+      const n2 = s[0] * e[1] - s[1] * e[0];
+      const denom = dc[0] * dp[1] - dc[1] * dp[0];
+      if(Math.abs(denom) < 1e-9) return e;
+      return [
+        (n1 * dp[0] - n2 * dc[0]) / denom,
+        (n1 * dp[1] - n2 * dc[1]) / denom
+      ];
+    };
+    for(let i=0; i<clip.length; i++) {
+      const cp1 = clip[i];
+      const cp2 = clip[(i + 1) % clip.length];
+      const input = output.slice();
+      output = [];
+      if(!input.length) break;
+      let s = input[input.length - 1];
+      input.forEach((e) => {
+        if(isInside(e, cp1, cp2)) {
+          if(!isInside(s, cp1, cp2)) {
+            output.push(lineIntersection(s, e, cp1, cp2));
+          }
+          output.push(e);
+        } else if(isInside(s, cp1, cp2)) {
+          output.push(lineIntersection(s, e, cp1, cp2));
+        }
+        s = e;
+      });
+    }
+    return output;
+  };
+
+  const clipSegmentToConvex = (p0, p1, clip) => {
+    let t0 = 0;
+    let t1 = 1;
+    for(let i=0; i<clip.length; i++) {
+      const a = clip[i];
+      const b = clip[(i + 1) % clip.length];
+      const edge = [b[0] - a[0], b[1] - a[1]];
+      const normal = [edge[1], -edge[0]];
+      const w = [p0[0] - a[0], p0[1] - a[1]];
+      const denom = normal[0] * (p1[0] - p0[0]) + normal[1] * (p1[1] - p0[1]);
+      const numer = -(normal[0] * w[0] + normal[1] * w[1]);
+      if(Math.abs(denom) < 1e-9) {
+        if(numer < 0) return null;
+        continue;
+      }
+      const t = numer / denom;
+      if(denom < 0) {
+        t0 = Math.max(t0, t);
+      } else {
+        t1 = Math.min(t1, t);
+      }
+      if(t0 > t1) return null;
+    }
+    const c0 = [p0[0] + (p1[0] - p0[0]) * t0, p0[1] + (p1[1] - p0[1]) * t0];
+    const c1 = [p0[0] + (p1[0] - p0[0]) * t1, p0[1] + (p1[1] - p0[1]) * t1];
+    return [c0, c1];
+  };
+
+  const clipPolylineToPolygon = (line, clip) => {
+    if(line.length < 2) return [];
+    const out = [];
+    let current = [];
+    for(let i=0; i<line.length - 1; i++) {
+      const clipped = clipSegmentToConvex(line[i], line[i + 1], clip);
+      if(clipped) {
+        const [c0, c1] = clipped;
+        if(!current.length) {
+          current.push(c0, c1);
+        } else {
+          const last = current[current.length - 1];
+          if(Math.hypot(last[0] - c0[0], last[1] - c0[1]) > 1e-4) {
+            out.push(current);
+            current = [c0, c1];
+          } else {
+            current.push(c1);
+          }
+        }
+      } else if(current.length) {
+        out.push(current);
+        current = [];
+      }
+    }
+    if(current.length) out.push(current);
+    return out;
+  };
+
+  const ensureClosed = (poly) => {
+    if(poly.length < 3) return poly;
+    const first = poly[0];
+    const last = poly[poly.length - 1];
+    if(Math.hypot(first[0] - last[0], first[1] - last[1]) > 1e-4) {
+      return poly.concat([first]);
+    }
+    return poly;
+  };
+
   $('btnDXF').onclick = () => {
     let dxf = "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
     const rgbToAci = ({ r, g, b }) => {
@@ -1892,28 +2177,46 @@
       alert('Generate contours first.');
       return;
     }
-    state.contourPaths.forEach(path => writePolyline('CONTOURS', path, state.contour.color));
+    const clipPoly = getClipPolygon();
+    if(polygonArea(clipPoly) < 0) clipPoly.reverse();
+    if(state.contour.enabled) {
+      state.contourPaths.forEach(path => {
+        clipPolylineToPolygon(path, clipPoly).forEach(seg => writePolyline('CONTOURS', seg, state.contour.color, false));
+      });
+    }
     if(state.osmData) {
       if(state.mapFeatures.greenAreas.enabled) {
-        state.osmData.greenPolygons.forEach(poly => writePolyline('GREEN_AREAS', poly, state.mapFeatures.greenAreas.color, true));
+        state.osmData.greenPolygons.forEach(poly => {
+          const clipped = clipPolygon(poly, clipPoly);
+          if(clipped.length >= 3) writePolyline('GREEN_AREAS', ensureClosed(clipped), state.mapFeatures.greenAreas.color, true);
+        });
       }
       if(state.mapFeatures.waterAreas.enabled) {
-        state.osmData.waterPolygons.forEach(poly => writePolyline('WATER_AREAS', poly, state.mapFeatures.waterAreas.color, true));
+        state.osmData.waterPolygons.forEach(poly => {
+          const clipped = clipPolygon(poly, clipPoly);
+          if(clipped.length >= 3) writePolyline('WATER_AREAS', ensureClosed(clipped), state.mapFeatures.waterAreas.color, true);
+        });
       }
       if(state.mapFeatures.rivers.enabled) {
-        state.osmData.waterLines.forEach(line => writePolyline('RIVERS', line, state.mapFeatures.rivers.color, false));
+        state.osmData.waterLines.forEach(line => {
+          clipPolylineToPolygon(line, clipPoly).forEach(seg => writePolyline('RIVERS', seg, state.mapFeatures.rivers.color, false));
+        });
       }
       if(state.mapFeatures.roads.enabled) {
-        state.osmData.roadLines.forEach(line => writePolyline('ROADS', line, state.mapFeatures.roads.color, false));
+        state.osmData.roadLines.forEach(line => {
+          clipPolylineToPolygon(line, clipPoly).forEach(seg => writePolyline('ROADS', seg, state.mapFeatures.roads.color, false));
+        });
       }
       if(state.mapFeatures.labels.enabled && state.osmData.places?.length) {
         state.osmData.places.forEach((place) => {
           const [x, y] = projectToSvg(place.lat, place.lon);
+          const inside = clipPolygon([[x, y], [x + 0.01, y], [x + 0.01, y + 0.01]], clipPoly).length;
+          if(!inside) return;
           writeText('LABELS', place.name, x, y, state.mapFeatures.labels.size, state.mapFeatures.labels.color);
         });
       }
     }
-    writePolyline('FRAME', [[0,0],[state.wMm,0],[state.wMm,state.hMm],[0,state.hMm],[0,0]], state.contour.color, true);
+    writePolyline('FRAME', ensureClosed(clipPoly), state.contour.color, true);
     dxf += "0\nENDSEC\n0\nEOF";
     save(new Blob([dxf], {type:'application/dxf'}), 'Topomapper.dxf');
   };
@@ -1972,15 +2275,16 @@
     }
     const boundaries = [range.minNorm, ...getContourLevels(range.minNorm, range.maxNorm), range.maxNorm];
     if(boundaries.length < 2) {
-      alert('Contour range too small for gradient export.');
+      alert('Contour range too small for height band export.');
       return;
     }
+    const bandCount = Math.max(2, boundaries.length - 1);
     const bandColors = [];
     for(let i=0; i<boundaries.length - 1; i++) {
       const midNorm = (boundaries[i] + boundaries[i + 1]) / 2;
       const height = state.terrainData.min + midNorm;
       const t = range.maxZ === range.minZ ? 0 : (height - range.minZ) / (range.maxZ - range.minZ);
-      bandColors.push(gradientColor(state.png.gradientStart, state.png.gradientEnd, t));
+      bandColors.push(getHypsometricBandColor(t, state.png.scheme, bandCount));
     }
 
     const imgData = ctx.createImageData(w, h);
