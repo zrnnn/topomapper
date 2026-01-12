@@ -7,6 +7,7 @@
 
   <!-- Libs -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Merriweather:wght@400;700&family=Roboto+Mono:wght@400;600&family=Nunito:wght@400;700&family=Roboto+Condensed:wght@400;700&family=Bebas+Neue&display=swap" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
@@ -42,14 +43,14 @@
       border-bottom: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px);
     }
     .top-brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 20px; letter-spacing: -0.6px; text-decoration: none; color: var(--color-text); }
-    .top-logo { width: 34px; height: 34px; object-fit: contain; }
+    .top-logo { width: auto; height: 50px; max-height: 50px; object-fit: contain; }
     .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: var(--color-text-sec); }
     .status-pill.ok { color: #9BE2B7; border-color: rgba(155,226,183,0.4); background: rgba(155,226,183,0.12); }
     .status-pill.error { color: #FF9A9A; border-color: rgba(255,154,154,0.4); background: rgba(255,154,154,0.12); }
 
     /* MAP AREA */
     .viewport { position: relative; flex: 1; height: 100%; }
-    #map { width: 100%; height: 100%; z-index: 0; background: #10141B; filter: contrast(1.1) saturate(0.85) brightness(0.92) hue-rotate(210deg); transition: filter 0.3s ease; }
+    #map { width: 100%; height: 100%; z-index: 0; background: #10141B; filter: grayscale(1) contrast(1.05) brightness(1.08) sepia(0.12) hue-rotate(190deg) saturate(0.6); transition: filter 0.3s ease; }
 
     /* SIDEBAR (iOS Floating Panel) */
     .sidebar {
@@ -62,12 +63,6 @@
     }
     .sidebar:hover { transform: translateY(-2px); box-shadow: 0 26px 65px rgba(0,0,0,0.5); }
 
-    .sidebar-header {
-      padding: 24px; border-bottom: 1px solid var(--color-border);
-      display: flex; align-items: center; justify-content: space-between;
-      background: rgba(16, 20, 28, 0.8);
-    }
-    .brand { font-weight: 800; font-size: 24px; letter-spacing: -0.8px; color: var(--color-text); text-decoration: none; display: flex; align-items: center; gap: 10px; }
     .scroll-content { flex: 1; overflow-y: auto; padding: 24px; }
 
     /* UI GROUPS */
@@ -111,8 +106,56 @@
     .layer-body { display: none; padding: 0 18px 18px 18px; background: rgba(10,12,18,0.7); }
     .layer-item.open .layer-body { display: block; }
     .layer-item.dragging { opacity: 0.65; border-color: rgba(76,141,255,0.8); }
-    .drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-right: 6px; opacity: 0.5; cursor: grab; }
-    .drag-handle svg { width: 16px; height: 16px; }
+    .layer-insert-indicator {
+      height: 2px;
+      margin: 6px 16px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(76,141,255,0), rgba(76,141,255,0.9), rgba(76,141,255,0));
+      box-shadow: 0 0 6px rgba(76,141,255,0.5);
+      display: none;
+    }
+    .drag-handle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      margin-right: 8px;
+      opacity: 0.85;
+      cursor: grab;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2);
+      color: var(--color-text);
+    }
+    .layer-head:hover .drag-handle { opacity: 1; }
+    .drag-handle svg { width: 14px; height: 14px; }
+    .drag-ghost {
+      position: absolute;
+      top: -9999px;
+      left: -9999px;
+      pointer-events: none;
+      opacity: 0.85;
+      transform: scale(0.98);
+      box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+    }
+    .layer-move {
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.08);
+      color: var(--color-text);
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+    .layer-move:hover:not(:disabled) { background: rgba(255,255,255,0.18); }
+    .layer-move:disabled { opacity: 0.35; cursor: not-allowed; }
+    .layer-move svg { width: 12px; height: 12px; }
     .layer-head { cursor: pointer; }
     .layer-head.drag-ready { cursor: grab; }
 
@@ -171,6 +214,45 @@
     }
     .btn-main:hover { transform: translateY(-2px); background: var(--color-primary-hover); }
     .btn-main:active { transform: translateY(0); }
+    .btn-secondary {
+      width: 100%;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.06);
+      color: var(--color-text);
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.2s ease;
+      box-shadow: none;
+    }
+    .btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
+    .btn-secondary:disabled { cursor: not-allowed; opacity: 0.45; }
+
+    .notice {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.08);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text);
+      margin-bottom: 12px;
+    }
+    .notice.show { display: flex; }
+    .notice button {
+      border: none;
+      background: transparent;
+      color: var(--color-text-sec);
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+    }
 
     .info-pill {
       display: inline-flex;
@@ -224,11 +306,62 @@
       display: flex; overflow: hidden; box-shadow: 0 40px 120px rgba(0,0,0,0.6);
     }
     .preview-stage {
-      flex: 1; background: #0B0F14; display: flex; align-items: stretch; justify-content: stretch;
-      padding: clamp(16px, 2vw, 40px); overflow: hidden;
+      flex: 1;
+      background: #0B0F14;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: stretch;
+      position: relative;
+      padding: clamp(16px, 2vw, 40px);
+      overflow: hidden;
+      gap: 16px;
     }
-    #previewArea { flex: 1; display: flex; align-items: center; justify-content: center; }
+    #previewArea {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(8px, 2.5vw, 24px);
+    }
     #previewArea svg { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
+    .preview-controls {
+      position: absolute;
+      left: 50%;
+      bottom: 5px;
+      transform: translateX(-50%);
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      pointer-events: auto;
+    }
+    .preview-controls .btn-secondary {
+      width: auto;
+      background: #1b2330;
+      border-color: rgba(255,255,255,0.18);
+    }
+    .btn-secondary.preview-toggle {
+      min-width: 220px;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-secondary.icon-button {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      font-size: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-secondary.preview-toggle.is-on {
+      border-color: rgba(76,141,255,0.5);
+      background: #25385f;
+      color: var(--color-primary);
+    }
     .export-side { width: 400px; background: #121821; border-left: 1px solid var(--color-border); padding: 40px; display: flex; flex-direction: column; gap: 30px; overflow-y: auto; }
 
     /* LOADER */
@@ -249,23 +382,10 @@
 <header class="top-header">
   <a class="top-brand" href="#">
     <img class="top-logo" src="assets/logo.png" alt="Topomapper logo">
-    Topomapper
   </a>
 </header>
 
 <div class="sidebar">
-  <div class="sidebar-header">
-    <a href="#" class="brand">
-      <svg width="26" height="26" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-        <rect x="6" y="6" width="36" height="36" rx="12" fill="rgba(76,141,255,0.18)" stroke="rgba(76,141,255,0.6)" stroke-width="1.5"/>
-        <path d="M12 18c4-6 20-8 24-2" stroke="var(--color-primary)" stroke-width="2.2" fill="none"/>
-        <path d="M12 24c5-5 19-6 24-1" stroke="rgba(76,141,255,0.75)" stroke-width="2" fill="none"/>
-        <path d="M12 30c6-4 18-4 24 1" stroke="rgba(76,141,255,0.55)" stroke-width="1.8" fill="none"/>
-        <path d="M16 36c4-2 12-2 16 1" stroke="rgba(76,141,255,0.4)" stroke-width="1.6" fill="none"/>
-      </svg>
-      Topomapper
-    </a>
-  </div>
   <div class="scroll-content">
     <div class="group">
       <label>Location Search</label>
@@ -316,7 +436,14 @@
 
 <div class="modal-overlay" id="modal">
   <div class="modal-card">
-    <div class="preview-stage" id="previewArea"></div>
+    <div class="preview-stage">
+      <div id="previewArea"></div>
+      <div class="preview-controls">
+        <button id="undoStep2" class="btn-secondary icon-button" type="button" aria-label="Undo last change" title="Undo">&#8630;</button>
+        <button id="refreshPreview" class="btn-secondary preview-toggle" type="button">Auto Preview On</button>
+        <button id="redoStep2" class="btn-secondary icon-button" type="button" aria-label="Redo last change" title="Redo">&#8631;</button>
+      </div>
+    </div>
     <div class="export-side">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
@@ -332,6 +459,17 @@
       </div>
 
       <div class="step-content active" data-step="2">
+        <div id="mapDataNotice" class="notice">
+          <span id="mapDataNoticeText">Map data loading...</span>
+          <button type="button" id="mapDataNoticeClose" aria-label="Dismiss notification">&times;</button>
+        </div>
+        <div class="group">
+          <label>Preview</label>
+          <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
+            Auto preview can be switched off to avoid performance issues while customizing.
+          </p>
+        </div>
+        <button id="resetStep2" class="btn-secondary">Reset Design</button>
         <div class="group">
           <label>Design Preset</label>
           <select id="presetSel" style="margin-top:6px;">
@@ -356,9 +494,8 @@
         <div class="group">
           <label>Layer Stack (Drag to Reorder)</label>
           <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
-            Grab the handle to move layers. Items higher in the list render above the ones below.
+            Grab the handle or use the arrows to move layers. Items higher in the list render above the ones below.
           </p>
-          <div id="mapDataStatus" class="status-pill" style="margin-top:10px;">Map data: --</div>
           <div id="layerStack" class="layer-list">
             <div class="layer-item" data-layer="labels" draggable="true">
               <div class="layer-head drag-ready">
@@ -370,20 +507,34 @@
                   <span>Place Names</span>
                 </div>
                 <div class="layer-actions">
+                  <button class="layer-move" data-move="up" title="Move layer up" aria-label="Move layer up">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l-6 6h12z"/></svg>
+                  </button>
+                  <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
+                  </button>
                   <div class="ios-switch" id="labelToggle"></div>
                 </div>
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Label Color</label><div class="color-dot" id="labelColorDot" style="background:#1E232B"><input type="color" id="labelColor" value="#1E232B"></div></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="labelOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="labelOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
-                <div class="cust-row"><label style="margin:0">Font Size</label><input type="range" id="labelSize" min="0.2" max="1.5" step="0.1" value="0.32"><span id="labelSizeVal" style="font-size:11px;width:36px;text-align:right;">0.32</span></div>
+                <div class="cust-row"><label style="margin:0">Text Background</label><div class="ios-switch" id="labelBgToggle"></div></div>
+                <div class="cust-row"><label style="margin:0">Background Color</label><div class="color-dot" id="labelBgColorDot" style="background:#F5F2EB"><input type="color" id="labelBgColor" value="#F5F2EB"></div></div>
+                <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="labelOpacity" min="0" max="100" step="1" value="85"><span id="labelOpacityVal" style="font-size:11px;width:46px;text-align:right;">85%</span></div>
+                <div class="cust-row"><label style="margin:0">Font Size (mm)</label><input type="range" id="labelSize" min="0.2" max="3" step="0.05" value="0.4"><span id="labelSizeVal" style="font-size:11px;width:56px;text-align:right;">0.40 mm</span></div>
+                <div class="cust-row"><label style="margin:0">Scale by Place Rank</label><div class="ios-switch" id="labelScaleToggle"></div></div>
                 <div class="cust-row"><label style="margin:0">Typeface</label>
                   <select id="labelFont">
                     <option value="system" selected>System Sans</option>
                     <option value="serif">Serif</option>
                     <option value="mono">Mono</option>
+                    <option value="rounded">Rounded</option>
+                    <option value="condensed">Condensed</option>
+                    <option value="display">Display</option>
                   </select>
                 </div>
+                <div class="cust-row"><label style="margin:0">Bold</label><div class="ios-switch" id="labelBoldToggle"></div></div>
+                <div class="cust-row"><label style="margin:0">Italic</label><div class="ios-switch" id="labelItalicToggle"></div></div>
               </div>
             </div>
             <div class="layer-item" data-layer="roads" draggable="true" style="margin-top:10px;">
@@ -396,13 +547,19 @@
                   <span>Roads</span>
                 </div>
                 <div class="layer-actions">
+                  <button class="layer-move" data-move="up" title="Move layer up" aria-label="Move layer up">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l-6 6h12z"/></svg>
+                  </button>
+                  <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
+                  </button>
                   <div class="ios-switch" id="roadToggle"></div>
                 </div>
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" id="roadColorDot" style="background:#C9A75A"><input type="color" id="roadColor" value="#C9A75A"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="roadWidth" min="0.05" max="0.6" step="0.05" value="0.35"><span id="roadWidthVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="roadOpacity" min="0.1" max="1" step="0.05" value="0.75"><span id="roadOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.75</span></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="roadWidth" min="0.5" max="8" step="0.5" value="1.5"><span id="roadWidthVal" style="font-size:11px;width:48px;text-align:right;">1.5 px</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="roadOpacity" min="0" max="100" step="1" value="75"><span id="roadOpacityVal" style="font-size:11px;width:46px;text-align:right;">75%</span></div>
               </div>
             </div>
             <div class="layer-item" data-layer="rivers" draggable="true" style="margin-top:10px;">
@@ -415,13 +572,19 @@
                   <span>Rivers</span>
                 </div>
                 <div class="layer-actions">
-                  <div class="ios-switch on" id="riverToggle"></div>
+                  <button class="layer-move" data-move="up" title="Move layer up" aria-label="Move layer up">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l-6 6h12z"/></svg>
+                  </button>
+                  <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
+                  </button>
+                  <div class="ios-switch" id="riverToggle"></div>
                 </div>
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Line Color</label><div class="color-dot" id="riverColorDot" style="background:#7DB5D3"><input type="color" id="riverColor" value="#7DB5D3"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="riverWidth" min="0.05" max="0.6" step="0.05" value="0.4"><span id="riverWidthVal" style="font-size:11px;width:36px;text-align:right;">0.4</span></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="riverOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="riverOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="riverWidth" min="0.5" max="8" step="0.5" value="1.5"><span id="riverWidthVal" style="font-size:11px;width:48px;text-align:right;">1.5 px</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="riverOpacity" min="0" max="100" step="1" value="85"><span id="riverOpacityVal" style="font-size:11px;width:46px;text-align:right;">85%</span></div>
               </div>
             </div>
             <div class="layer-item" data-layer="water" draggable="true" style="margin-top:10px;">
@@ -434,12 +597,18 @@
                   <span>Water Areas</span>
                 </div>
                 <div class="layer-actions">
-                  <div class="ios-switch on" id="waterAreaToggle"></div>
+                  <button class="layer-move" data-move="up" title="Move layer up" aria-label="Move layer up">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l-6 6h12z"/></svg>
+                  </button>
+                  <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
+                  </button>
+                  <div class="ios-switch" id="waterAreaToggle"></div>
                 </div>
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="waterAreaColorDot" style="background:#7DB5D3"><input type="color" id="waterAreaColor" value="#7DB5D3"></div></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="waterAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.45"><span id="waterAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.45</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="waterAreaOpacity" min="0" max="100" step="1" value="45"><span id="waterAreaOpacityVal" style="font-size:11px;width:46px;text-align:right;">45%</span></div>
               </div>
             </div>
             <div class="layer-item" data-layer="green" draggable="true" style="margin-top:10px;">
@@ -452,12 +621,18 @@
                   <span>Green Areas</span>
                 </div>
                 <div class="layer-actions">
-                  <div class="ios-switch on" id="greenAreaToggle"></div>
+                  <button class="layer-move" data-move="up" title="Move layer up" aria-label="Move layer up">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l-6 6h12z"/></svg>
+                  </button>
+                  <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
+                  </button>
+                  <div class="ios-switch" id="greenAreaToggle"></div>
                 </div>
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="greenAreaColorDot" style="background:#7FAE8A"><input type="color" id="greenAreaColor" value="#7FAE8A"></div></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="greenAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.15"><span id="greenAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.15</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="greenAreaOpacity" min="0" max="100" step="1" value="15"><span id="greenAreaOpacityVal" style="font-size:11px;width:46px;text-align:right;">15%</span></div>
               </div>
             </div>
             <div class="layer-item open" data-layer="contours" draggable="true" style="margin-top:10px;">
@@ -470,15 +645,21 @@
                   <span>Contour Lines</span>
                 </div>
                 <div class="layer-actions">
+                  <button class="layer-move" data-move="up" title="Move layer up" aria-label="Move layer up">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l-6 6h12z"/></svg>
+                  </button>
+                  <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
+                  </button>
                   <div class="ios-switch on" id="contourToggle"></div>
                 </div>
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#10141B"><input type="color" id="contourColor" value="#10141B"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
-                <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="8" max="60" step="2" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="contourOpacity" min="0.1" max="1" step="0.05" value="0.8"><span id="contourOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.8</span></div>
-                <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="4" step="1" value="1"><span id="contourSmoothVal" style="font-size:11px;width:36px;text-align:right;">1</span></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="contourWidth" min="0.5" max="8" step="0.5" value="1.5"><span id="contourWidthVal" style="font-size:11px;width:48px;text-align:right;">1.5 px</span></div>
+                <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="5" max="350" step="5" value="24"><span id="contourDensityVal" style="font-size:11px;width:40px;text-align:right;">24</span></div>
+          <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="contourOpacity" min="0" max="100" step="1" value="80"><span id="contourOpacityVal" style="font-size:11px;width:46px;text-align:right;">80%</span></div>
+                <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="20" step="1" value="4"><span id="contourSmoothVal" style="font-size:11px;width:40px;text-align:right;">4</span></div>
               </div>
             </div>
           </div>
@@ -499,19 +680,39 @@
                 <select id="pngScheme">
                   <option value="color" selected>Topographic Color</option>
                   <option value="mono">Topographic Mono</option>
+                  <option value="terra">Terra Warm</option>
+                  <option value="glacier">Glacier Cool</option>
                 </select>
               </div>
               <div class="cust-row">
-                <label style="margin:0">Fill Opacity</label>
-                <input type="range" id="pngGradOpacity" min="0.1" max="1" step="0.05" value="0.9">
-                <span id="pngGradOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.9</span>
+                <label style="margin:0">Blend Mode</label>
+                <select id="pngBlendMode">
+                  <option value="normal" selected>Normal</option>
+                  <option value="multiply">Multiply</option>
+                  <option value="color">Color</option>
+                </select>
+              </div>
+              <div class="cust-row">
+                <label style="margin:0">Fill Opacity (%)</label>
+                <input type="range" id="pngGradOpacity" min="0" max="100" step="1" value="0">
+                <span id="pngGradOpacityVal" style="font-size:11px;width:36px;text-align:right;">0%</span>
+              </div>
+              <div class="cust-row">
+                <label style="margin:0">Gradient Shift (%)</label>
+                <input type="range" id="pngGradShift" min="-80" max="80" step="1" value="0">
+                <span id="pngGradShiftVal" style="font-size:11px;width:44px;text-align:right;">0%</span>
+              </div>
+              <div class="cust-row">
+                <label style="margin:0">Gradient Scale (%)</label>
+                <input type="range" id="pngGradScale" min="30" max="200" step="1" value="100">
+                <span id="pngGradScaleVal" style="font-size:11px;width:44px;text-align:right;">100%</span>
               </div>
               <div class="gradient-preview" id="pngGradientPreview"></div>
               <div class="info-pill" id="pngRangeInfo" style="margin-top:10px;">Range: --</div>
             </div>
           </div>
         </div>
-        <button id="toExport" class="btn-main" style="margin-top:6px;">Continue to Export Design</button>
+        <button id="toExport" class="btn-main" style="margin-top:6px;">Continue to Export</button>
       </div>
 
       <div class="step-content" data-step="3">
@@ -537,7 +738,7 @@
         <label>Poster (PNG High-Res)</label>
         <label style="margin-top:10px; font-size:10px;">Resolution (Long Edge)</label>
         <div class="cust-row" style="margin-bottom:8px;">
-          <input type="range" id="pngResRange" min="500" max="5000" step="100" value="2000">
+          <input type="range" id="pngResRange" min="500" max="8000" step="100" value="2000">
           <span id="pngResVal" style="font-size:12px; font-weight:700; width:60px;">2000px</span>
         </div>
         <button id="btnPNG" class="btn-main" style="background:#2B3440; color:#F5F7FB;">Save PNG</button>
@@ -555,15 +756,18 @@
     contour: {
       enabled: true,
       density: 24,
-      width: 0.2,
+      width: 1.5,
       color: '#10141B',
-      smooth: 1,
-      opacity: 0.8
+      smooth: 4,
+      opacity: 80
     },
     png: {
-      layered: false,
+      layered: true,
       scheme: 'color',
-      gradientOpacity: 0.9,
+      blend: 'normal',
+      gradientOpacity: 0,
+      gradientShift: 0,
+      gradientScale: 100,
       reliefStrength: 0.48,
       reliefWarm: '#F3A15F',
       reliefShadow: '#0A1624'
@@ -574,23 +778,89 @@
       line: '#10141B'
     },
     mapFeatures: {
-      waterAreas: { enabled: true, color: '#7DB5D3', opacity: 0.45 },
-      rivers: { enabled: true, color: '#7DB5D3', width: 0.4, opacity: 0.85 },
-      greenAreas: { enabled: true, color: '#7FAE8A', opacity: 0.15 },
-      roads: { enabled: false, color: '#C9A75A', width: 0.35, opacity: 0.75 },
-      labels: { enabled: false, color: '#1E232B', size: 0.32, font: 'system', opacity: 0.85 }
+      waterAreas: { enabled: false, color: '#7DB5D3', opacity: 45 },
+      rivers: { enabled: false, color: '#7DB5D3', width: 1.5, opacity: 85 },
+      greenAreas: { enabled: false, color: '#7FAE8A', opacity: 15 },
+      roads: { enabled: false, color: '#C9A75A', width: 1.5, opacity: 75 },
+      labels: {
+        enabled: false,
+        color: '#1E232B',
+        size: 0.4,
+        font: 'system',
+        opacity: 85,
+        background: { enabled: true, color: '#F5F2EB' },
+        weight: 'normal',
+        style: 'normal',
+        scaleByRank: true
+      }
     },
     layerOrder: ['labels', 'roads', 'rivers', 'water', 'green', 'contours'],
     bbox: null,
+    renderBbox: null,
     terrainData: null,
     contourPaths: [],
     osmData: null,
-    osmStatus: { loaded: false, error: null, tiles: 1, ignored: false }
+    osmStatus: { loaded: false, error: null, tiles: 1, ignored: false },
+    previewDirty: false,
+    autoPreview: true,
+    terrainVersion: 0,
+    pngPreviewCache: { key: null, dataUrl: null }
+  };
+
+  const defaultDesign = {
+    contour: {
+      enabled: true,
+      density: 24,
+      width: 1.5,
+      color: '#10141B',
+      smooth: 4,
+      opacity: 80
+    },
+    png: {
+      layered: true,
+      scheme: 'color',
+      blend: 'normal',
+      gradientOpacity: 0,
+      gradientShift: 0,
+      gradientScale: 100,
+      reliefStrength: 0.48,
+      reliefWarm: '#F3A15F',
+      reliefShadow: '#0A1624'
+    },
+    theme: {
+      preset: 'bright',
+      background: '#F5F2EB',
+      line: '#10141B'
+    },
+    mapFeatures: {
+      waterAreas: { enabled: false, color: '#7DB5D3', opacity: 45 },
+      rivers: { enabled: false, color: '#7DB5D3', width: 1.5, opacity: 85 },
+      greenAreas: { enabled: false, color: '#7FAE8A', opacity: 15 },
+      roads: { enabled: false, color: '#C9A75A', width: 1.5, opacity: 75 },
+      labels: {
+        enabled: false,
+        color: '#1E232B',
+        size: 0.4,
+        font: 'system',
+        opacity: 85,
+        background: { enabled: true, color: '#F5F2EB' },
+        weight: 'normal',
+        style: 'normal',
+        scaleByRank: true
+      }
+    },
+    layerOrder: ['labels', 'roads', 'rivers', 'water', 'green', 'contours']
   };
 
   const $ = id => document.getElementById(id);
   const msg = t => { $('loaderText').innerText=t; $('loader').classList.add('active'); };
   const idle = () => $('loader').classList.remove('active');
+  const refreshPreviewBtn = $('refreshPreview');
+  const undoStep2Btn = $('undoStep2');
+  const redoStep2Btn = $('redoStep2');
+  const mapDataNotice = $('mapDataNotice');
+  const mapDataNoticeText = $('mapDataNoticeText');
+  const mapDataNoticeClose = $('mapDataNoticeClose');
 
   // --- HELPERS: SCALING & INTERPOLATION ---
   function getZInterpolated(nx, ny) {
@@ -618,7 +888,7 @@
 
   function getContourLineCount() {
     const desired = Math.max(4, Math.round(state.contour.density));
-    const minSpacing = Math.max(1.2, state.contour.width * 8);
+    const minSpacing = Math.max(1.2, pxToMm(state.contour.width) * 8);
     const maxLines = Math.max(4, Math.floor(Math.min(state.wMm, state.hMm) / minSpacing));
     return Math.max(4, Math.min(desired, maxLines));
   }
@@ -687,6 +957,34 @@
 
   function lerp(a, b, t) { return a + (b - a) * t; }
   function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
+  const PX_TO_MM = 0.264583;
+  const pxToMm = (value) => value * PX_TO_MM;
+  const formatPx = (value) => `${value.toFixed(1).replace(/\.0$/, '')} px`;
+  const formatMm = (value) => `${value.toFixed(2)} mm`;
+  function smoothstep(t) {
+    const clamped = clamp(t, 0, 1);
+    return clamped * clamped * (3 - 2 * clamped);
+  }
+
+  function getSmoothedBandColor(zNorm, boundaries, bandColors) {
+    const band = findBandIndex(zNorm, boundaries);
+    let color = bandColors[band];
+    const lower = boundaries[band];
+    const upper = boundaries[band + 1];
+    const bandSpan = Math.max(upper - lower, 1e-6);
+    const blendWindow = Math.min(0.04, bandSpan * 0.35);
+    if(blendWindow > 0) {
+      if(band > 0) {
+        const t = smoothstep((zNorm - lower) / blendWindow);
+        color = mixColor(bandColors[band - 1], color, t);
+      }
+      if(band < bandColors.length - 1) {
+        const t = smoothstep((upper - zNorm) / blendWindow);
+        color = mixColor(color, bandColors[band + 1], 1 - t);
+      }
+    }
+    return { band, color };
+  }
 
   function gradientColor(startColor, endColor, t) {
     const s = colorToRgb(startColor);
@@ -703,7 +1001,13 @@
     if(scheme === 'mono') {
       return ['#FFFFFF', '#E6E6E6', '#CCCCCC', '#B3B3B3', '#999999', '#7F7F7F', '#666666', '#4D4D4D', '#333333'];
     }
-    return [
+    if(scheme === 'terra') {
+      return ['#1F4E5F', '#3E6F6E', '#6A8E6D', '#9CAD68', '#C9B86A', '#D5A86A', '#C98B5E', '#B16F50', '#8C5A44'];
+    }
+    if(scheme === 'glacier') {
+      return ['#0E2A47', '#1D4C6B', '#2F6E8E', '#4D90A8', '#7BB1C2', '#A6CAD5', '#CDE1E6', '#E5EFF2', '#F4F8FA'];
+    }
+    const stops = [
       '#0F3E63',
       '#1F5C83',
       '#3B7EA6',
@@ -715,10 +1019,30 @@
       '#B18D5B',
       '#8E6C45'
     ];
+    const waterColor = state.mapFeatures?.waterAreas?.color;
+    const greenColor = state.mapFeatures?.greenAreas?.color;
+    if(waterColor && greenColor) {
+      stops[0] = waterColor;
+      stops[1] = gradientColor(waterColor, greenColor, 0.55);
+      stops[2] = greenColor;
+    } else if(waterColor) {
+      stops[0] = waterColor;
+      stops[1] = gradientColor(waterColor, stops[2], 0.5);
+    } else if(greenColor) {
+      stops[0] = gradientColor(greenColor, stops[0], 0.6);
+      stops[1] = greenColor;
+    }
+    return stops;
+  };
+
+  const getScaledGradientT = (t) => {
+    const scale = Math.max(0.3, Math.min(2.0, (state.png.gradientScale ?? 100) / 100));
+    const shift = Math.max(-0.8, Math.min(0.8, (state.png.gradientShift ?? 0) / 100));
+    return clamp((t - 0.5) / scale + 0.5 + shift, 0, 1);
   };
 
   const getHypsometricBandColor = (t, scheme, bandCount) => {
-    const clamped = clamp(t, 0, 1);
+    const clamped = getScaledGradientT(t);
     const bandIndex = Math.min(bandCount - 1, Math.floor(clamped * bandCount));
     const stops = getHypsometricStops(scheme);
     if(bandCount <= 1) return colorToRgb(stops[0]);
@@ -780,7 +1104,26 @@
 
   function getLayeredPreviewDataUrl() {
     if(!state.terrainData) return null;
-    const alpha = Math.round(255 * clamp(state.png.gradientOpacity ?? 1, 0, 1));
+    const previewKey = JSON.stringify({
+      terrainVersion: state.terrainVersion,
+      wMm: state.wMm,
+      hMm: state.hMm,
+      contourDensity: state.contour.density,
+      contourWidth: state.contour.width,
+      scheme: state.png.scheme,
+      gradientOpacity: state.png.gradientOpacity,
+      gradientShift: state.png.gradientShift,
+      gradientScale: state.png.gradientScale,
+      reliefStrength: state.png.reliefStrength,
+      reliefWarm: state.png.reliefWarm,
+      reliefShadow: state.png.reliefShadow,
+      waterColor: state.mapFeatures?.waterAreas?.color,
+      greenColor: state.mapFeatures?.greenAreas?.color
+    });
+    if(state.pngPreviewCache?.key === previewKey && state.pngPreviewCache.dataUrl) {
+      return state.pngPreviewCache.dataUrl;
+    }
+    const alpha = Math.round(255 * clamp(toUnitOpacity(state.png.gradientOpacity), 0, 1));
     const ratio = state.hMm / state.wMm;
     const target = 320;
     let w = target;
@@ -805,7 +1148,11 @@
     cv.width = w;
     cv.height = h;
     const ctx = cv.getContext('2d');
-    const imgData = ctx.createImageData(w, h);
+    const gradientCanvas = document.createElement('canvas');
+    gradientCanvas.width = w;
+    gradientCanvas.height = h;
+    const gradientCtx = gradientCanvas.getContext('2d');
+    const imgData = gradientCtx.createImageData(w, h);
     const data = imgData.data;
     const step = 1 / Math.max(state.terrainData.cols - 1, state.terrainData.rows - 1);
     for(let y=0; y<h; y++) {
@@ -813,11 +1160,11 @@
       for(let x=0; x<w; x++) {
         const nx = w === 1 ? 0 : x / (w - 1);
         const zNorm = getZInterpolated(nx, ny);
-        const band = findBandIndex(zNorm, boundaries);
+        const { color: bandColor } = getSmoothedBandColor(zNorm, boundaries, bandColors);
         const height = state.terrainData.min + zNorm;
         const elevationT = range.maxZ === range.minZ ? 0 : (height - range.minZ) / (range.maxZ - range.minZ);
         const shade = getHillshade(nx, ny, step, zNorm);
-        const color = applyReliefOverlay(bandColors[band], shade, elevationT);
+        const color = applyReliefOverlay(bandColor, shade, elevationT);
         const idx = (y * w + x) * 4;
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -825,8 +1172,14 @@
         data[idx + 3] = alpha;
       }
     }
-    ctx.putImageData(imgData, 0, 0);
-    return cv.toDataURL('image/png');
+    gradientCtx.putImageData(imgData, 0, 0);
+    ctx.save();
+    ctx.globalCompositeOperation = getCanvasBlendMode(state.png.blend);
+    ctx.drawImage(gradientCanvas, 0, 0);
+    ctx.restore();
+    const dataUrl = cv.toDataURL('image/png');
+    state.pngPreviewCache = { key: previewKey, dataUrl };
+    return dataUrl;
   }
 
   function getContourSegments(level, widthMm, heightMm) {
@@ -1002,8 +1355,9 @@
   }
 
   function projectToSvg(lat, lon) {
-    if(!state.bbox) return [0, 0];
-    const { sw, ne } = state.bbox;
+    const bbox = state.renderBbox || state.bbox;
+    if(!bbox) return [0, 0];
+    const { sw, ne } = bbox;
     const x = ((lon - sw.lng) / (ne.lng - sw.lng)) * state.wMm;
     const y = ((ne.lat - lat) / (ne.lat - sw.lat)) * state.hMm;
     return [x, y];
@@ -1223,6 +1577,7 @@
 
   async function fetchMapFeatures(sw, ne) {
     state.osmStatus = { loaded: false, error: null, tiles: 1, ignored: false };
+    updateMapDataStatus({ announce: true, loading: true });
     const attemptFetch = async (bboxes) => {
       const osmData = buildEmptyOsmData();
       for(const bbox of bboxes) {
@@ -1240,7 +1595,7 @@
       state.osmData = await attemptFetch([{ sw, ne }]);
       state.osmStatus.loaded = true;
       state.osmStatus.tiles = 1;
-      updateMapDataStatus();
+      updateMapDataStatus({ announce: true });
       return true;
     } catch (err) {
       try {
@@ -1248,12 +1603,12 @@
         state.osmData = await attemptFetch(tiledBboxes);
         state.osmStatus.loaded = true;
         state.osmStatus.tiles = tiledBboxes.length;
-        updateMapDataStatus();
+        updateMapDataStatus({ announce: true });
         return true;
       } catch (tileErr) {
         state.osmData = buildEmptyOsmData();
         state.osmStatus.error = 'Straßen, Flüsse oder Flächen konnten nicht geladen werden. Bitte wähle einen kleineren Ausschnitt oder versuche es erneut.';
-        updateMapDataStatus();
+        updateMapDataStatus({ announce: true });
         return false;
       }
     }
@@ -1315,9 +1670,42 @@
     });
   });
 
+  const syncLayerOrder = (container) => {
+    if(!container) return;
+    const orderedItems = Array.from(container.children).filter(el => el.dataset.layer);
+    state.layerOrder = orderedItems.map(el => el.dataset.layer);
+    orderedItems.forEach((item, idx) => {
+      const upBtn = item.querySelector('[data-move="up"]');
+      const downBtn = item.querySelector('[data-move="down"]');
+      if(upBtn) upBtn.disabled = idx === 0;
+      if(downBtn) downBtn.disabled = idx === orderedItems.length - 1;
+    });
+  };
+
+  const moveLayerItem = (item, direction) => {
+    const container = item?.closest('.layer-list');
+    if(!container) return;
+    const siblings = Array.from(container.children).filter(el => el.dataset.layer);
+    const index = siblings.indexOf(item);
+    const nextIndex = index + direction;
+    if(index === -1 || nextIndex < 0 || nextIndex >= siblings.length) return;
+    if(direction < 0) {
+      container.insertBefore(item, siblings[nextIndex]);
+    } else {
+      container.insertBefore(item, siblings[nextIndex].nextSibling);
+    }
+    syncLayerOrder(container);
+    markPreviewDirty();
+    pushHistoryState();
+  };
+
   const setupLayerReorder = (container) => {
     if(!container) return;
     let draggedItem = null;
+    let dragPreview = null;
+    const insertIndicator = document.createElement('div');
+    insertIndicator.className = 'layer-insert-indicator';
+    container.appendChild(insertIndicator);
     const items = Array.from(container.querySelectorAll('[draggable="true"]'));
     items.forEach((item) => {
       let handleActive = false;
@@ -1327,6 +1715,13 @@
         dragHandle.addEventListener('pointerup', () => { handleActive = false; });
         dragHandle.addEventListener('pointerleave', () => { handleActive = false; });
       }
+      item.querySelectorAll('[data-move]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const direction = btn.dataset.move === 'up' ? -1 : 1;
+          moveLayerItem(item, direction);
+        });
+      });
       item.addEventListener('dragstart', (e) => {
         if(!handleActive) {
           e.preventDefault();
@@ -1334,17 +1729,39 @@
         }
         draggedItem = item;
         item.classList.add('dragging');
+        insertIndicator.style.display = 'none';
         if(e.dataTransfer) {
           e.dataTransfer.effectAllowed = 'move';
+          dragPreview = item.cloneNode(true);
+          dragPreview.classList.add('drag-ghost');
+          dragPreview.style.width = `${item.offsetWidth}px`;
+          document.body.appendChild(dragPreview);
+          const handleRect = dragHandle?.getBoundingClientRect();
+          const itemRect = item.getBoundingClientRect();
+          const offsetX = handleRect ? handleRect.left - itemRect.left + handleRect.width / 2 : 20;
+          const offsetY = handleRect ? handleRect.top - itemRect.top + handleRect.height / 2 : 20;
+          e.dataTransfer.setDragImage(dragPreview, offsetX, offsetY);
         }
       });
       item.addEventListener('dragend', () => {
         item.classList.remove('dragging');
         draggedItem = null;
         handleActive = false;
+        if(dragPreview) {
+          dragPreview.remove();
+          dragPreview = null;
+        }
+        insertIndicator.style.display = 'none';
       });
       item.addEventListener('dragover', (e) => {
         e.preventDefault();
+        if(!draggedItem) return;
+        const target = e.currentTarget;
+        if(!target || target === draggedItem) return;
+        const rect = target.getBoundingClientRect();
+        const insertBefore = e.clientY < rect.top + rect.height / 2;
+        insertIndicator.style.display = 'block';
+        container.insertBefore(insertIndicator, insertBefore ? target : target.nextSibling);
       });
       item.addEventListener('drop', (e) => {
         e.preventDefault();
@@ -1357,10 +1774,13 @@
         } else {
           container.insertBefore(draggedItem, item);
         }
-        state.layerOrder = Array.from(container.children).filter(el => el.dataset.layer).map(el => el.dataset.layer);
-        if(state.terrainData) renderSVG();
+        syncLayerOrder(container);
+        markPreviewDirty();
+        pushHistoryState();
+        insertIndicator.style.display = 'none';
       });
     });
+    syncLayerOrder(container);
   };
 
   const layerStack = $('layerStack');
@@ -1377,6 +1797,59 @@
   if(toExport) toExport.addEventListener('click', () => setStep('3'));
   const backToStyle = $('backToStyle');
   if(backToStyle) backToStyle.addEventListener('click', () => setStep('2'));
+  if(refreshPreviewBtn) {
+    refreshPreviewBtn.addEventListener('click', () => {
+      if(!state.terrainData) return;
+      state.autoPreview = !state.autoPreview;
+      updateAutoPreviewButton();
+      if(state.autoPreview && state.previewDirty) {
+        renderSVG();
+      }
+    });
+  }
+  if(undoStep2Btn) {
+    undoStep2Btn.addEventListener('click', () => {
+      if(historyState.past.length <= 1) return;
+      const current = historyState.past.pop();
+      historyState.future.push(current);
+      applyHistorySnapshot(historyState.past[historyState.past.length - 1]);
+    });
+  }
+  if(redoStep2Btn) {
+    redoStep2Btn.addEventListener('click', () => {
+      const snapshot = historyState.future.pop();
+      if(!snapshot) return;
+      historyState.past.push(snapshot);
+      applyHistorySnapshot(snapshot);
+    });
+  }
+  if(mapDataNoticeClose) {
+    mapDataNoticeClose.addEventListener('click', () => {
+      hideMapNotice();
+    });
+  }
+  const resetStep2Btn = $('resetStep2');
+  if(resetStep2Btn) {
+    resetStep2Btn.addEventListener('click', () => {
+      state.contour = { ...defaultDesign.contour };
+      state.png = { ...defaultDesign.png };
+      state.theme = { ...defaultDesign.theme };
+      state.mapFeatures = {
+        waterAreas: { ...defaultDesign.mapFeatures.waterAreas },
+        rivers: { ...defaultDesign.mapFeatures.rivers },
+        greenAreas: { ...defaultDesign.mapFeatures.greenAreas },
+        roads: { ...defaultDesign.mapFeatures.roads },
+        labels: {
+          ...defaultDesign.mapFeatures.labels,
+          background: { ...defaultDesign.mapFeatures.labels.background }
+        }
+      };
+      state.layerOrder = [...defaultDesign.layerOrder];
+      syncUiFromState();
+      markPreviewDirty();
+      pushHistoryState();
+    });
+  }
 
   const presets = {
     dark: {
@@ -1429,12 +1902,125 @@
     return `#${toHex(parseInt(match[1], 10))}${toHex(parseInt(match[2], 10))}${toHex(parseInt(match[3], 10))}`.toUpperCase();
   };
 
+  const toPercent = (value) => {
+    const parsed = parseFloat(value);
+    if(Number.isNaN(parsed)) return 0;
+    return Math.min(100, Math.max(0, parsed));
+  };
+
+  const formatPercent = (value) => `${Math.round(value)}%`;
+  const toUnitOpacity = (value) => Math.min(1, Math.max(0, value / 100));
+  const formatSignedPercent = (value) => {
+    const rounded = Math.round(value);
+    return `${rounded > 0 ? '+' : ''}${rounded}%`;
+  };
+  const getBlendMode = (mode) => {
+    const allowed = ['normal', 'multiply', 'color'];
+    return allowed.includes(mode) ? mode : 'normal';
+  };
+  const getCanvasBlendMode = (mode) => (getBlendMode(mode) === 'normal' ? 'source-over' : getBlendMode(mode));
+  const updateBlendStyle = (mode) => {
+    const blendMode = getBlendMode(mode);
+    return blendMode === 'normal' ? '' : ` style="mix-blend-mode:${blendMode};"`;
+  };
+
+  let previewTimer = null;
+  const historyState = { past: [], future: [] };
+  const historyLimit = 5;
+  let isRestoringHistory = false;
+
+  const getDesignSnapshot = () => JSON.stringify({
+    theme: state.theme,
+    contour: state.contour,
+    png: state.png,
+    mapFeatures: state.mapFeatures,
+    layerOrder: state.layerOrder
+  });
+
+  const updateHistoryButtons = () => {
+    if(undoStep2Btn) undoStep2Btn.disabled = historyState.past.length <= 1;
+    if(redoStep2Btn) redoStep2Btn.disabled = historyState.future.length === 0;
+  };
+
+  const pushHistoryState = () => {
+    if(isRestoringHistory) return;
+    const snapshot = getDesignSnapshot();
+    const last = historyState.past[historyState.past.length - 1];
+    if(snapshot === last) return;
+    historyState.past.push(snapshot);
+    if(historyState.past.length > historyLimit) historyState.past.shift();
+    historyState.future = [];
+    updateHistoryButtons();
+  };
+
+  const applyHistorySnapshot = (snapshot) => {
+    if(!snapshot) return;
+    isRestoringHistory = true;
+    const parsed = JSON.parse(snapshot);
+    state.theme = parsed.theme;
+    state.contour = parsed.contour;
+    state.png = parsed.png;
+    state.mapFeatures = parsed.mapFeatures;
+    state.layerOrder = parsed.layerOrder;
+    syncUiFromState();
+    isRestoringHistory = false;
+    updateHistoryButtons();
+  };
+
+  const updateAutoPreviewButton = () => {
+    if(!refreshPreviewBtn) return;
+    const label = state.autoPreview ? 'Auto Preview On' : 'Auto Preview Off';
+    const dirtyHint = !state.autoPreview && state.previewDirty ? ' · Needs Refresh' : '';
+    refreshPreviewBtn.textContent = `${label}${dirtyHint}`;
+    refreshPreviewBtn.classList.toggle('is-on', state.autoPreview);
+    refreshPreviewBtn.disabled = !state.terrainData;
+  };
+
+  let mapNoticeTimer = null;
+  const showMapNotice = (text, { sticky = false } = {}) => {
+    if(!mapDataNotice || !mapDataNoticeText) return;
+    mapDataNoticeText.textContent = text;
+    mapDataNotice.classList.add('show');
+    if(mapNoticeTimer) clearTimeout(mapNoticeTimer);
+    if(!sticky) {
+      mapNoticeTimer = setTimeout(() => {
+        mapDataNotice.classList.remove('show');
+      }, 5000);
+    }
+  };
+  const hideMapNotice = () => {
+    if(mapNoticeTimer) clearTimeout(mapNoticeTimer);
+    if(mapDataNotice) mapDataNotice.classList.remove('show');
+  };
+
+  const schedulePreviewRender = () => {
+    if(!state.terrainData || !state.autoPreview) return;
+    if(previewTimer) clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => {
+      previewTimer = null;
+      if(state.previewDirty) {
+        renderSVG();
+      }
+    }, 120);
+  };
+
+  const markPreviewDirty = () => {
+    if(!state.terrainData) return;
+    state.previewDirty = true;
+    updateAutoPreviewButton();
+    schedulePreviewRender();
+  };
+
   const applyTheme = () => {
     $('previewArea').style.background = state.theme.background;
     state.contour.color = state.theme.line;
     $('contourColor').value = state.contour.color;
     $('contourColor').parentElement.style.background = state.contour.color;
-    if(state.terrainData) renderSVG();
+    const previewBg = $('previewArea')?.querySelector('#previewBackground');
+    if(previewBg) {
+      previewBg.setAttribute('fill', state.theme.background);
+    }
+    markPreviewDirty();
   };
 
   const syncWaterColors = (color) => {
@@ -1460,28 +2046,64 @@
     $('labelColorDot').style.background = state.mapFeatures.labels.color;
   };
 
-  const updateMapDataStatus = () => {
-    const statusEl = $('mapDataStatus');
-    if(!statusEl) return;
-    if(!state.osmStatus) {
-      statusEl.textContent = 'Map data: --';
-      statusEl.className = 'status-pill';
+  const getLabelSize = (place) => {
+    const base = state.mapFeatures.labels.size;
+    if(!state.mapFeatures.labels.scaleByRank || !place?.place) return base;
+    const scaleMap = {
+      city: 1.5,
+      town: 1.3,
+      village: 1.15,
+      suburb: 1.1,
+      neighbourhood: 1.05,
+      hamlet: 1
+    };
+    return base * (scaleMap[place.place] || 1);
+  };
+
+  const getOverlayAlignmentStatus = () => {
+    const bbox = state.renderBbox || state.bbox;
+    if(!bbox || !state.terrainData) return null;
+    const alignmentPoints = [
+      { lat: bbox.ne.lat, lon: bbox.sw.lng, expected: [0, 0] },
+      { lat: bbox.ne.lat, lon: bbox.ne.lng, expected: [state.wMm, 0] },
+      { lat: bbox.sw.lat, lon: bbox.sw.lng, expected: [0, state.hMm] },
+      { lat: (bbox.sw.lat + bbox.ne.lat) / 2, lon: (bbox.sw.lng + bbox.ne.lng) / 2, expected: [state.wMm / 2, state.hMm / 2] }
+    ];
+    let maxDelta = 0;
+    alignmentPoints.forEach((pt) => {
+      const [x, y] = projectToSvg(pt.lat, pt.lon);
+      const dx = x - pt.expected[0];
+      const dy = y - pt.expected[1];
+      maxDelta = Math.max(maxDelta, Math.hypot(dx, dy));
+    });
+    return { ok: maxDelta <= 0.5, delta: maxDelta };
+  };
+
+  const ensureOverlayAlignment = async () => {
+    if(!state.renderBbox) return;
+    const alignmentStatus = getOverlayAlignmentStatus();
+    if(alignmentStatus?.ok) return;
+    const { sw, ne } = state.renderBbox;
+    await fetchMapFeatures(sw, ne);
+  };
+
+  const updateMapDataStatus = ({ announce = false, loading = false } = {}) => {
+    const alignmentStatus = getOverlayAlignmentStatus();
+    const alignmentLabel = alignmentStatus ? ` · Alignment ${alignmentStatus.ok ? 'OK' : 'Check'}` : '';
+    if(!announce) return;
+    if(loading) {
+      showMapNotice('Map data loading...', { sticky: true });
       return;
     }
-    if(state.osmStatus.loaded && state.osmData) {
+    if(state.osmStatus?.loaded && state.osmData) {
       const tilesLabel = state.osmStatus.tiles > 1 ? ` · ${state.osmStatus.tiles} tiles` : '';
-      statusEl.textContent = `Map data loaded: Water ${state.osmData.waterPolygons.length}, Rivers ${state.osmData.waterLines.length}, Roads ${state.osmData.roadLines.length}, Green ${state.osmData.greenPolygons.length}, Labels ${state.osmData.places.length}${tilesLabel}`;
-      statusEl.className = 'status-pill ok';
+      showMapNotice(`Map data loaded: Water ${state.osmData.waterPolygons.length}, Rivers ${state.osmData.waterLines.length}, Roads ${state.osmData.roadLines.length}, Green ${state.osmData.greenPolygons.length}, Labels ${state.osmData.places.length}${tilesLabel}${alignmentLabel}`);
       return;
     }
-    if(state.osmStatus.error) {
+    if(state.osmStatus?.error) {
       const suffix = state.osmStatus.ignored ? ' (ignored)' : '';
-      statusEl.textContent = `Map data missing${suffix}: ${state.osmStatus.error}`;
-      statusEl.className = 'status-pill error';
-      return;
+      showMapNotice(`Map data missing${suffix}: ${state.osmStatus.error}${alignmentLabel}`);
     }
-    statusEl.textContent = 'Map data: --';
-    statusEl.className = 'status-pill';
   };
 
   const syncCustomField = (value, pickerId, textId, dotId) => {
@@ -1543,130 +2165,155 @@
     $('lineColorPicker').value = state.contour.color;
     $('lineColorText').value = state.contour.color;
     $('lineColorDot').style.background = state.contour.color;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   $('contourWidth').oninput = (e) => {
     state.contour.width = parseFloat(e.target.value);
-    $('contourWidthVal').innerText = state.contour.width.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    $('contourWidthVal').innerText = formatPx(state.contour.width);
+    markPreviewDirty();
   };
 
   $('contourDensity').oninput = (e) => {
     state.contour.density = parseInt(e.target.value, 10);
     $('contourDensityVal').innerText = state.contour.density;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   $('contourOpacity').oninput = (e) => {
-    state.contour.opacity = parseFloat(e.target.value);
-    $('contourOpacityVal').innerText = state.contour.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.contour.opacity = toPercent(e.target.value);
+    $('contourOpacityVal').innerText = formatPercent(state.contour.opacity);
+    markPreviewDirty();
   };
 
   $('contourSmooth').oninput = (e) => {
     state.contour.smooth = parseInt(e.target.value, 10);
     $('contourSmoothVal').innerText = state.contour.smooth;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   $('contourToggle').onclick = function() {
     state.contour.enabled = !state.contour.enabled;
     this.classList.toggle('on', state.contour.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   $('waterAreaToggle').onclick = function() {
     state.mapFeatures.waterAreas.enabled = !state.mapFeatures.waterAreas.enabled;
     this.classList.toggle('on', state.mapFeatures.waterAreas.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('waterAreaColor').oninput = (e) => {
     syncWaterColors(e.target.value);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('waterAreaOpacity').oninput = (e) => {
-    state.mapFeatures.waterAreas.opacity = parseFloat(e.target.value);
-    $('waterAreaOpacityVal').innerText = state.mapFeatures.waterAreas.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.mapFeatures.waterAreas.opacity = toPercent(e.target.value);
+    $('waterAreaOpacityVal').innerText = formatPercent(state.mapFeatures.waterAreas.opacity);
+    markPreviewDirty();
   };
   $('riverToggle').onclick = function() {
     state.mapFeatures.rivers.enabled = !state.mapFeatures.rivers.enabled;
     this.classList.toggle('on', state.mapFeatures.rivers.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('riverColor').oninput = (e) => {
     syncWaterColors(e.target.value);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('riverWidth').oninput = (e) => {
     state.mapFeatures.rivers.width = parseFloat(e.target.value);
-    $('riverWidthVal').innerText = state.mapFeatures.rivers.width.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    $('riverWidthVal').innerText = formatPx(state.mapFeatures.rivers.width);
+    markPreviewDirty();
   };
   $('riverOpacity').oninput = (e) => {
-    state.mapFeatures.rivers.opacity = parseFloat(e.target.value);
-    $('riverOpacityVal').innerText = state.mapFeatures.rivers.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.mapFeatures.rivers.opacity = toPercent(e.target.value);
+    $('riverOpacityVal').innerText = formatPercent(state.mapFeatures.rivers.opacity);
+    markPreviewDirty();
   };
   $('greenAreaToggle').onclick = function() {
     state.mapFeatures.greenAreas.enabled = !state.mapFeatures.greenAreas.enabled;
     this.classList.toggle('on', state.mapFeatures.greenAreas.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('greenAreaColor').oninput = (e) => {
     state.mapFeatures.greenAreas.color = e.target.value;
     $('greenAreaColorDot').style.background = state.mapFeatures.greenAreas.color;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('greenAreaOpacity').oninput = (e) => {
-    state.mapFeatures.greenAreas.opacity = parseFloat(e.target.value);
-    $('greenAreaOpacityVal').innerText = state.mapFeatures.greenAreas.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.mapFeatures.greenAreas.opacity = toPercent(e.target.value);
+    $('greenAreaOpacityVal').innerText = formatPercent(state.mapFeatures.greenAreas.opacity);
+    markPreviewDirty();
   };
   $('roadToggle').onclick = function() {
     state.mapFeatures.roads.enabled = !state.mapFeatures.roads.enabled;
     this.classList.toggle('on', state.mapFeatures.roads.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('roadColor').oninput = (e) => {
     state.mapFeatures.roads.color = e.target.value;
     $('roadColorDot').style.background = state.mapFeatures.roads.color;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('roadWidth').oninput = (e) => {
     state.mapFeatures.roads.width = parseFloat(e.target.value);
-    $('roadWidthVal').innerText = state.mapFeatures.roads.width.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    $('roadWidthVal').innerText = formatPx(state.mapFeatures.roads.width);
+    markPreviewDirty();
   };
   $('roadOpacity').oninput = (e) => {
-    state.mapFeatures.roads.opacity = parseFloat(e.target.value);
-    $('roadOpacityVal').innerText = state.mapFeatures.roads.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.mapFeatures.roads.opacity = toPercent(e.target.value);
+    $('roadOpacityVal').innerText = formatPercent(state.mapFeatures.roads.opacity);
+    markPreviewDirty();
   };
   $('labelToggle').onclick = function() {
     state.mapFeatures.labels.enabled = !state.mapFeatures.labels.enabled;
     this.classList.toggle('on', state.mapFeatures.labels.enabled);
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
   $('labelColor').oninput = (e) => {
     state.mapFeatures.labels.color = e.target.value;
     $('labelColorDot').style.background = state.mapFeatures.labels.color;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
+  };
+  $('labelBgToggle').onclick = function() {
+    state.mapFeatures.labels.background.enabled = !state.mapFeatures.labels.background.enabled;
+    this.classList.toggle('on', state.mapFeatures.labels.background.enabled);
+    markPreviewDirty();
+  };
+  $('labelBgColor').oninput = (e) => {
+    state.mapFeatures.labels.background.color = e.target.value;
+    $('labelBgColorDot').style.background = state.mapFeatures.labels.background.color;
+    markPreviewDirty();
   };
   $('labelOpacity').oninput = (e) => {
-    state.mapFeatures.labels.opacity = parseFloat(e.target.value);
-    $('labelOpacityVal').innerText = state.mapFeatures.labels.opacity.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    state.mapFeatures.labels.opacity = toPercent(e.target.value);
+    $('labelOpacityVal').innerText = formatPercent(state.mapFeatures.labels.opacity);
+    markPreviewDirty();
   };
   $('labelSize').oninput = (e) => {
     state.mapFeatures.labels.size = parseFloat(e.target.value);
-    $('labelSizeVal').innerText = state.mapFeatures.labels.size.toFixed(2).replace(/\.00$/, '');
-    if(state.terrainData) renderSVG();
+    $('labelSizeVal').innerText = formatMm(state.mapFeatures.labels.size);
+    markPreviewDirty();
+  };
+  $('labelScaleToggle').onclick = function() {
+    state.mapFeatures.labels.scaleByRank = !state.mapFeatures.labels.scaleByRank;
+    this.classList.toggle('on', state.mapFeatures.labels.scaleByRank);
+    markPreviewDirty();
   };
   $('labelFont').onchange = (e) => {
     state.mapFeatures.labels.font = e.target.value;
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
+  };
+  $('labelBoldToggle').onclick = function() {
+    state.mapFeatures.labels.weight = state.mapFeatures.labels.weight === 'bold' ? 'normal' : 'bold';
+    this.classList.toggle('on', state.mapFeatures.labels.weight === 'bold');
+    markPreviewDirty();
+  };
+  $('labelItalicToggle').onclick = function() {
+    state.mapFeatures.labels.style = state.mapFeatures.labels.style === 'italic' ? 'normal' : 'italic';
+    this.classList.toggle('on', state.mapFeatures.labels.style === 'italic');
+    markPreviewDirty();
   };
   const buildHypsometricPreview = (scheme) => {
     const stops = getHypsometricStops(scheme);
@@ -1700,18 +2347,32 @@
     $('pngLayerOptions').style.display = state.png.layered ? 'block' : 'none';
     updateGradientPreview();
     updatePngRangeInfo();
-    if(state.terrainData) renderSVG();
+    markPreviewDirty();
   };
 
   $('pngScheme').onchange = (e) => {
     state.png.scheme = e.target.value;
     updateGradientPreview();
-    if(state.png.layered && state.terrainData) renderSVG();
+    if(state.png.layered) markPreviewDirty();
+  };
+  $('pngBlendMode').onchange = (e) => {
+    state.png.blend = getBlendMode(e.target.value);
+    if(state.png.layered) markPreviewDirty();
   };
   $('pngGradOpacity').oninput = (e) => {
-    state.png.gradientOpacity = parseFloat(e.target.value);
-    $('pngGradOpacityVal').innerText = state.png.gradientOpacity.toFixed(2).replace(/\.00$/, '');
-    if(state.png.layered && state.terrainData) renderSVG();
+    state.png.gradientOpacity = toPercent(e.target.value);
+    $('pngGradOpacityVal').innerText = formatPercent(state.png.gradientOpacity);
+    if(state.png.layered) markPreviewDirty();
+  };
+  $('pngGradShift').oninput = (e) => {
+    state.png.gradientShift = parseFloat(e.target.value);
+    $('pngGradShiftVal').innerText = formatSignedPercent(state.png.gradientShift);
+    if(state.png.layered) markPreviewDirty();
+  };
+  $('pngGradScale').oninput = (e) => {
+    state.png.gradientScale = parseFloat(e.target.value);
+    $('pngGradScaleVal').innerText = formatPercent(state.png.gradientScale);
+    if(state.png.layered) markPreviewDirty();
   };
 
   $('shapeSel').onchange = (e) => {
@@ -1721,60 +2382,100 @@
   };
   ['dimW','dimH'].forEach(id => $(id).oninput = updateVf);
 
-  $('presetSel').value = state.theme.preset;
-  $('bgColorText').value = state.theme.background;
-  $('lineColorText').value = state.theme.line;
-  $('bgColorDot').style.background = state.theme.background;
-  $('lineColorDot').style.background = state.theme.line;
-  $('contourToggle').classList.toggle('on', state.contour.enabled);
-  $('contourOpacity').value = state.contour.opacity;
-  $('contourOpacityVal').innerText = state.contour.opacity.toFixed(2).replace(/\.00$/, '');
-  $('waterAreaToggle').classList.toggle('on', state.mapFeatures.waterAreas.enabled);
-  $('waterAreaColor').value = state.mapFeatures.waterAreas.color;
-  $('waterAreaColorDot').style.background = state.mapFeatures.waterAreas.color;
-  $('waterAreaOpacity').value = state.mapFeatures.waterAreas.opacity;
-  $('waterAreaOpacityVal').innerText = state.mapFeatures.waterAreas.opacity.toFixed(2).replace(/\.00$/, '');
-  $('riverToggle').classList.toggle('on', state.mapFeatures.rivers.enabled);
-  $('riverColor').value = state.mapFeatures.rivers.color;
-  $('riverColorDot').style.background = state.mapFeatures.rivers.color;
-  $('riverWidth').value = state.mapFeatures.rivers.width;
-  $('riverWidthVal').innerText = state.mapFeatures.rivers.width.toFixed(2).replace(/\.00$/, '');
-  $('riverOpacity').value = state.mapFeatures.rivers.opacity;
-  $('riverOpacityVal').innerText = state.mapFeatures.rivers.opacity.toFixed(2).replace(/\.00$/, '');
-  $('greenAreaToggle').classList.toggle('on', state.mapFeatures.greenAreas.enabled);
-  $('greenAreaColor').value = state.mapFeatures.greenAreas.color;
-  $('greenAreaColorDot').style.background = state.mapFeatures.greenAreas.color;
-  $('greenAreaOpacity').value = state.mapFeatures.greenAreas.opacity;
-  $('greenAreaOpacityVal').innerText = state.mapFeatures.greenAreas.opacity.toFixed(2).replace(/\.00$/, '');
-  $('roadToggle').classList.toggle('on', state.mapFeatures.roads.enabled);
-  $('roadColor').value = state.mapFeatures.roads.color;
-  $('roadColorDot').style.background = state.mapFeatures.roads.color;
-  $('roadWidth').value = state.mapFeatures.roads.width;
-  $('roadWidthVal').innerText = state.mapFeatures.roads.width.toFixed(2).replace(/\.00$/, '');
-  $('roadOpacity').value = state.mapFeatures.roads.opacity;
-  $('roadOpacityVal').innerText = state.mapFeatures.roads.opacity.toFixed(2).replace(/\.00$/, '');
-  $('labelToggle').classList.toggle('on', state.mapFeatures.labels.enabled);
-  $('labelColor').value = state.mapFeatures.labels.color;
-  $('labelColorDot').style.background = state.mapFeatures.labels.color;
-  $('labelOpacity').value = state.mapFeatures.labels.opacity;
-  $('labelOpacityVal').innerText = state.mapFeatures.labels.opacity.toFixed(2).replace(/\.00$/, '');
-  $('labelSize').value = state.mapFeatures.labels.size;
-  $('labelSizeVal').innerText = state.mapFeatures.labels.size.toFixed(2).replace(/\.00$/, '');
-  $('labelFont').value = state.mapFeatures.labels.font;
-  $('pngScheme').value = state.png.scheme;
-  $('pngGradOpacity').value = state.png.gradientOpacity;
-  $('pngGradOpacityVal').innerText = state.png.gradientOpacity.toFixed(2).replace(/\.00$/, '');
-  $('pngLayerToggle').classList.toggle('on', state.png.layered);
-  $('pngLayerOptions').style.display = state.png.layered ? 'block' : 'none';
-  if(layerStack) {
-    state.layerOrder.forEach((key) => {
-      const item = layerStack.querySelector(`[data-layer="${key}"]`);
-      if(item) layerStack.appendChild(item);
+  const syncUiFromState = () => {
+    $('presetSel').value = state.theme.preset;
+    $('bgColorText').value = state.theme.background;
+    $('lineColorText').value = state.theme.line;
+    $('bgColorDot').style.background = state.theme.background;
+    $('lineColorDot').style.background = state.theme.line;
+    $('bgColorPicker').value = state.theme.background;
+    $('lineColorPicker').value = state.theme.line;
+    $('contourToggle').classList.toggle('on', state.contour.enabled);
+    $('contourColor').value = state.contour.color;
+    $('contourColor').parentElement.style.background = state.contour.color;
+    $('contourWidth').value = state.contour.width;
+    $('contourWidthVal').innerText = formatPx(state.contour.width);
+    $('contourDensity').value = state.contour.density;
+    $('contourDensityVal').innerText = state.contour.density;
+    $('contourOpacity').value = state.contour.opacity;
+    $('contourOpacityVal').innerText = formatPercent(state.contour.opacity);
+    $('contourSmooth').value = state.contour.smooth;
+    $('contourSmoothVal').innerText = state.contour.smooth;
+    $('waterAreaToggle').classList.toggle('on', state.mapFeatures.waterAreas.enabled);
+    $('waterAreaColor').value = state.mapFeatures.waterAreas.color;
+    $('waterAreaColorDot').style.background = state.mapFeatures.waterAreas.color;
+    $('waterAreaOpacity').value = state.mapFeatures.waterAreas.opacity;
+    $('waterAreaOpacityVal').innerText = formatPercent(state.mapFeatures.waterAreas.opacity);
+    $('riverToggle').classList.toggle('on', state.mapFeatures.rivers.enabled);
+    $('riverColor').value = state.mapFeatures.rivers.color;
+    $('riverColorDot').style.background = state.mapFeatures.rivers.color;
+    $('riverWidth').value = state.mapFeatures.rivers.width;
+    $('riverWidthVal').innerText = formatPx(state.mapFeatures.rivers.width);
+    $('riverOpacity').value = state.mapFeatures.rivers.opacity;
+    $('riverOpacityVal').innerText = formatPercent(state.mapFeatures.rivers.opacity);
+    $('greenAreaToggle').classList.toggle('on', state.mapFeatures.greenAreas.enabled);
+    $('greenAreaColor').value = state.mapFeatures.greenAreas.color;
+    $('greenAreaColorDot').style.background = state.mapFeatures.greenAreas.color;
+    $('greenAreaOpacity').value = state.mapFeatures.greenAreas.opacity;
+    $('greenAreaOpacityVal').innerText = formatPercent(state.mapFeatures.greenAreas.opacity);
+    $('roadToggle').classList.toggle('on', state.mapFeatures.roads.enabled);
+    $('roadColor').value = state.mapFeatures.roads.color;
+    $('roadColorDot').style.background = state.mapFeatures.roads.color;
+    $('roadWidth').value = state.mapFeatures.roads.width;
+    $('roadWidthVal').innerText = formatPx(state.mapFeatures.roads.width);
+    $('roadOpacity').value = state.mapFeatures.roads.opacity;
+    $('roadOpacityVal').innerText = formatPercent(state.mapFeatures.roads.opacity);
+    $('labelToggle').classList.toggle('on', state.mapFeatures.labels.enabled);
+    $('labelColor').value = state.mapFeatures.labels.color;
+    $('labelColorDot').style.background = state.mapFeatures.labels.color;
+    $('labelBgToggle').classList.toggle('on', state.mapFeatures.labels.background.enabled);
+    $('labelBgColor').value = state.mapFeatures.labels.background.color;
+    $('labelBgColorDot').style.background = state.mapFeatures.labels.background.color;
+    $('labelOpacity').value = state.mapFeatures.labels.opacity;
+    $('labelOpacityVal').innerText = formatPercent(state.mapFeatures.labels.opacity);
+    $('labelSize').value = state.mapFeatures.labels.size;
+    $('labelSizeVal').innerText = formatMm(state.mapFeatures.labels.size);
+    $('labelScaleToggle').classList.toggle('on', state.mapFeatures.labels.scaleByRank);
+    $('labelFont').value = state.mapFeatures.labels.font;
+    $('labelBoldToggle').classList.toggle('on', state.mapFeatures.labels.weight === 'bold');
+    $('labelItalicToggle').classList.toggle('on', state.mapFeatures.labels.style === 'italic');
+    $('pngScheme').value = state.png.scheme;
+    $('pngBlendMode').value = state.png.blend;
+    $('pngGradOpacity').value = state.png.gradientOpacity;
+    $('pngGradOpacityVal').innerText = formatPercent(state.png.gradientOpacity);
+    $('pngGradShift').value = state.png.gradientShift;
+    $('pngGradShiftVal').innerText = formatSignedPercent(state.png.gradientShift);
+    $('pngGradScale').value = state.png.gradientScale;
+    $('pngGradScaleVal').innerText = formatPercent(state.png.gradientScale);
+    $('pngLayerToggle').classList.toggle('on', state.png.layered);
+    $('pngLayerOptions').style.display = state.png.layered ? 'block' : 'none';
+    if(layerStack) {
+      state.layerOrder.forEach((key) => {
+        const item = layerStack.querySelector(`[data-layer="${key}"]`);
+        if(item) layerStack.appendChild(item);
+      });
+    }
+    updateGradientPreview();
+    applyTheme();
+    updateAutoPreviewButton();
+  };
+  syncUiFromState();
+  pushHistoryState();
+  updateHistoryButtons();
+
+  const step2Content = document.querySelector('.step-content[data-step="2"]');
+  if(step2Content) {
+    step2Content.querySelectorAll('input, select').forEach((control) => {
+      control.addEventListener('change', () => {
+        pushHistoryState();
+      });
+    });
+    step2Content.addEventListener('click', (event) => {
+      if(event.target?.classList?.contains('ios-switch')) {
+        pushHistoryState();
+      }
     });
   }
-  updateGradientPreview();
-  applyTheme();
-  updateMapDataStatus();
 
   function updateVf() {
     state.wMm = +$('dimW').value; state.hMm = +$('dimH').value;
@@ -1809,12 +2510,19 @@
     $('vfBadge').innerText = `${state.wMm} × ${state.hMm} mm`;
     state.bbox = { sw: map.containerPointToLatLng([cx-hw, cy+hh]), ne: map.containerPointToLatLng([cx+hw, cy-hh]) };
     if(state.terrainData) updatePngRangeInfo();
+    updateMapDataStatus();
   }
   window.onresize = updateVf; map.on('move zoom', updateVf); setTimeout(updateVf,500);
 
   // --- GENERATION PIPELINE ---
   $('btnGen').onclick = async () => {
     msg('Fetching Elevation Data...');
+    if(state.bbox) {
+      state.renderBbox = {
+        sw: { ...state.bbox.sw },
+        ne: { ...state.bbox.ne }
+      };
+    }
     const {sw, ne} = state.bbox;
     await fetchTerrain(sw, ne);
     msg('Fetching Map Features...');
@@ -1835,6 +2543,7 @@
       state.osmStatus.ignored = true;
       updateMapDataStatus();
     }
+    await ensureOverlayAlignment();
     renderSVG();
     idle();
     setStep('2');
@@ -1856,7 +2565,12 @@
       for(let i=0; i<smoothPasses; i++) h = smoothPass(h, rows, cols);
       let min=Infinity, max=-Infinity; h.forEach(v => { if(v<min) min=v; if(v>max) max=v; });
       state.terrainData = { rows, cols, h: h.map(z=>z-min), min, max, delta: max-min };
-    } catch(e) { state.terrainData = null; }
+      state.terrainVersion += 1;
+      state.pngPreviewCache = { key: null, dataUrl: null };
+    } catch(e) {
+      state.terrainData = null;
+      state.pngPreviewCache = { key: null, dataUrl: null };
+    }
   }
 
   function smoothPass(data, rows, cols) {
@@ -1880,19 +2594,21 @@
     svg += `<defs><clipPath id="shapeClip"><path d="${clipPathD}"/></clipPath></defs>`;
     svg += `<g clip-path="url(#shapeClip)">`;
     if(includeBackground) {
-      svg += `<rect width="100%" height="100%" fill="${state.theme.background}"/>`;
+      svg += `<rect id="previewBackground" width="100%" height="100%" fill="${state.theme.background}"/>`;
     }
     if(includeGradient && state.png.layered && state.terrainData) {
       const previewUrl = getLayeredPreviewDataUrl();
       if(previewUrl) {
-        svg += `<image href="${previewUrl}" x="0" y="0" width="${wMm}" height="${hMm}" preserveAspectRatio="none" />`;
+        const blendMode = state.png.blend || 'normal';
+        const blendStyle = updateBlendStyle(blendMode);
+        svg += `<image href="${previewUrl}" x="0" y="0" width="${wMm}" height="${hMm}" preserveAspectRatio="none"${blendStyle} />`;
       }
     }
 
     const layers = {
       green: () => {
         if(!state.osmData || !state.mapFeatures.greenAreas.enabled || !state.osmData.greenPolygons.length) return '';
-        let out = `<g id="greenAreas" fill="${state.mapFeatures.greenAreas.color}" fill-opacity="${state.mapFeatures.greenAreas.opacity}">`;
+        let out = `<g id="greenAreas" fill="${state.mapFeatures.greenAreas.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.greenAreas.opacity)}">`;
         state.osmData.greenPolygons.forEach((poly) => {
           const d = pathFromCoords(poly, true);
           if(d) out += `<path d="${d}"/>`;
@@ -1901,7 +2617,7 @@
       },
       water: () => {
         if(!state.osmData || !state.mapFeatures.waterAreas.enabled || !state.osmData.waterPolygons.length) return '';
-        let out = `<g id="waterAreas" fill="${state.mapFeatures.waterAreas.color}" fill-opacity="${state.mapFeatures.waterAreas.opacity}">`;
+        let out = `<g id="waterAreas" fill="${state.mapFeatures.waterAreas.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.waterAreas.opacity)}">`;
         state.osmData.waterPolygons.forEach((poly) => {
           const d = pathFromCoords(poly, true);
           if(d) out += `<path d="${d}"/>`;
@@ -1910,7 +2626,7 @@
       },
       rivers: () => {
         if(!state.osmData || !state.mapFeatures.rivers.enabled || !state.osmData.waterLines.length) return '';
-        let out = `<g id="rivers" stroke="${state.mapFeatures.rivers.color}" stroke-width="${state.mapFeatures.rivers.width}" stroke-opacity="${state.mapFeatures.rivers.opacity}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        let out = `<g id="rivers" stroke="${state.mapFeatures.rivers.color}" stroke-width="${state.mapFeatures.rivers.width}px" stroke-opacity="${toUnitOpacity(state.mapFeatures.rivers.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
         state.osmData.waterLines.forEach((line) => {
           const d = pathFromCoords(line, false);
           if(d) out += `<path d="${d}"/>`;
@@ -1919,7 +2635,7 @@
       },
       roads: () => {
         if(!state.osmData || !state.mapFeatures.roads.enabled || !state.osmData.roadLines.length) return '';
-        let out = `<g id="roads" stroke="${state.mapFeatures.roads.color}" stroke-width="${state.mapFeatures.roads.width}" stroke-opacity="${state.mapFeatures.roads.opacity}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        let out = `<g id="roads" stroke="${state.mapFeatures.roads.color}" stroke-width="${state.mapFeatures.roads.width}px" stroke-opacity="${toUnitOpacity(state.mapFeatures.roads.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
         state.osmData.roadLines.forEach((line) => {
           const d = pathFromCoords(line, false);
           if(d) out += `<path d="${d}"/>`;
@@ -1935,7 +2651,7 @@
           return `<text x="${cx}" y="${cy}" text-anchor="middle" font-family="SF Pro Text, Segoe UI, Roboto, sans-serif" font-size="6" fill="#9AA3B2">Elevation data missing. Try generating again.</text>`;
         }
         const levels = getContourLevels();
-        let out = `<g id="contours" stroke="${state.contour.color}" stroke-width="${state.contour.width}" stroke-opacity="${state.contour.opacity}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        let out = `<g id="contours" stroke="${state.contour.color}" stroke-width="${state.contour.width}px" stroke-opacity="${toUnitOpacity(state.contour.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
         levels.forEach(level => {
           const segments = getContourSegments(level, wMm, hMm);
           if(!segments.length) return;
@@ -1953,16 +2669,24 @@
       labels: () => {
         if(!state.osmData || !state.mapFeatures.labels.enabled || !state.osmData.places.length) return '';
         const fontFamilies = {
-          system: 'SF Pro Text, Segoe UI, Roboto, sans-serif',
-          serif: 'Georgia, Times New Roman, serif',
-          mono: 'SF Mono, Menlo, Consolas, monospace'
+          system: 'Inter, SF Pro Text, Segoe UI, Roboto, sans-serif',
+          serif: 'Merriweather, Georgia, Times New Roman, serif',
+          mono: '"Roboto Mono", "SF Mono", Menlo, Consolas, monospace',
+          rounded: 'Nunito, "Arial Rounded MT Bold", "Trebuchet MS", sans-serif',
+          condensed: '"Roboto Condensed", "Arial Narrow", "Helvetica Neue Condensed", sans-serif',
+          display: '"Bebas Neue", "Impact", "Haettenschweiler", "Franklin Gothic Heavy", sans-serif'
         };
         const fontFamily = fontFamilies[state.mapFeatures.labels.font] || fontFamilies.system;
-        const halo = state.theme.background;
-        let out = `<g id="placeLabels" font-family="${fontFamily}" font-size="${state.mapFeatures.labels.size}mm" text-anchor="middle" fill="${state.mapFeatures.labels.color}" fill-opacity="${state.mapFeatures.labels.opacity}" paint-order="stroke">`;
+        const haloEnabled = state.mapFeatures.labels.background.enabled;
+        const haloColor = state.mapFeatures.labels.background.color || state.theme.background;
+        const fontWeight = state.mapFeatures.labels.weight || 'normal';
+        const fontStyle = state.mapFeatures.labels.style || 'normal';
+        let out = `<g id="placeLabels" font-family="${fontFamily}" text-anchor="middle" fill="${state.mapFeatures.labels.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.labels.opacity)}" paint-order="stroke" font-weight="${fontWeight}" font-style="${fontStyle}">`;
         state.osmData.places.forEach((place) => {
           const [x, y] = projectToSvg(place.lat, place.lon);
-          out += `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" stroke="${halo}" stroke-width="0.6">${place.name}</text>`;
+          const size = getLabelSize(place);
+          const stroke = haloEnabled ? ` stroke="${haloColor}" stroke-width="0.6"` : ' stroke="none" stroke-width="0"';
+          out += `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${size.toFixed(2)}mm"${stroke}>${place.name}</text>`;
         });
         return out + `</g>`;
       }
@@ -1986,6 +2710,8 @@
     const svg = buildSvgMarkup({ includeBackground: true, includeGradient: true, includeFrame: true });
     $('previewArea').innerHTML = svg;
     updatePngRangeInfo();
+    state.previewDirty = false;
+    updateAutoPreviewButton();
   }
 
   const polygonArea = (poly) => {
@@ -2134,6 +2860,7 @@
   };
 
   $('btnDXF').onclick = () => {
+    buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: true });
     let dxf = "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
     const rgbToAci = ({ r, g, b }) => {
       const max = Math.max(r, g, b);
@@ -2212,7 +2939,7 @@
           const [x, y] = projectToSvg(place.lat, place.lon);
           const inside = clipPolygon([[x, y], [x + 0.01, y], [x + 0.01, y + 0.01]], clipPoly).length;
           if(!inside) return;
-          writeText('LABELS', place.name, x, y, state.mapFeatures.labels.size, state.mapFeatures.labels.color);
+          writeText('LABELS', place.name, x, y, getLabelSize(place), state.mapFeatures.labels.color);
         });
       }
     }
@@ -2256,7 +2983,7 @@
       alert('Generate contours first.');
       return;
     }
-    const alpha = Math.round(255 * clamp(state.png.gradientOpacity ?? 1, 0, 1));
+    const alpha = Math.round(255 * clamp(toUnitOpacity(state.png.gradientOpacity), 0, 1));
     const e = +$('pngResRange').value;
     const r = state.hMm / state.wMm;
     const w = state.wMm >= state.hMm ? e : Math.round(e / r);
@@ -2295,11 +3022,11 @@
       for(let x=0; x<w; x++) {
         const nx = w === 1 ? 0 : x / (w - 1);
         const zNorm = getZInterpolated(nx, ny);
-        const band = findBandIndex(zNorm, boundaries);
+        const { color: bandColor } = getSmoothedBandColor(zNorm, boundaries, bandColors);
         const height = state.terrainData.min + zNorm;
         const elevationT = range.maxZ === range.minZ ? 0 : (height - range.minZ) / (range.maxZ - range.minZ);
         const shade = getHillshade(nx, ny, step, zNorm);
-        const color = applyReliefOverlay(bandColors[band], shade, elevationT);
+        const color = applyReliefOverlay(bandColor, shade, elevationT);
         const idx = (y * w + x) * 4;
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -2321,7 +3048,7 @@
     }
     const e = +$('pngResRange').value, r = state.hMm/state.wMm;
     const w = state.wMm >= state.hMm ? e : Math.round(e/r), h = state.wMm >= state.hMm ? Math.round(e*r) : e;
-    const s = new XMLSerializer().serializeToString($('prevSvg'));
+    const s = buildSvgMarkup({ includeBackground: true, includeGradient: true, includeFrame: true });
     const img = new Image(), cv = document.createElement('canvas'); cv.width = w; cv.height = h;
     img.onload = () => { const ctx = cv.getContext('2d'); ctx.fillStyle=state.theme.background; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h); cv.toBlob(b => save(b, 'Topomapper.png')); };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
