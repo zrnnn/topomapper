@@ -50,7 +50,7 @@
 
     /* MAP AREA */
     .viewport { position: relative; flex: 1; height: 100%; }
-    #map { width: 100%; height: 100%; z-index: 0; background: #10141B; filter: grayscale(1) contrast(1.05) brightness(1.08) sepia(0.12) hue-rotate(190deg) saturate(0.6); transition: filter 0.3s ease; }
+    #map { width: 100%; height: 100%; z-index: 0; background: #10141B; filter: grayscale(1) contrast(1.08) brightness(1.05) sepia(0.18) hue-rotate(200deg) saturate(0.35); transition: filter 0.3s ease; }
 
     /* SIDEBAR (iOS Floating Panel) */
     .sidebar {
@@ -192,6 +192,13 @@
     .color-dot input { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; opacity: 0; cursor: pointer; }
     input[type=range] { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); -webkit-appearance: none; }
     input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #F5F7FB; box-shadow: 0 2px 8px rgba(0,0,0,0.35); border: 0.5px solid rgba(0,0,0,0.3); }
+    .width-input {
+      width: 86px;
+      padding: 8px 10px;
+      font-size: 12px;
+      text-align: right;
+      border-radius: 10px;
+    }
 
     /* IOS SWITCH */
     .ios-switch {
@@ -558,7 +565,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" id="roadColorDot" style="background:#C9A75A"><input type="color" id="roadColor" value="#C9A75A"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="roadWidth" min="0.5" max="8" step="0.5" value="1.5"><span id="roadWidthVal" style="font-size:11px;width:48px;text-align:right;">1.5 px</span></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="roadWidth" min="0.05" max="5" step="0.05" value="0.2"><input type="number" id="roadWidthInput" class="width-input" min="0.05" max="5" step="0.05" value="0.2"></div>
                 <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="roadOpacity" min="0" max="100" step="1" value="75"><span id="roadOpacityVal" style="font-size:11px;width:46px;text-align:right;">75%</span></div>
               </div>
             </div>
@@ -583,7 +590,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Line Color</label><div class="color-dot" id="riverColorDot" style="background:#7DB5D3"><input type="color" id="riverColor" value="#7DB5D3"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="riverWidth" min="0.5" max="8" step="0.5" value="1.5"><span id="riverWidthVal" style="font-size:11px;width:48px;text-align:right;">1.5 px</span></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="riverWidth" min="0.05" max="5" step="0.05" value="0.2"><input type="number" id="riverWidthInput" class="width-input" min="0.05" max="5" step="0.05" value="0.2"></div>
                 <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="riverOpacity" min="0" max="100" step="1" value="85"><span id="riverOpacityVal" style="font-size:11px;width:46px;text-align:right;">85%</span></div>
               </div>
             </div>
@@ -656,10 +663,10 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#10141B"><input type="color" id="contourColor" value="#10141B"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="contourWidth" min="0.5" max="8" step="0.5" value="1.5"><span id="contourWidthVal" style="font-size:11px;width:48px;text-align:right;">1.5 px</span></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="contourWidth" min="0.05" max="5" step="0.05" value="0.2"><input type="number" id="contourWidthInput" class="width-input" min="0.05" max="5" step="0.05" value="0.2"></div>
                 <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="5" max="350" step="5" value="24"><span id="contourDensityVal" style="font-size:11px;width:40px;text-align:right;">24</span></div>
           <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="contourOpacity" min="0" max="100" step="1" value="80"><span id="contourOpacityVal" style="font-size:11px;width:46px;text-align:right;">80%</span></div>
-                <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="20" step="1" value="4"><span id="contourSmoothVal" style="font-size:11px;width:40px;text-align:right;">4</span></div>
+                <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="5" step="1" value="4"><span id="contourSmoothVal" style="font-size:11px;width:40px;text-align:right;">4</span></div>
               </div>
             </div>
           </div>
@@ -756,7 +763,7 @@
     contour: {
       enabled: true,
       density: 24,
-      width: 1.5,
+      width: 0.2,
       color: '#10141B',
       smooth: 4,
       opacity: 80
@@ -779,9 +786,9 @@
     },
     mapFeatures: {
       waterAreas: { enabled: false, color: '#7DB5D3', opacity: 45 },
-      rivers: { enabled: false, color: '#7DB5D3', width: 1.5, opacity: 85 },
+      rivers: { enabled: false, color: '#7DB5D3', width: 0.2, opacity: 85 },
       greenAreas: { enabled: false, color: '#7FAE8A', opacity: 15 },
-      roads: { enabled: false, color: '#C9A75A', width: 1.5, opacity: 75 },
+      roads: { enabled: false, color: '#5B3A1C', width: 0.2, opacity: 75 },
       labels: {
         enabled: false,
         color: '#1E232B',
@@ -811,7 +818,7 @@
     contour: {
       enabled: true,
       density: 24,
-      width: 1.5,
+      width: 0.2,
       color: '#10141B',
       smooth: 4,
       opacity: 80
@@ -834,9 +841,9 @@
     },
     mapFeatures: {
       waterAreas: { enabled: false, color: '#7DB5D3', opacity: 45 },
-      rivers: { enabled: false, color: '#7DB5D3', width: 1.5, opacity: 85 },
+      rivers: { enabled: false, color: '#7DB5D3', width: 0.2, opacity: 85 },
       greenAreas: { enabled: false, color: '#7FAE8A', opacity: 15 },
-      roads: { enabled: false, color: '#C9A75A', width: 1.5, opacity: 75 },
+      roads: { enabled: false, color: '#5B3A1C', width: 0.2, opacity: 75 },
       labels: {
         enabled: false,
         color: '#1E232B',
@@ -959,7 +966,15 @@
   function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
   const PX_TO_MM = 0.264583;
   const pxToMm = (value) => value * PX_TO_MM;
-  const formatPx = (value) => `${value.toFixed(1).replace(/\.0$/, '')} px`;
+  const formatWidthInput = (value) => {
+    const rounded = Math.round(value * 100) / 100;
+    return `${rounded}`.replace(/\.0$/, '').replace(/(\.\d)0$/, '$1');
+  };
+  const clampLineWidth = (value) => {
+    const parsed = parseFloat(value);
+    if(Number.isNaN(parsed)) return 0.2;
+    return clamp(parsed, 0.05, 5);
+  };
   const formatMm = (value) => `${value.toFixed(2)} mm`;
   function smoothstep(t) {
     const clamped = clamp(t, 0, 1);
@@ -1859,7 +1874,7 @@
         waterAreas: '#4C86A8',
         rivers: '#4C86A8',
         greenAreas: '#4E7E5A',
-        roads: '#E7C36E',
+        roads: '#6A4322',
         labels: '#F5F7FB'
       }
     },
@@ -1870,7 +1885,7 @@
         waterAreas: '#7DB5D3',
         rivers: '#7DB5D3',
         greenAreas: '#7FAE8A',
-        roads: '#C9A75A',
+        roads: '#5B3A1C',
         labels: '#1E232B'
       }
     },
@@ -1881,7 +1896,7 @@
         waterAreas: '#5A5A5A',
         rivers: '#5A5A5A',
         greenAreas: '#444444',
-        roads: '#8C8C8C',
+        roads: '#4F3E34',
         labels: '#F2F2F2'
       }
     }
@@ -2168,11 +2183,16 @@
     markPreviewDirty();
   };
 
-  $('contourWidth').oninput = (e) => {
-    state.contour.width = parseFloat(e.target.value);
-    $('contourWidthVal').innerText = formatPx(state.contour.width);
+  const setContourWidth = (value) => {
+    if(value === '') return;
+    const width = clampLineWidth(value);
+    state.contour.width = width;
+    $('contourWidth').value = width;
+    $('contourWidthInput').value = formatWidthInput(width);
     markPreviewDirty();
   };
+  $('contourWidth').oninput = (e) => setContourWidth(e.target.value);
+  $('contourWidthInput').oninput = (e) => setContourWidth(e.target.value);
 
   $('contourDensity').oninput = (e) => {
     state.contour.density = parseInt(e.target.value, 10);
@@ -2221,11 +2241,16 @@
     syncWaterColors(e.target.value);
     markPreviewDirty();
   };
-  $('riverWidth').oninput = (e) => {
-    state.mapFeatures.rivers.width = parseFloat(e.target.value);
-    $('riverWidthVal').innerText = formatPx(state.mapFeatures.rivers.width);
+  const setRiverWidth = (value) => {
+    if(value === '') return;
+    const width = clampLineWidth(value);
+    state.mapFeatures.rivers.width = width;
+    $('riverWidth').value = width;
+    $('riverWidthInput').value = formatWidthInput(width);
     markPreviewDirty();
   };
+  $('riverWidth').oninput = (e) => setRiverWidth(e.target.value);
+  $('riverWidthInput').oninput = (e) => setRiverWidth(e.target.value);
   $('riverOpacity').oninput = (e) => {
     state.mapFeatures.rivers.opacity = toPercent(e.target.value);
     $('riverOpacityVal').innerText = formatPercent(state.mapFeatures.rivers.opacity);
@@ -2256,11 +2281,16 @@
     $('roadColorDot').style.background = state.mapFeatures.roads.color;
     markPreviewDirty();
   };
-  $('roadWidth').oninput = (e) => {
-    state.mapFeatures.roads.width = parseFloat(e.target.value);
-    $('roadWidthVal').innerText = formatPx(state.mapFeatures.roads.width);
+  const setRoadWidth = (value) => {
+    if(value === '') return;
+    const width = clampLineWidth(value);
+    state.mapFeatures.roads.width = width;
+    $('roadWidth').value = width;
+    $('roadWidthInput').value = formatWidthInput(width);
     markPreviewDirty();
   };
+  $('roadWidth').oninput = (e) => setRoadWidth(e.target.value);
+  $('roadWidthInput').oninput = (e) => setRoadWidth(e.target.value);
   $('roadOpacity').oninput = (e) => {
     state.mapFeatures.roads.opacity = toPercent(e.target.value);
     $('roadOpacityVal').innerText = formatPercent(state.mapFeatures.roads.opacity);
@@ -2394,7 +2424,7 @@
     $('contourColor').value = state.contour.color;
     $('contourColor').parentElement.style.background = state.contour.color;
     $('contourWidth').value = state.contour.width;
-    $('contourWidthVal').innerText = formatPx(state.contour.width);
+    $('contourWidthInput').value = formatWidthInput(state.contour.width);
     $('contourDensity').value = state.contour.density;
     $('contourDensityVal').innerText = state.contour.density;
     $('contourOpacity').value = state.contour.opacity;
@@ -2410,7 +2440,7 @@
     $('riverColor').value = state.mapFeatures.rivers.color;
     $('riverColorDot').style.background = state.mapFeatures.rivers.color;
     $('riverWidth').value = state.mapFeatures.rivers.width;
-    $('riverWidthVal').innerText = formatPx(state.mapFeatures.rivers.width);
+    $('riverWidthInput').value = formatWidthInput(state.mapFeatures.rivers.width);
     $('riverOpacity').value = state.mapFeatures.rivers.opacity;
     $('riverOpacityVal').innerText = formatPercent(state.mapFeatures.rivers.opacity);
     $('greenAreaToggle').classList.toggle('on', state.mapFeatures.greenAreas.enabled);
@@ -2422,7 +2452,7 @@
     $('roadColor').value = state.mapFeatures.roads.color;
     $('roadColorDot').style.background = state.mapFeatures.roads.color;
     $('roadWidth').value = state.mapFeatures.roads.width;
-    $('roadWidthVal').innerText = formatPx(state.mapFeatures.roads.width);
+    $('roadWidthInput').value = formatWidthInput(state.mapFeatures.roads.width);
     $('roadOpacity').value = state.mapFeatures.roads.opacity;
     $('roadOpacityVal').innerText = formatPercent(state.mapFeatures.roads.opacity);
     $('labelToggle').classList.toggle('on', state.mapFeatures.labels.enabled);
@@ -2978,6 +3008,58 @@
     });
   }
 
+  function buildHeightMap(w, h) {
+    const T = state.terrainData;
+    if(!T) return null;
+    const cols = T.cols;
+    const rows = T.rows;
+    if(cols < 2 || rows < 2) {
+      const fallback = T.h[0] ?? 0;
+      return new Float32Array(w * h).fill(fallback);
+    }
+    const maxCol = Math.max(0, cols - 2);
+    const maxRow = Math.max(0, rows - 2);
+    const colIndex = new Int32Array(w);
+    const colT = new Float32Array(w);
+    for(let x=0; x<w; x++) {
+      const nx = w === 1 ? 0 : x / (w - 1);
+      const cFloat = nx * (cols - 1);
+      const c0 = Math.min(maxCol, Math.max(0, Math.floor(cFloat)));
+      colIndex[x] = c0;
+      colT[x] = cFloat - c0;
+    }
+    const rowIndex = new Int32Array(h);
+    const rowT = new Float32Array(h);
+    for(let y=0; y<h; y++) {
+      const ny = h === 1 ? 0 : y / (h - 1);
+      const rFloat = ny * (rows - 1);
+      const r0 = Math.min(maxRow, Math.max(0, Math.floor(rFloat)));
+      rowIndex[y] = r0;
+      rowT[y] = rFloat - r0;
+    }
+    const heightMap = new Float32Array(w * h);
+    for(let y=0; y<h; y++) {
+      const r0 = rowIndex[y];
+      const r1 = r0 + 1;
+      const ty = rowT[y];
+      const rowOffset0 = r0 * cols;
+      const rowOffset1 = r1 * cols;
+      for(let x=0; x<w; x++) {
+        const c0 = colIndex[x];
+        const c1 = c0 + 1;
+        const tx = colT[x];
+        const h00 = T.h[rowOffset0 + c0];
+        const h01 = T.h[rowOffset0 + c1];
+        const h10 = T.h[rowOffset1 + c0];
+        const h11 = T.h[rowOffset1 + c1];
+        const top = h00 * (1 - tx) + h01 * tx;
+        const bottom = h10 * (1 - tx) + h11 * tx;
+        heightMap[y * w + x] = top * (1 - ty) + bottom * ty;
+      }
+    }
+    return heightMap;
+  }
+
   function exportLayeredPng() {
     if(!state.terrainData) {
       alert('Generate contours first.');
@@ -3014,24 +3096,43 @@
       bandColors.push(getHypsometricBandColor(t, state.png.scheme, bandCount));
     }
 
+    const heightMap = buildHeightMap(w, h);
+    if(!heightMap) {
+      alert('Elevation data missing.');
+      return;
+    }
     const imgData = ctx.createImageData(w, h);
     const data = imgData.data;
-    const step = 1 / Math.max(state.terrainData.cols - 1, state.terrainData.rows - 1);
+    const stepX = w > 1 ? 1 / (w - 1) : 1;
+    const stepY = h > 1 ? 1 / (h - 1) : 1;
+    const relief = clamp(state.terrainData.delta / 700, 0.35, 1.25);
+    const ambient = 0.36;
     for(let y=0; y<h; y++) {
-      const ny = h === 1 ? 0 : y / (h - 1);
+      const rowOffset = y * w;
+      const rowOffsetDown = (y + 1 < h ? (y + 1) : y) * w;
       for(let x=0; x<w; x++) {
-        const nx = w === 1 ? 0 : x / (w - 1);
-        const zNorm = getZInterpolated(nx, ny);
+        const idx = rowOffset + x;
+        const zNorm = heightMap[idx];
         const { color: bandColor } = getSmoothedBandColor(zNorm, boundaries, bandColors);
         const height = state.terrainData.min + zNorm;
         const elevationT = range.maxZ === range.minZ ? 0 : (height - range.minZ) / (range.maxZ - range.minZ);
-        const shade = getHillshade(nx, ny, step, zNorm);
+        const zRight = heightMap[rowOffset + (x + 1 < w ? x + 1 : x)];
+        const zDown = heightMap[rowOffsetDown + x];
+        const dzdx = (zRight - zNorm) / stepX;
+        const dzdy = (zDown - zNorm) / stepY;
+        const nxv = -dzdx * relief;
+        const nyv = -dzdy * relief;
+        const nzv = 1;
+        const len = Math.hypot(nxv, nyv, nzv) || 1;
+        const dot = (nxv / len) * reliefLight.x + (nyv / len) * reliefLight.y + (nzv / len) * reliefLight.z;
+        const lit = Math.max(0, dot);
+        const shade = clamp(ambient + lit * (1 - ambient), 0, 1);
         const color = applyReliefOverlay(bandColor, shade, elevationT);
-        const idx = (y * w + x) * 4;
-        data[idx] = color.r;
-        data[idx + 1] = color.g;
-        data[idx + 2] = color.b;
-        data[idx + 3] = alpha;
+        const pixel = idx * 4;
+        data[pixel] = color.r;
+        data[pixel + 1] = color.g;
+        data[pixel + 2] = color.b;
+        data[pixel + 3] = alpha;
       }
     }
     ctx.putImageData(imgData, 0, 0);
@@ -3077,7 +3178,7 @@
     for(let i=0; i<meshSmoothPasses; i++) {
       heightGrid = smoothPass(heightGrid, gridSize, gridSize);
     }
-    const isIn = (x,y) => { if(['rect','din_l','din_p','sq'].includes(state.shape)) return true; const dx=x-state.wMm/2, dy=y-state.hMm/2; return (dx*dx+dy*dy)<=(state.wMm/2)**2; };
+    const isIn = (x, y) => isInShape(x, y);
     for(let r=0;r<=res;r++) for(let c=0;c<=res;c++) {
       const x=c/res*state.wMm, y=r/res*state.hMm; if(!isIn(x,y)) continue;
       const z=2.0 + (heightGrid[r * gridSize + c] * zScale);
