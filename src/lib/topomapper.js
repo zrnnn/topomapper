@@ -11,7 +11,8 @@ export function initTopomapper() {
         width: 0.2,
         color: '#10141B',
         smooth: 4,
-        opacity: 80
+        opacity: 80,
+        emphasisEvery: 10
       },
       png: {
         layered: true,
@@ -66,7 +67,8 @@ export function initTopomapper() {
         width: 0.2,
         color: '#10141B',
         smooth: 4,
-        opacity: 80
+        opacity: 80,
+        emphasisEvery: 10
       },
       png: {
         layered: true,
@@ -102,6 +104,37 @@ export function initTopomapper() {
         }
       },
       layerOrder: ['labels', 'roads', 'rivers', 'water', 'green', 'contours']
+    };
+
+    const FETCH_TIMEOUT = 12000;
+    const terrainCache = new Map();
+    const osmCache = new Map();
+    const bboxKey = (sw, ne) => {
+      if(!sw || !ne) return '';
+      return `${sw.lat.toFixed(4)},${sw.lng.toFixed(4)}:${ne.lat.toFixed(4)},${ne.lng.toFixed(4)}`;
+    };
+
+    const linkAbort = (source, target) => {
+      if(!source) return;
+      if(source.aborted) {
+        target.abort();
+        return;
+      }
+      source.addEventListener('abort', () => target.abort(), { once: true });
+    };
+
+    const fetchJsonWithTimeout = async (url, options = {}, timeoutMs = FETCH_TIMEOUT) => {
+      const controller = new AbortController();
+      linkAbort(options.signal, controller);
+      const { signal: _ignored, ...rest } = options;
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { ...rest, signal: controller.signal });
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+      } finally {
+        clearTimeout(timer);
+      }
     };
 
     const $ = id => document.getElementById(id);
@@ -211,6 +244,11 @@ export function initTopomapper() {
     function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
     const PX_TO_MM = 0.264583;
     const pxToMm = (value) => value * PX_TO_MM;
+    const clampDimensionMm = (value) => {
+      const parsed = parseFloat(value);
+      if(Number.isNaN(parsed)) return 200;
+      return clamp(parsed, 50, 1200);
+    };
     const formatWidthInput = (value) => {
       const rounded = Math.round(value * 100) / 100;
       return `${rounded}`.replace(/\.0$/, '').replace(/(\.\d)0$/, '$1');
@@ -823,15 +861,14 @@ export function initTopomapper() {
       let lastError = null;
       for(const server of overpassServers) {
         try {
-          const res = await fetch(server, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `data=${encodeURIComponent(query)}`
-          });
-          if(!res.ok) {
-            throw new Error(`Overpass error ${res.status}`);
-          }
-          return await res.json();
+          return await fetchJsonWithTimeout(
+            server,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: `data=${encodeURIComponent(query)}`
+            }
+          );
         } catch (err) {
           lastError = err;
         }
@@ -852,6 +889,15 @@ export function initTopomapper() {
 
     async function fetchMapFeatures(sw, ne) {
       state.osmStatus = { loaded: false, error: null, tiles: 1, ignored: false };
+      const cacheId = bboxKey(sw, ne);
+      const cached = cacheId ? osmCache.get(cacheId) : null;
+      if(cached?.data) {
+        state.osmData = typeof structuredClone === 'function' ? structuredClone(cached.data) : JSON.parse(JSON.stringify(cached.data));
+        state.osmStatus.loaded = true;
+        state.osmStatus.tiles = cached.tiles ?? 1;
+        updateMapDataStatus({ announce: true });
+        return true;
+      }
       updateMapDataStatus({ announce: true, loading: true });
       const attemptFetch = async (bboxes) => {
         const osmData = buildEmptyOsmData();
@@ -882,6 +928,7 @@ export function initTopomapper() {
         state.osmStatus.loaded = true;
         state.osmStatus.tiles = 1;
         updateMapDataStatus({ announce: true });
+        if(cacheId) osmCache.set(cacheId, { data: state.osmData, tiles: state.osmStatus.tiles });
         return true;
       } catch (err) {
         try {
@@ -890,10 +937,11 @@ export function initTopomapper() {
           state.osmStatus.loaded = true;
           state.osmStatus.tiles = tiledBboxes.length;
           updateMapDataStatus({ announce: true });
+          if(cacheId) osmCache.set(cacheId, { data: state.osmData, tiles: state.osmStatus.tiles });
           return true;
         } catch (tileErr) {
           state.osmData = buildEmptyOsmData();
-          state.osmStatus.error = 'Straßen, Flüsse oder Flächen konnten nicht geladen werden. Bitte wähle einen kleineren Ausschnitt oder versuche es erneut.';
+          state.osmStatus.error = 'Roads, rivers or areas could not be loaded. Please try a smaller area or retry.';
           updateMapDataStatus({ announce: true });
           return false;
         }
@@ -929,6 +977,8 @@ export function initTopomapper() {
       updateVf();
     });
 
+    const SEARCH_DEBOUNCE_MS = 350;
+    const SEARCH_TIMEOUT_MS = 8000;
     let timer;
     let activeSearch = null;
     $('searchInp').addEventListener('input', (e) => {
@@ -941,11 +991,11 @@ export function initTopomapper() {
             activeSearch.abort();
           }
           activeSearch = new AbortController();
-          const r = await fetch(
+          const d = await fetchJsonWithTimeout(
             `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&limit=5`,
-            { signal: activeSearch.signal }
+            { signal: activeSearch.signal },
+            SEARCH_TIMEOUT_MS
           );
-          const d = await r.json();
           const box = $('suggestionBox'); box.innerHTML='';
           if(d.length) {
             d.forEach(i => {
@@ -961,7 +1011,7 @@ export function initTopomapper() {
             $('suggestionBox').style.display='none';
           }
         }
-      }, 400);
+      }, SEARCH_DEBOUNCE_MS);
     });
 
     // --- UI CONSTRUCTION ---
@@ -1222,6 +1272,12 @@ export function initTopomapper() {
       const rounded = Math.round(value);
       return `${rounded > 0 ? '+' : ''}${rounded}%`;
     };
+    const formatNthLineLabel = (value) => {
+      const n = Math.max(0, Math.round(value));
+      if(n <= 0) return 'Off';
+      if(n === 1) return 'Every line';
+      return `${n}th line`;
+    };
     const getBlendMode = (mode) => {
       const allowed = ['normal', 'multiply', 'color'];
       return allowed.includes(mode) ? mode : 'normal';
@@ -1278,7 +1334,7 @@ export function initTopomapper() {
     const updateAutoPreviewButton = () => {
       if(!refreshPreviewBtn) return;
       const label = state.autoPreview ? 'Auto Preview On' : 'Auto Preview Off';
-      const dirtyHint = !state.autoPreview && state.previewDirty ? ' · Needs Refresh' : '';
+      const dirtyHint = !state.autoPreview && state.previewDirty ? ' - Needs Refresh' : '';
       refreshPreviewBtn.textContent = `${label}${dirtyHint}`;
       refreshPreviewBtn.classList.toggle('is-on', state.autoPreview);
       refreshPreviewBtn.disabled = !state.terrainData;
@@ -1400,14 +1456,14 @@ export function initTopomapper() {
 
     const updateMapDataStatus = ({ announce = false, loading = false } = {}) => {
       const alignmentStatus = getOverlayAlignmentStatus();
-      const alignmentLabel = alignmentStatus ? ` · Alignment ${alignmentStatus.ok ? 'OK' : 'Check'}` : '';
+      const alignmentLabel = alignmentStatus ? ` | Alignment ${alignmentStatus.ok ? 'OK' : 'Check'}` : '';
       if(!announce) return;
       if(loading) {
         showMapNotice('Map data loading...', { sticky: true });
         return;
       }
       if(state.osmStatus?.loaded && state.osmData) {
-        const tilesLabel = state.osmStatus.tiles > 1 ? ` · ${state.osmStatus.tiles} tiles` : '';
+        const tilesLabel = state.osmStatus.tiles > 1 ? ` | ${state.osmStatus.tiles} tiles` : '';
         showMapNotice(`Map data loaded: Water ${state.osmData.waterPolygons.length}, Rivers ${state.osmData.waterLines.length}, Roads ${state.osmData.roadLines.length}, Green ${state.osmData.greenPolygons.length}, Labels ${state.osmData.labels.length}${tilesLabel}${alignmentLabel}`);
         return;
       }
@@ -1489,6 +1545,13 @@ export function initTopomapper() {
     };
     $('contourWidth').oninput = (e) => setContourWidth(e.target.value);
     $('contourWidthInput').oninput = (e) => setContourWidth(e.target.value);
+    $('contourEmphasis').oninput = (e) => {
+      const raw = parseInt(e.target.value, 10);
+      const val = Math.min(20, Math.max(0, Number.isNaN(raw) ? 0 : raw));
+      state.contour.emphasisEvery = val;
+      $('contourEmphasisVal').innerText = formatNthLineLabel(val);
+      markPreviewDirty();
+    };
 
     $('contourDensity').oninput = (e) => {
       state.contour.density = parseInt(e.target.value, 10);
@@ -1662,7 +1725,7 @@ export function initTopomapper() {
         $('pngRangeInfo').innerText = 'Range: --';
         return;
       }
-      $('pngRangeInfo').innerText = `Range: ${Math.round(range.minZ)} m – ${Math.round(range.maxZ)} m`;
+      $('pngRangeInfo').innerText = `Range: ${Math.round(range.minZ)} m - ${Math.round(range.maxZ)} m`;
     };
 
     $('pngResRange').oninput = (e) => { $('pngResVal').innerText = e.target.value + 'px'; };
@@ -1721,6 +1784,8 @@ export function initTopomapper() {
       $('contourColor').parentElement.style.background = state.contour.color;
       $('contourWidth').value = state.contour.width;
       $('contourWidthInput').value = formatWidthInput(state.contour.width);
+      $('contourEmphasis').value = state.contour.emphasisEvery ?? 0;
+      $('contourEmphasisVal').innerText = formatNthLineLabel(state.contour.emphasisEvery);
       $('contourDensity').value = state.contour.density;
       $('contourDensityVal').innerText = state.contour.density;
       $('contourOpacity').value = state.contour.opacity;
@@ -1804,7 +1869,9 @@ export function initTopomapper() {
     }
 
     function updateVf() {
-      state.wMm = +$('dimW').value; state.hMm = +$('dimH').value;
+      state.wMm = clampDimensionMm($('dimW').value); state.hMm = clampDimensionMm($('dimH').value);
+      $('dimW').value = state.wMm;
+      $('dimH').value = state.hMm;
       if(['sq','circle','hex'].includes(state.shape)) { state.hMm = state.wMm; $('dimH').value = state.wMm; }
       if(state.shape === 'din_l') { state.hMm = Math.round(state.wMm / 1.414); $('dimH').value = state.hMm; }
       if(state.shape === 'din_p') { state.hMm = Math.round(state.wMm * 1.414); $('dimH').value = state.hMm; }
@@ -1833,11 +1900,14 @@ export function initTopomapper() {
       $('vfHole').setAttribute('d', d); $('vfOutline').setAttribute('d', d);
       $('vfBadge').style.left = cx+'px';
       $('vfBadge').style.top = (cy+hh)+'px';
-      $('vfBadge').innerText = `${state.wMm} × ${state.hMm} mm`;
+      $('vfBadge').innerText = `${state.wMm} x ${state.hMm} mm`;
       const sw = map.unproject([cx - hw, cy + hh]);
       const ne = map.unproject([cx + hw, cy - hh]);
       state.bbox = { sw: { lat: sw.lat, lng: sw.lng }, ne: { lat: ne.lat, lng: ne.lng } };
-      if(state.terrainData) updatePngRangeInfo();
+      if(state.terrainData) {
+        updatePngRangeInfo();
+        markPreviewDirty();
+      }
       updateMapDataStatus();
     }
     window.addEventListener('resize', () => { map.resize(); updateVf(); });
@@ -1868,7 +1938,7 @@ export function initTopomapper() {
       }
       if(!mapOk) {
         idle();
-        const proceed = confirm('Kartendaten (Straßen, Flüsse, Wasser/Grünflächen) konnten nicht geladen werden.\n\nMöchtest du trotzdem fortfahren?\nAbbrechen, um einen neuen Ausschnitt zu wählen.');
+        const proceed = confirm('Map data (roads, rivers, water/green areas) could not be loaded.\n\nProceed without map data?\nCancel to pick another area.');
         if(!proceed) {
           return;
         }
@@ -1884,6 +1954,14 @@ export function initTopomapper() {
 
     async function fetchTerrain(sw, ne) {
       try {
+        const cacheId = bboxKey(sw, ne);
+        const cached = cacheId ? terrainCache.get(cacheId) : null;
+        if(cached) {
+          state.terrainData = cached;
+          state.terrainVersion += 1;
+          state.pngPreviewCache = { key: null, dataUrl: null };
+          return;
+        }
         const rows = 120;
         const cols = rows;
         const locs=[];
@@ -1895,8 +1973,10 @@ export function initTopomapper() {
             locs.push({ latitude: lat, longitude: sw.lng + c * dLon });
           }
         }
-        const res = await fetch('https://api.open-elevation.com/api/v1/lookup', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locations:locs})});
-        const j = await res.json();
+        const j = await fetchJsonWithTimeout(
+          'https://api.open-elevation.com/api/v1/lookup',
+          {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locations:locs})}
+        );
         let h = j.results.map(x=>x.elevation);
         // Smooth based on detail: higher detail keeps more variation.
         const smoothPasses = 4;
@@ -1905,6 +1985,7 @@ export function initTopomapper() {
         state.terrainData = { rows, cols, h: h.map(z=>z-min), min, max, delta: max-min };
         state.terrainVersion += 1;
         state.pngPreviewCache = { key: null, dataUrl: null };
+        if(cacheId) terrainCache.set(cacheId, state.terrainData);
       } catch(e) {
         state.terrainData = null;
         state.pngPreviewCache = { key: null, dataUrl: null };
@@ -1989,17 +2070,20 @@ export function initTopomapper() {
             return `<text x="${cx}" y="${cy}" text-anchor="middle" font-family="SF Pro Text, Segoe UI, Roboto, sans-serif" font-size="6" fill="#9AA3B2">Elevation data missing. Try generating again.</text>`;
           }
           const levels = getContourLevels();
-          let out = `<g id="contours" stroke="${state.contour.color}" stroke-width="${state.contour.width}px" stroke-opacity="${toUnitOpacity(state.contour.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
-          levels.forEach(level => {
+          const emphasisEvery = Math.max(0, Math.round(state.contour.emphasisEvery || 0));
+          let out = `<g id="contours" stroke="${state.contour.color}" stroke-opacity="${toUnitOpacity(state.contour.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+          levels.forEach((level, idx) => {
             const segments = getContourSegments(level, wMm, hMm);
             if(!segments.length) return;
             const polylines = buildPolylines(segments);
+            const isBold = emphasisEvery > 0 && ((idx + 1) % emphasisEvery === 0);
+            const lineWidth = state.contour.width * (isBold ? 2 : 1);
             polylines.forEach(line => {
               const smoothed = state.contour.smooth ? smoothPolyline(line, state.contour.smooth) : line;
               if(smoothed.length < 2) return;
               state.contourPaths.push(smoothed);
               const path = smoothed.map((pt, idx) => `${idx ? 'L' : 'M'} ${pt[0].toFixed(2)} ${pt[1].toFixed(2)}`).join(' ');
-              out += `<path d="${path}" />`;
+              out += `<path d="${path}" stroke-width="${lineWidth}px" />`;
             });
           });
           return out + `</g>`;

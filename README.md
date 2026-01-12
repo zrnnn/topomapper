@@ -29,6 +29,12 @@ npm run preview -- --host 127.0.0.1 --port 4173
 
 ## GitHub Pages
 
+- Base path is `/topomapper` when `NODE_ENV=production`; adjust `paths.base` in `svelte.config.js` if the repo name changes.
+- Deploy via the workflow `.github/workflows/pages.yml` (builds and publishes `build/` to GitHub Pages).
+- A `.nojekyll` file in `static/` prevents GitHub Pages from ignoring underscore-prefixed files.
+
+## Manual GitHub Pages publish (fallback)
+
 1. Run `npm run build`
 2. Publish the `build/` folder
 

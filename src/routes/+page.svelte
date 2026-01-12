@@ -17,7 +17,7 @@
 
 <header class="top-header">
   <a class="top-brand" href={base + '/'}>
-    <img class="top-logo" src="/assets/logo.png" alt="Topomapper logo">
+    <img class="top-logo" src={base + '/assets/logo.png'} alt="Topomapper logo">
   </a>
 </header>
 
@@ -48,7 +48,7 @@
     </div>
 
     <div class="group">
-      <span class="ui-label">Step 1 · Choose Frame</span>
+      <span class="ui-label">Step 1 - Choose Frame</span>
       <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
         Contour styling, color presets, and map feature layers are adjusted in the preview panel after generation.
       </p>
@@ -56,7 +56,7 @@
 
     <button id="btnGen" class="btn-main">Generate Preview</button>
     <div class="sidebar-footer">
-      © <a href="https://github.com/topomapper" target="_blank" rel="noopener noreferrer">Topomapper</a>
+      (c) <a href="https://github.com/topomapper" target="_blank" rel="noopener noreferrer">Topomapper</a>
     </div>
   </div>
 </div>
@@ -87,14 +87,14 @@
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
           <h2 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-1px;">Preview & Export</h2>
-          <div style="font-size:12px; color:var(--color-text-sec); margin-top:4px;">Step 2: Choose Design · Step 3: Export Design</div>
+          <div style="font-size:12px; color:var(--color-text-sec); margin-top:4px;">Step 2: Choose Design - Step 3: Export Design</div>
         </div>
         <button on:click={() => window.closeModal?.()} style="border:none;background:none;font-size:32px;cursor:pointer;color:var(--color-text-sec);">&times;</button>
       </div>
 
-      <div class="stepper">
-        <button class="active" data-step-target="2">Step 2 · Choose Design</button>
-        <button data-step-target="3">Step 3 · Export Design</button>
+        <div class="stepper">
+        <button class="active" data-step-target="2">Step 2 - Choose Design</button>
+        <button data-step-target="3">Step 3 - Export Design</button>
       </div>
 
       <div class="step-content active" data-step="2">
@@ -296,6 +296,7 @@
               <div class="layer-body">
                 <div class="cust-row"><span style="margin:0" class="ui-label">Color</span><div class="color-dot" style="background:#10141B"><input type="color" id="contourColor" value="#10141B"></div></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (px)</span><input type="range" id="contourWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="contourWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Bold Every Nth</span><input type="range" id="contourEmphasis" min="0" max="20" step="1" value="10"><span id="contourEmphasisVal" style="font-size:11px;width:60px;text-align:right;">10th line</span></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Density</span><input type="range" id="contourDensity" min="5" max="250" step="5" value="24"><span id="contourDensityVal" style="font-size:11px;width:40px;text-align:right;">24</span></div>
           <div class="cust-row"><span style="margin:0" class="ui-label">Opacity (%)</span><input type="range" id="contourOpacity" min="0" max="100" step="1" value="80"><span id="contourOpacityVal" style="font-size:11px;width:46px;text-align:right;">80%</span></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Smoothing</span><input type="range" id="contourSmooth" min="0" max="5" step="1" value="4"><span id="contourSmoothVal" style="font-size:11px;width:40px;text-align:right;">4</span></div>
