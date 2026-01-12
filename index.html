@@ -46,7 +46,7 @@
 
     /* MAP AREA */
     .viewport { position: relative; flex: 1; height: 100%; }
-    #map { width: 100%; height: 100%; z-index: 0; background: #0A0D12; filter: contrast(1.25) saturate(1.2) brightness(1.08); transition: filter 0.3s ease; }
+    #map { width: 100%; height: 100%; z-index: 0; background: #0A0D12; filter: contrast(1.45) saturate(1.28) brightness(1.12); transition: filter 0.3s ease; }
 
     /* SIDEBAR (iOS Floating Panel) */
     .sidebar {
@@ -135,6 +135,33 @@
     }
     .btn-main:hover { transform: translateY(-2px); background: var(--color-primary-hover); }
     .btn-main:active { transform: translateY(0); }
+
+    .info-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-text-sec);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+    .gradient-preview {
+      height: 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: linear-gradient(90deg, #0B0F14, #F5F7FB);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
+      margin-top: 8px;
+    }
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
 
     /* VIEWFINDER Overlay */
     .viewfinder-wrapper { position: absolute; inset: 0; pointer-events: none; z-index: 500; }
@@ -327,6 +354,27 @@
           <input type="range" id="pngResRange" min="500" max="5000" step="100" value="2000">
           <span id="pngResVal" style="font-size:12px; font-weight:700; width:60px;">2000px</span>
         </div>
+        <div class="layer-item" style="padding: 12px 14px; display:flex; flex-direction:column; gap:10px; margin-bottom:12px;">
+          <div class="toggle-row">
+            <span style="font-weight:600; font-size:14px;">Layered Gradient Fills</span>
+            <div class="ios-switch" id="pngLayerToggle"></div>
+          </div>
+          <p style="font-size:11px; color:var(--color-text-sec); margin:0; line-height:1.4;">
+            Fills each contour level with a gradient-mapped tone based on the lowest/highest points in the current frame.
+          </p>
+          <div id="pngLayerOptions" style="display:none;">
+            <div class="cust-row">
+              <label style="margin:0">Start Color (Low)</label>
+              <div class="color-dot" id="pngGradStartDot" style="background:#0B0F14"><input type="color" id="pngGradStart" value="#0B0F14"></div>
+            </div>
+            <div class="cust-row">
+              <label style="margin:0">End Color (High)</label>
+              <div class="color-dot" id="pngGradEndDot" style="background:#F5F7FB"><input type="color" id="pngGradEnd" value="#F5F7FB"></div>
+            </div>
+            <div class="gradient-preview" id="pngGradientPreview"></div>
+            <div class="info-pill" id="pngRangeInfo" style="margin-top:10px;">Range: --</div>
+          </div>
+        </div>
         <button id="btnPNG" class="btn-main" style="background:#2B3440; color:#F5F7FB;">Save PNG</button>
       </div>
     </div>
@@ -345,6 +393,11 @@
       color: '#D7E3FF',
       autoScale: true,
       smooth: 1
+    },
+    png: {
+      layered: false,
+      gradientStart: '#0B0F14',
+      gradientEnd: '#F5F7FB'
     },
     theme: {
       preset: 'dark',
@@ -384,14 +437,132 @@
     return qx + qy * 0.577 <= 1;
   }
 
-  function getContourLevels() {
-    if(!state.terrainData || state.terrainData.delta <= 0) return [];
+  function getContourLineCount() {
     const desired = Math.max(4, Math.round(state.contour.density * state.contour.detail));
     const minSpacing = state.contour.autoScale ? Math.max(1.2, state.contour.width * 8) : 0;
     const maxLines = minSpacing ? Math.max(4, Math.floor(Math.min(state.wMm, state.hMm) / minSpacing)) : desired;
-    const lineCount = Math.max(4, Math.min(desired, maxLines));
-    const interval = state.terrainData.delta / lineCount;
-    return Array.from({length: lineCount - 1}, (_, i) => interval * (i + 1));
+    return Math.max(4, Math.min(desired, maxLines));
+  }
+
+  function getContourLevels(minNorm = 0, maxNorm = state.terrainData?.delta ?? 0) {
+    if(!state.terrainData || maxNorm <= minNorm) return [];
+    const lineCount = getContourLineCount();
+    const interval = (maxNorm - minNorm) / lineCount;
+    return Array.from({length: lineCount - 1}, (_, i) => minNorm + interval * (i + 1));
+  }
+
+  function getShapeHeightRange() {
+    if(!state.terrainData) return null;
+    const { rows, cols, h, min, delta } = state.terrainData;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for(let r=0; r<rows; r++) {
+      const y = (r / (rows - 1)) * state.hMm;
+      for(let c=0; c<cols; c++) {
+        const x = (c / (cols - 1)) * state.wMm;
+        if(!isInShape(x, y)) continue;
+        const z = min + h[r * cols + c];
+        if(z < minZ) minZ = z;
+        if(z > maxZ) maxZ = z;
+      }
+    }
+    if(!Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
+      minZ = min;
+      maxZ = min + delta;
+    }
+    return { minZ, maxZ, minNorm: minZ - min, maxNorm: maxZ - min };
+  }
+
+  function parseHexColor(hex) {
+    const v = hex.replace('#', '').trim();
+    if(v.length === 3) {
+      return {
+        r: parseInt(v[0] + v[0], 16),
+        g: parseInt(v[1] + v[1], 16),
+        b: parseInt(v[2] + v[2], 16)
+      };
+    }
+    if(v.length === 6) {
+      return {
+        r: parseInt(v.slice(0,2), 16),
+        g: parseInt(v.slice(2,4), 16),
+        b: parseInt(v.slice(4,6), 16)
+      };
+    }
+    return { r: 0, g: 0, b: 0 };
+  }
+
+  function colorToRgb(color) {
+    const tester = new Option().style;
+    tester.color = color;
+    const parsed = tester.color || '#000000';
+    if(parsed.startsWith('#')) {
+      return parseHexColor(parsed);
+    }
+    const match = parsed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if(match) {
+      return { r: parseInt(match[1], 10), g: parseInt(match[2], 10), b: parseInt(match[3], 10) };
+    }
+    return { r: 0, g: 0, b: 0 };
+  }
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
+
+  function gradientColor(startColor, endColor, t) {
+    const s = colorToRgb(startColor);
+    const e = colorToRgb(endColor);
+    const tt = clamp(t, 0, 1);
+    return {
+      r: Math.round(lerp(s.r, e.r, tt)),
+      g: Math.round(lerp(s.g, e.g, tt)),
+      b: Math.round(lerp(s.b, e.b, tt))
+    };
+  }
+
+  function getLayeredPreviewDataUrl() {
+    if(!state.terrainData) return null;
+    const ratio = state.hMm / state.wMm;
+    const target = 320;
+    let w = target;
+    let h = Math.max(1, Math.round(target * ratio));
+    if(h > target) {
+      h = target;
+      w = Math.max(1, Math.round(target / ratio));
+    }
+    const range = getShapeHeightRange();
+    if(!range) return null;
+    const boundaries = [range.minNorm, ...getContourLevels(range.minNorm, range.maxNorm), range.maxNorm];
+    if(boundaries.length < 2) return null;
+    const bandColors = [];
+    for(let i=0; i<boundaries.length - 1; i++) {
+      const midNorm = (boundaries[i] + boundaries[i + 1]) / 2;
+      const height = state.terrainData.min + midNorm;
+      const t = range.maxZ === range.minZ ? 0 : (height - range.minZ) / (range.maxZ - range.minZ);
+      bandColors.push(gradientColor(state.png.gradientStart, state.png.gradientEnd, t));
+    }
+    const cv = document.createElement('canvas');
+    cv.width = w;
+    cv.height = h;
+    const ctx = cv.getContext('2d');
+    const imgData = ctx.createImageData(w, h);
+    const data = imgData.data;
+    for(let y=0; y<h; y++) {
+      const ny = h === 1 ? 0 : y / (h - 1);
+      for(let x=0; x<w; x++) {
+        const nx = w === 1 ? 0 : x / (w - 1);
+        const zNorm = getZInterpolated(nx, ny);
+        const band = findBandIndex(zNorm, boundaries);
+        const color = bandColors[band];
+        const idx = (y * w + x) * 4;
+        data[idx] = color.r;
+        data[idx + 1] = color.g;
+        data[idx + 2] = color.b;
+        data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    return cv.toDataURL('image/png');
   }
 
   function getContourSegments(level, widthMm, heightMm) {
@@ -726,7 +897,42 @@
   };
 
   $('autoScaleToggle').onclick = function() { state.contour.autoScale = !state.contour.autoScale; this.classList.toggle('on'); if(state.terrainData) renderSVG(); };
+  const updateGradientPreview = () => {
+    $('pngGradientPreview').style.background = `linear-gradient(90deg, ${state.png.gradientStart}, ${state.png.gradientEnd})`;
+  };
+
+  const updatePngRangeInfo = () => {
+    const range = getShapeHeightRange();
+    if(!range) {
+      $('pngRangeInfo').innerText = 'Range: --';
+      return;
+    }
+    $('pngRangeInfo').innerText = `Range: ${Math.round(range.minZ)} m – ${Math.round(range.maxZ)} m`;
+  };
+
   $('pngResRange').oninput = (e) => { $('pngResVal').innerText = e.target.value + 'px'; };
+
+  $('pngLayerToggle').onclick = function() {
+    state.png.layered = !state.png.layered;
+    this.classList.toggle('on', state.png.layered);
+    $('pngLayerOptions').style.display = state.png.layered ? 'block' : 'none';
+    updateGradientPreview();
+    updatePngRangeInfo();
+    if(state.terrainData) renderSVG();
+  };
+
+  $('pngGradStart').oninput = (e) => {
+    state.png.gradientStart = e.target.value;
+    $('pngGradStartDot').style.background = state.png.gradientStart;
+    updateGradientPreview();
+    if(state.png.layered && state.terrainData) renderSVG();
+  };
+  $('pngGradEnd').oninput = (e) => {
+    state.png.gradientEnd = e.target.value;
+    $('pngGradEndDot').style.background = state.png.gradientEnd;
+    updateGradientPreview();
+    if(state.png.layered && state.terrainData) renderSVG();
+  };
 
   $('shapeSel').onchange = (e) => {
     state.shape = e.target.value;
@@ -741,6 +947,11 @@
   $('bgColorDot').style.background = state.theme.background;
   $('lineColorDot').style.background = state.theme.line;
   $('customPreset').style.display = state.theme.preset === 'custom' ? 'block' : 'none';
+  $('pngGradStartDot').style.background = state.png.gradientStart;
+  $('pngGradEndDot').style.background = state.png.gradientEnd;
+  $('pngLayerToggle').classList.toggle('on', state.png.layered);
+  $('pngLayerOptions').style.display = state.png.layered ? 'block' : 'none';
+  updateGradientPreview();
   applyTheme();
 
   function updateVf() {
@@ -775,6 +986,7 @@
     $('vfBadge').style.top = (cy+hh)+'px';
     $('vfBadge').innerText = `${state.wMm} × ${state.hMm} mm`;
     state.bbox = { sw: map.containerPointToLatLng([cx-hw, cy+hh]), ne: map.containerPointToLatLng([cx+hw, cy-hh]) };
+    if(state.terrainData) updatePngRangeInfo();
   }
   window.onresize = updateVf; map.on('move zoom', updateVf); setTimeout(updateVf,500);
 
@@ -784,7 +996,9 @@
     const {sw, ne} = state.bbox;
     await fetchTerrain(sw, ne);
     if(!state.terrainData) {
+      renderSVG();
       idle();
+      $('modal').classList.add('open');
       alert('Elevation data unavailable. Try a smaller area or try again.');
       return;
     }
@@ -831,6 +1045,12 @@
     const {wMm, hMm} = state;
     let svg = `<svg id="prevSvg" width="${wMm}mm" height="${hMm}mm" viewBox="0 0 ${wMm} ${hMm}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
     svg += `<rect width="100%" height="100%" fill="${state.theme.background}"/>`;
+    if(state.png.layered && state.terrainData) {
+      const previewUrl = getLayeredPreviewDataUrl();
+      if(previewUrl) {
+        svg += `<image href="${previewUrl}" x="0" y="0" width="${wMm}" height="${hMm}" preserveAspectRatio="none" />`;
+      }
+    }
     svg += `<rect x="0.5" y="0.5" width="${wMm - 1}" height="${hMm - 1}" fill="none" stroke="rgba(36,48,65,0.6)" stroke-width="0.5" />`;
 
     state.contourPaths = [];
@@ -857,6 +1077,7 @@
     }
     svg += `</svg>`;
     $('previewArea').innerHTML = svg;
+    updatePngRangeInfo();
   }
 
   $('btnDXF').onclick = () => {
@@ -880,7 +1101,83 @@
     save(new Blob([dxf], {type:'application/dxf'}), 'Topomapper.dxf');
   };
 
+  function findBandIndex(value, boundaries) {
+    if(value <= boundaries[0]) return 0;
+    if(value >= boundaries[boundaries.length - 1]) return boundaries.length - 2;
+    let lo = 0;
+    let hi = boundaries.length - 2;
+    while(lo <= hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if(value < boundaries[mid]) {
+        hi = mid - 1;
+      } else if(value >= boundaries[mid + 1]) {
+        lo = mid + 1;
+      } else {
+        return mid;
+      }
+    }
+    return Math.max(0, Math.min(boundaries.length - 2, lo));
+  }
+
+  function exportLayeredPng() {
+    if(!state.terrainData) {
+      alert('Generate contours first.');
+      return;
+    }
+    const e = +$('pngResRange').value;
+    const r = state.hMm / state.wMm;
+    const w = state.wMm >= state.hMm ? e : Math.round(e / r);
+    const h = state.wMm >= state.hMm ? Math.round(e * r) : e;
+    const cv = document.createElement('canvas');
+    cv.width = w;
+    cv.height = h;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = state.theme.background;
+    ctx.fillRect(0, 0, w, h);
+
+    const range = getShapeHeightRange();
+    if(!range) {
+      alert('Elevation data missing.');
+      return;
+    }
+    const boundaries = [range.minNorm, ...getContourLevels(range.minNorm, range.maxNorm), range.maxNorm];
+    if(boundaries.length < 2) {
+      alert('Contour range too small for gradient export.');
+      return;
+    }
+    const bandColors = [];
+    for(let i=0; i<boundaries.length - 1; i++) {
+      const midNorm = (boundaries[i] + boundaries[i + 1]) / 2;
+      const height = state.terrainData.min + midNorm;
+      const t = range.maxZ === range.minZ ? 0 : (height - range.minZ) / (range.maxZ - range.minZ);
+      bandColors.push(gradientColor(state.png.gradientStart, state.png.gradientEnd, t));
+    }
+
+    const imgData = ctx.createImageData(w, h);
+    const data = imgData.data;
+    for(let y=0; y<h; y++) {
+      const ny = h === 1 ? 0 : y / (h - 1);
+      for(let x=0; x<w; x++) {
+        const nx = w === 1 ? 0 : x / (w - 1);
+        const zNorm = getZInterpolated(nx, ny);
+        const band = findBandIndex(zNorm, boundaries);
+        const color = bandColors[band];
+        const idx = (y * w + x) * 4;
+        data[idx] = color.r;
+        data[idx + 1] = color.g;
+        data[idx + 2] = color.b;
+        data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    cv.toBlob(b => save(b, 'Topomapper_Layered.png'));
+  }
+
   $('btnPNG').onclick = () => {
+    if(state.png.layered) {
+      exportLayeredPng();
+      return;
+    }
     const e = +$('pngResRange').value, r = state.hMm/state.wMm;
     const w = state.wMm >= state.hMm ? e : Math.round(e/r), h = state.wMm >= state.hMm ? Math.round(e*r) : e;
     const s = new XMLSerializer().serializeToString($('prevSvg'));
