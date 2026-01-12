@@ -101,6 +101,7 @@
     .layer-item:hover { border-color: rgba(255,255,255,0.28); transform: translateY(-1px); }
     .layer-item.open { background: rgba(255,255,255,0.14); border-color: rgba(76,141,255,0.6); }
     .layer-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; }
+    .layer-actions { display: inline-flex; align-items: center; gap: 10px; }
     .layer-info { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; }
     .chevron { transition: transform 0.3s; width: 14px; height: 14px; opacity: 0.4; }
     .layer-item.open .chevron { transform: rotate(180deg); opacity: 1; color: var(--color-primary); }
@@ -244,7 +245,13 @@
 
 <header class="top-header">
   <a class="top-brand" href="#">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--color-primary)"><path d="M12 2l-5.5 9h11z"/><path d="M12 22l5.5-9h-11z"/></svg>
+    <svg width="32" height="32" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <rect x="6" y="6" width="36" height="36" rx="12" fill="rgba(76,141,255,0.18)" stroke="rgba(76,141,255,0.6)" stroke-width="1.5"/>
+      <path d="M12 18c4-6 20-8 24-2" stroke="var(--color-primary)" stroke-width="2.2" fill="none"/>
+      <path d="M12 24c5-5 19-6 24-1" stroke="rgba(76,141,255,0.75)" stroke-width="2" fill="none"/>
+      <path d="M12 30c6-4 18-4 24 1" stroke="rgba(76,141,255,0.55)" stroke-width="1.8" fill="none"/>
+      <path d="M16 36c4-2 12-2 16 1" stroke="rgba(76,141,255,0.4)" stroke-width="1.6" fill="none"/>
+    </svg>
     Topomapper
   </a>
   <span class="top-badge">Live Terrain Studio</span>
@@ -253,7 +260,13 @@
 <div class="sidebar">
   <div class="sidebar-header">
     <a href="#" class="brand">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--color-primary)"><path d="M12 2l-5.5 9h11z"/><path d="M12 22l5.5-9h-11z"/></svg>
+      <svg width="26" height="26" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+        <rect x="6" y="6" width="36" height="36" rx="12" fill="rgba(76,141,255,0.18)" stroke="rgba(76,141,255,0.6)" stroke-width="1.5"/>
+        <path d="M12 18c4-6 20-8 24-2" stroke="var(--color-primary)" stroke-width="2.2" fill="none"/>
+        <path d="M12 24c5-5 19-6 24-1" stroke="rgba(76,141,255,0.75)" stroke-width="2" fill="none"/>
+        <path d="M12 30c6-4 18-4 24 1" stroke="rgba(76,141,255,0.55)" stroke-width="1.8" fill="none"/>
+        <path d="M16 36c4-2 12-2 16 1" stroke="rgba(76,141,255,0.4)" stroke-width="1.6" fill="none"/>
+      </svg>
       Topomapper
     </a>
   </div>
@@ -283,7 +296,7 @@
     </div>
 
     <div class="group">
-      <label>Step 1 · Map Frame</label>
+      <label>Step 1 · Choose Frame</label>
       <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
         Contour styling, color presets, and map feature layers are adjusted in the preview panel after generation.
       </p>
@@ -312,44 +325,33 @@
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
           <h2 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-1px;">Preview & Export</h2>
-          <div style="font-size:12px; color:var(--color-text-sec); margin-top:4px;">Step 2: Style · Step 3: Export</div>
+          <div style="font-size:12px; color:var(--color-text-sec); margin-top:4px;">Step 2: Choose Design · Step 3: Export Design</div>
         </div>
         <button onclick="closeModal()" style="border:none;background:none;font-size:32px;cursor:pointer;color:var(--color-text-sec);">&times;</button>
       </div>
 
       <div class="stepper">
-        <button class="active" data-step-target="2">Step 2 · Styling</button>
-        <button data-step-target="3">Step 3 · Export</button>
+        <button class="active" data-step-target="2">Step 2 · Choose Design</button>
+        <button data-step-target="3">Step 3 · Export Design</button>
       </div>
 
       <div class="step-content active" data-step="2">
         <div class="group">
-          <label>Preview Styling</label>
-          <div class="layer-item" style="margin-top:10px;">
-            <div class="layer-head">
-              <div class="layer-info">
-                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
-                <span>Color Preset</span>
-              </div>
+          <label>Design Preset</label>
+          <select id="presetSel" style="margin-top:6px;">
+            <option value="dark">Dark (Negative)</option>
+            <option value="bright">Bright (Positive)</option>
+          </select>
+          <div id="designColors" style="margin-top:12px;">
+            <div class="cust-row">
+              <label style="margin:0">Background</label>
+              <div class="color-dot" id="bgColorDot" style="background:#141A22"><input type="color" id="bgColorPicker" value="#141A22"></div>
+              <input type="text" id="bgColorText" placeholder="#141A22 or rgb(20,26,34)" style="flex:1">
             </div>
-            <div class="layer-body">
-              <select id="presetSel" style="margin-bottom:12px;">
-                <option value="dark">Dark (Negative)</option>
-                <option value="bright">Bright (Positive)</option>
-                <option value="custom">Custom</option>
-              </select>
-              <div id="customPreset" style="display:none;">
-                <div class="cust-row">
-                  <label style="margin:0">Background</label>
-                  <div class="color-dot" id="bgColorDot" style="background:#141A22"><input type="color" id="bgColorPicker" value="#141A22"></div>
-                  <input type="text" id="bgColorText" placeholder="#141A22 or rgb(20,26,34)" style="flex:1">
-                </div>
-                <div class="cust-row">
-                  <label style="margin:0">Contour Lines</label>
-                  <div class="color-dot" id="lineColorDot" style="background:#D7E3FF"><input type="color" id="lineColorPicker" value="#D7E3FF"></div>
-                  <input type="text" id="lineColorText" placeholder="#D7E3FF or rgb(215,227,255)" style="flex:1">
-                </div>
-              </div>
+            <div class="cust-row">
+              <label style="margin:0">Contour Lines</label>
+              <div class="color-dot" id="lineColorDot" style="background:#D7E3FF"><input type="color" id="lineColorPicker" value="#D7E3FF"></div>
+              <input type="text" id="lineColorText" placeholder="#D7E3FF or rgb(215,227,255)" style="flex:1">
             </div>
           </div>
         </div>
@@ -369,12 +371,11 @@
                   <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
                   <span>Place Names</span>
                 </div>
-              </div>
-              <div class="layer-body">
-                <div class="toggle-row">
-                  <span style="font-weight:600; font-size:14px;">Place Names</span>
+                <div class="layer-actions">
                   <div class="ios-switch" id="labelToggle"></div>
                 </div>
+              </div>
+              <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Label Color</label><div class="color-dot" id="labelColorDot" style="background:#F5F7FB"><input type="color" id="labelColor" value="#F5F7FB"></div></div>
                 <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="labelOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="labelOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
                 <div class="cust-row"><label style="margin:0">Font Size</label><input type="range" id="labelSize" min="0.2" max="1.5" step="0.1" value="0.32"><span id="labelSizeVal" style="font-size:11px;width:36px;text-align:right;">0.32</span></div>
@@ -396,12 +397,11 @@
                   <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
                   <span>Roads</span>
                 </div>
-              </div>
-              <div class="layer-body">
-                <div class="toggle-row">
-                  <span style="font-weight:600; font-size:14px;">Road Lines</span>
+                <div class="layer-actions">
                   <div class="ios-switch" id="roadToggle"></div>
                 </div>
+              </div>
+              <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" id="roadColorDot" style="background:#E7C36E"><input type="color" id="roadColor" value="#E7C36E"></div></div>
                 <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="roadWidth" min="0.05" max="0.6" step="0.05" value="0.35"><span id="roadWidthVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
                 <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="roadOpacity" min="0.1" max="1" step="0.05" value="0.75"><span id="roadOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.75</span></div>
@@ -416,12 +416,11 @@
                   <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
                   <span>Rivers</span>
                 </div>
-              </div>
-              <div class="layer-body">
-                <div class="toggle-row">
-                  <span style="font-weight:600; font-size:14px;">Rivers</span>
+                <div class="layer-actions">
                   <div class="ios-switch on" id="riverToggle"></div>
                 </div>
+              </div>
+              <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Line Color</label><div class="color-dot" id="riverColorDot" style="background:#6BB4FF"><input type="color" id="riverColor" value="#6BB4FF"></div></div>
                 <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="riverWidth" min="0.05" max="0.6" step="0.05" value="0.25"><span id="riverWidthVal" style="font-size:11px;width:36px;text-align:right;">0.25</span></div>
                 <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="riverOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="riverOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
@@ -436,12 +435,11 @@
                   <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
                   <span>Water Areas</span>
                 </div>
-              </div>
-              <div class="layer-body">
-                <div class="toggle-row">
-                  <span style="font-weight:600; font-size:14px;">Water Areas</span>
+                <div class="layer-actions">
                   <div class="ios-switch on" id="waterAreaToggle"></div>
                 </div>
+              </div>
+              <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="waterAreaColorDot" style="background:#4C86A8"><input type="color" id="waterAreaColor" value="#4C86A8"></div></div>
                 <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="waterAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.45"><span id="waterAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.45</span></div>
               </div>
@@ -455,12 +453,11 @@
                   <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
                   <span>Green Areas</span>
                 </div>
-              </div>
-              <div class="layer-body">
-                <div class="toggle-row">
-                  <span style="font-weight:600; font-size:14px;">Parks & Forests</span>
+                <div class="layer-actions">
                   <div class="ios-switch on" id="greenAreaToggle"></div>
                 </div>
+              </div>
+              <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="greenAreaColorDot" style="background:#4E7E5A"><input type="color" id="greenAreaColor" value="#4E7E5A"></div></div>
                 <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="greenAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.35"><span id="greenAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
               </div>
@@ -485,11 +482,11 @@
             </div>
           </div>
         </div>
-        <button id="toExport" class="btn-main" style="margin-top:6px;">Continue to Export</button>
+        <button id="toExport" class="btn-main" style="margin-top:6px;">Continue to Export Design</button>
       </div>
 
       <div class="step-content" data-step="3">
-        <button id="backToStyle" class="btn-main" style="background:#3A3A3C;">Back to Styling</button>
+        <button id="backToStyle" class="btn-main" style="background:#3A3A3C;">Back to Design</button>
         <div class="group" style="margin-top:20px;">
         <label>3D Print (3MF Terrain)</label>
         <p style="font-size:13px; color:var(--color-text-sec); margin-bottom:12px; line-height:1.5;">
@@ -504,7 +501,7 @@
 
       <div class="group">
         <label>Laser / Vector (DXF)</label>
-        <button id="btnDXF" class="btn-main" style="background:#3A3A3C;">Download DXF R12</button>
+        <button id="btnDXF" class="btn-main" style="background:#3A3A3C;">Download DXF</button>
       </div>
 
       <div class="group">
@@ -530,6 +527,11 @@
             <div class="cust-row">
               <label style="margin:0">End Color (High)</label>
               <div class="color-dot" id="pngGradEndDot" style="background:#F5F7FB"><input type="color" id="pngGradEnd" value="#F5F7FB"></div>
+            </div>
+            <div class="cust-row">
+              <label style="margin:0">Gradient Opacity</label>
+              <input type="range" id="pngGradOpacity" min="0.1" max="1" step="0.05" value="0.9">
+              <span id="pngGradOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.9</span>
             </div>
             <div class="gradient-preview" id="pngGradientPreview"></div>
             <div class="info-pill" id="pngRangeInfo" style="margin-top:10px;">Range: --</div>
@@ -557,7 +559,8 @@
     png: {
       layered: false,
       gradientStart: '#0B0F14',
-      gradientEnd: '#F5F7FB'
+      gradientEnd: '#F5F7FB',
+      gradientOpacity: 0.9
     },
     theme: {
       preset: 'dark',
@@ -691,6 +694,7 @@
 
   function getLayeredPreviewDataUrl() {
     if(!state.terrainData) return null;
+    const alpha = Math.round(255 * clamp(state.png.gradientOpacity ?? 1, 0, 1));
     const ratio = state.hMm / state.wMm;
     const target = 320;
     let w = target;
@@ -727,7 +731,7 @@
         data[idx] = color.r;
         data[idx + 1] = color.g;
         data[idx + 2] = color.b;
-        data[idx + 3] = 255;
+        data[idx + 3] = alpha;
       }
     }
     ctx.putImageData(imgData, 0, 0);
@@ -928,6 +932,55 @@
     return closed ? coords : [...coords, first];
   }
 
+  function joinLineSegments(segments, tolerance = 0.4) {
+    if(!segments.length) return [];
+    const remaining = segments.map(seg => seg.slice());
+    const rings = [];
+    const closeEnough = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= tolerance;
+    while(remaining.length) {
+      let ring = remaining.pop();
+      let merged = true;
+      while(merged) {
+        merged = false;
+        for(let i = remaining.length - 1; i >= 0; i--) {
+          const seg = remaining[i];
+          const segStart = seg[0];
+          const segEnd = seg[seg.length - 1];
+          const ringStart = ring[0];
+          const ringEnd = ring[ring.length - 1];
+          if(closeEnough(ringEnd, segStart)) {
+            ring = ring.concat(seg.slice(1));
+            remaining.splice(i, 1);
+            merged = true;
+            break;
+          }
+          if(closeEnough(ringEnd, segEnd)) {
+            ring = ring.concat(seg.slice(0, -1).reverse());
+            remaining.splice(i, 1);
+            merged = true;
+            break;
+          }
+          if(closeEnough(ringStart, segEnd)) {
+            ring = seg.slice(0, -1).concat(ring);
+            remaining.splice(i, 1);
+            merged = true;
+            break;
+          }
+          if(closeEnough(ringStart, segStart)) {
+            ring = seg.slice(1).reverse().concat(ring);
+            remaining.splice(i, 1);
+            merged = true;
+            break;
+          }
+        }
+      }
+      if(ring.length >= 3) {
+        rings.push(normalizeRing(ring));
+      }
+    }
+    return rings;
+  }
+
   function getShapePathD() {
     const w = state.wMm;
     const h = state.hMm;
@@ -1020,16 +1073,17 @@
           return;
         }
         if(el.type === 'relation' && Array.isArray(el.members)) {
-          const relationPolys = el.members
+          const relationSegments = el.members
             .filter(m => m.role === 'outer' && Array.isArray(m.geometry))
-            .map(m => normalizeRing(toSvgCoords(m.geometry)));
+            .map(m => toSvgCoords(m.geometry));
+          const relationPolys = joinLineSegments(relationSegments);
           const isWater = tags.natural === 'water' || tags.waterway === 'riverbank';
           const isGreen = greenLanduse.has(tags.landuse) || greenLeisure.has(tags.leisure) || greenNatural.has(tags.natural);
           if(isWater) {
-            waterPolygons.push(...relationPolys);
+            waterPolygons.push(...(relationPolys.length ? relationPolys : relationSegments.map(normalizeRing)));
           }
           if(isGreen) {
-            greenPolygons.push(...relationPolys);
+            greenPolygons.push(...(relationPolys.length ? relationPolys : relationSegments.map(normalizeRing)));
           }
           if(tags.highway) {
             const relationLines = el.members
@@ -1103,6 +1157,11 @@
       if(item?.classList.contains('dragging')) return;
       item.classList.toggle('open');
     };
+  });
+  document.querySelectorAll('.layer-head .ios-switch').forEach((toggle) => {
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
   });
 
   const setupLayerReorder = (container) => {
@@ -1208,14 +1267,14 @@
   $('presetSel').onchange = (e) => {
     const preset = e.target.value;
     state.theme.preset = preset;
-    $('customPreset').style.display = preset === 'custom' ? 'block' : 'none';
-    if(preset === 'custom') {
-      state.theme.background = $('bgColorPicker').value;
-      state.theme.line = $('lineColorPicker').value;
-    } else {
-      state.theme.background = presets[preset].background;
-      state.theme.line = presets[preset].line;
-    }
+    state.theme.background = presets[preset].background;
+    state.theme.line = presets[preset].line;
+    $('bgColorPicker').value = state.theme.background;
+    $('lineColorPicker').value = state.theme.line;
+    $('bgColorText').value = state.theme.background;
+    $('lineColorText').value = state.theme.line;
+    $('bgColorDot').style.background = state.theme.background;
+    $('lineColorDot').style.background = state.theme.line;
     applyTheme();
   };
 
@@ -1223,38 +1282,36 @@
     state.theme.background = e.target.value;
     $('bgColorDot').style.background = state.theme.background;
     $('bgColorText').value = state.theme.background;
-    if(state.theme.preset === 'custom') applyTheme();
+    applyTheme();
   };
   $('lineColorPicker').oninput = (e) => {
     state.theme.line = e.target.value;
     $('lineColorDot').style.background = state.theme.line;
     $('lineColorText').value = state.theme.line;
-    if(state.theme.preset === 'custom') applyTheme();
+    applyTheme();
   };
   $('bgColorText').onchange = (e) => {
     const parsed = parseColorInput(e.target.value);
     if(!parsed) return;
     state.theme.background = parsed.startsWith('rgb') ? parsed : e.target.value;
     syncCustomField(parsed, 'bgColorPicker', 'bgColorText', 'bgColorDot');
-    if(state.theme.preset === 'custom') applyTheme();
+    applyTheme();
   };
   $('lineColorText').onchange = (e) => {
     const parsed = parseColorInput(e.target.value);
     if(!parsed) return;
     state.theme.line = parsed.startsWith('rgb') ? parsed : e.target.value;
     syncCustomField(parsed, 'lineColorPicker', 'lineColorText', 'lineColorDot');
-    if(state.theme.preset === 'custom') applyTheme();
+    applyTheme();
   };
 
   $('contourColor').oninput = (e) => {
     state.contour.color = e.target.value;
     e.target.parentElement.style.background = state.contour.color;
-    if(state.theme.preset === 'custom') {
-      state.theme.line = state.contour.color;
-      $('lineColorPicker').value = state.contour.color;
-      $('lineColorText').value = state.contour.color;
-      $('lineColorDot').style.background = state.contour.color;
-    }
+    state.theme.line = state.contour.color;
+    $('lineColorPicker').value = state.contour.color;
+    $('lineColorText').value = state.contour.color;
+    $('lineColorDot').style.background = state.contour.color;
     if(state.terrainData) renderSVG();
   };
 
@@ -1412,6 +1469,11 @@
     updateGradientPreview();
     if(state.png.layered && state.terrainData) renderSVG();
   };
+  $('pngGradOpacity').oninput = (e) => {
+    state.png.gradientOpacity = parseFloat(e.target.value);
+    $('pngGradOpacityVal').innerText = state.png.gradientOpacity.toFixed(2).replace(/\.00$/, '');
+    if(state.png.layered && state.terrainData) renderSVG();
+  };
 
   $('shapeSel').onchange = (e) => {
     state.shape = e.target.value;
@@ -1427,7 +1489,6 @@
   $('lineColorDot').style.background = state.theme.line;
   $('contourOpacity').value = state.contour.opacity;
   $('contourOpacityVal').innerText = state.contour.opacity.toFixed(2).replace(/\.00$/, '');
-  $('customPreset').style.display = state.theme.preset === 'custom' ? 'block' : 'none';
   $('waterAreaToggle').classList.toggle('on', state.mapFeatures.waterAreas.enabled);
   $('waterAreaColor').value = state.mapFeatures.waterAreas.color;
   $('waterAreaColorDot').style.background = state.mapFeatures.waterAreas.color;
@@ -1462,6 +1523,8 @@
   $('labelFont').value = state.mapFeatures.labels.font;
   $('pngGradStartDot').style.background = state.png.gradientStart;
   $('pngGradEndDot').style.background = state.png.gradientEnd;
+  $('pngGradOpacity').value = state.png.gradientOpacity;
+  $('pngGradOpacityVal').innerText = state.png.gradientOpacity.toFixed(2).replace(/\.00$/, '');
   $('pngLayerToggle').classList.toggle('on', state.png.layered);
   $('pngLayerOptions').style.display = state.png.layered ? 'block' : 'none';
   if(layerStack) {
@@ -1668,21 +1731,55 @@
 
   $('btnDXF').onclick = () => {
     let dxf = "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
-    const writePolyline = (l, pts, aci) => {
+    const rgbToAci = ({ r, g, b }) => {
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      if(max < 40) return 7;
+      if(max - min < 20 && max > 200) return 7;
+      if(r >= g && r >= b) {
+        if(g > 200 && b < 120) return 2;
+        if(b > 200 && g < 120) return 6;
+        return 1;
+      }
+      if(g >= r && g >= b) {
+        if(b > 200) return 4;
+        return 3;
+      }
+      if(b >= r && b >= g) return 5;
+      return 7;
+    };
+    const writePolyline = (layer, pts, color, forceClosed = null) => {
       if(pts.length < 2) return;
       const first = pts[0];
       const last = pts[pts.length - 1];
-      const closed = Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.01;
+      const closed = forceClosed ?? (Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.01);
       const outPts = closed ? pts.slice(0, -1) : pts;
-      dxf += `0\nLWPOLYLINE\n8\n${l}\n62\n${aci}\n90\n${outPts.length}\n70\n${closed ? 1 : 0}\n`;
+      const rgb = colorToRgb(color);
+      const aci = rgbToAci(rgb);
+      const trueColor = (rgb.r << 16) + (rgb.g << 8) + rgb.b;
+      dxf += `0\nLWPOLYLINE\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n90\n${outPts.length}\n70\n${closed ? 1 : 0}\n`;
       outPts.forEach(p => dxf += `10\n${p[0].toFixed(4)}\n20\n${(state.hMm - p[1]).toFixed(4)}\n`);
     };
     if(!state.contourPaths.length) {
       alert('Generate contours first.');
       return;
     }
-    state.contourPaths.forEach(path => writePolyline('CONTOURS', path, 7));
-    writePolyline('FRAME', [[0,0],[state.wMm,0],[state.wMm,state.hMm],[0,state.hMm],[0,0]], 6);
+    state.contourPaths.forEach(path => writePolyline('CONTOURS', path, state.contour.color));
+    if(state.osmData) {
+      if(state.mapFeatures.greenAreas.enabled) {
+        state.osmData.greenPolygons.forEach(poly => writePolyline('GREEN_AREAS', poly, state.mapFeatures.greenAreas.color, true));
+      }
+      if(state.mapFeatures.waterAreas.enabled) {
+        state.osmData.waterPolygons.forEach(poly => writePolyline('WATER_AREAS', poly, state.mapFeatures.waterAreas.color, true));
+      }
+      if(state.mapFeatures.rivers.enabled) {
+        state.osmData.waterLines.forEach(line => writePolyline('RIVERS', line, state.mapFeatures.rivers.color, false));
+      }
+      if(state.mapFeatures.roads.enabled) {
+        state.osmData.roadLines.forEach(line => writePolyline('ROADS', line, state.mapFeatures.roads.color, false));
+      }
+    }
+    writePolyline('FRAME', [[0,0],[state.wMm,0],[state.wMm,state.hMm],[0,state.hMm],[0,0]], state.contour.color, true);
     dxf += "0\nENDSEC\n0\nEOF";
     save(new Blob([dxf], {type:'application/dxf'}), 'Topomapper.dxf');
   };
@@ -1710,6 +1807,7 @@
       alert('Generate contours first.');
       return;
     }
+    const alpha = Math.round(255 * clamp(state.png.gradientOpacity ?? 1, 0, 1));
     const e = +$('pngResRange').value;
     const r = state.hMm / state.wMm;
     const w = state.wMm >= state.hMm ? e : Math.round(e / r);
@@ -1752,7 +1850,7 @@
         data[idx] = color.r;
         data[idx + 1] = color.g;
         data[idx + 2] = color.b;
-        data[idx + 3] = 255;
+        data[idx + 3] = alpha;
       }
     }
     ctx.putImageData(imgData, 0, 0);
