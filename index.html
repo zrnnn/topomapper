@@ -43,7 +43,7 @@
       border-bottom: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px);
     }
     .top-brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 20px; letter-spacing: -0.6px; text-decoration: none; color: var(--color-text); }
-    .top-logo { width: auto; height: 50px; object-fit: contain; }
+    .top-logo { width: auto; height: 50px; max-height: 50px; object-fit: contain; }
     .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: var(--color-text-sec); }
     .status-pill.ok { color: #9BE2B7; border-color: rgba(155,226,183,0.4); background: rgba(155,226,183,0.12); }
     .status-pill.error { color: #FF9A9A; border-color: rgba(255,154,154,0.4); background: rgba(255,154,154,0.12); }
@@ -63,12 +63,6 @@
     }
     .sidebar:hover { transform: translateY(-2px); box-shadow: 0 26px 65px rgba(0,0,0,0.5); }
 
-    .sidebar-header {
-      padding: 24px; border-bottom: 1px solid var(--color-border);
-      display: flex; align-items: center; justify-content: space-between;
-      background: rgba(16, 20, 28, 0.8);
-    }
-    .brand { font-weight: 800; font-size: 24px; letter-spacing: -0.8px; color: var(--color-text); text-decoration: none; display: flex; align-items: center; gap: 10px; }
     .scroll-content { flex: 1; overflow-y: auto; padding: 24px; }
 
     /* UI GROUPS */
@@ -392,9 +386,6 @@
 </header>
 
 <div class="sidebar">
-  <div class="sidebar-header">
-    <a href="#" class="brand">Topomapper</a>
-  </div>
   <div class="scroll-content">
     <div class="group">
       <label>Location Search</label>
@@ -478,7 +469,7 @@
             Auto preview can be switched off to avoid performance issues while customizing.
           </p>
         </div>
-        <button id="resetStep2" class="btn-secondary">Reset Step 2 Defaults</button>
+        <button id="resetStep2" class="btn-secondary">Reset Design</button>
         <div class="group">
           <label>Design Preset</label>
           <select id="presetSel" style="margin-top:6px;">
@@ -529,8 +520,8 @@
                 <div class="cust-row"><label style="margin:0">Label Color</label><div class="color-dot" id="labelColorDot" style="background:#1E232B"><input type="color" id="labelColor" value="#1E232B"></div></div>
                 <div class="cust-row"><label style="margin:0">Text Background</label><div class="ios-switch" id="labelBgToggle"></div></div>
                 <div class="cust-row"><label style="margin:0">Background Color</label><div class="color-dot" id="labelBgColorDot" style="background:#F5F2EB"><input type="color" id="labelBgColor" value="#F5F2EB"></div></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="labelOpacity" min="0" max="100" step="1" value="85"><span id="labelOpacityVal" style="font-size:11px;width:36px;text-align:right;">85%</span></div>
-                <div class="cust-row"><label style="margin:0">Font Size</label><input type="range" id="labelSize" min="0.2" max="1.5" step="0.1" value="0.32"><span id="labelSizeVal" style="font-size:11px;width:36px;text-align:right;">0.32</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="labelOpacity" min="0" max="100" step="1" value="85"><span id="labelOpacityVal" style="font-size:11px;width:46px;text-align:right;">85%</span></div>
+                <div class="cust-row"><label style="margin:0">Font Size (mm)</label><input type="range" id="labelSize" min="0.2" max="3" step="0.05" value="0.4"><span id="labelSizeVal" style="font-size:11px;width:56px;text-align:right;">0.40 mm</span></div>
                 <div class="cust-row"><label style="margin:0">Scale by Place Rank</label><div class="ios-switch" id="labelScaleToggle"></div></div>
                 <div class="cust-row"><label style="margin:0">Typeface</label>
                   <select id="labelFont">
@@ -567,8 +558,8 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" id="roadColorDot" style="background:#C9A75A"><input type="color" id="roadColor" value="#C9A75A"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="roadWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="roadWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="roadOpacity" min="0" max="100" step="1" value="75"><span id="roadOpacityVal" style="font-size:11px;width:36px;text-align:right;">75%</span></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="roadWidth" min="0.5" max="8" step="0.5" value="1.5"><span id="roadWidthVal" style="font-size:11px;width:48px;text-align:right;">1.5 px</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="roadOpacity" min="0" max="100" step="1" value="75"><span id="roadOpacityVal" style="font-size:11px;width:46px;text-align:right;">75%</span></div>
               </div>
             </div>
             <div class="layer-item" data-layer="rivers" draggable="true" style="margin-top:10px;">
@@ -592,8 +583,8 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Line Color</label><div class="color-dot" id="riverColorDot" style="background:#7DB5D3"><input type="color" id="riverColor" value="#7DB5D3"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="riverWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="riverWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="riverOpacity" min="0" max="100" step="1" value="85"><span id="riverOpacityVal" style="font-size:11px;width:36px;text-align:right;">85%</span></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="riverWidth" min="0.5" max="8" step="0.5" value="1.5"><span id="riverWidthVal" style="font-size:11px;width:48px;text-align:right;">1.5 px</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="riverOpacity" min="0" max="100" step="1" value="85"><span id="riverOpacityVal" style="font-size:11px;width:46px;text-align:right;">85%</span></div>
               </div>
             </div>
             <div class="layer-item" data-layer="water" draggable="true" style="margin-top:10px;">
@@ -617,7 +608,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="waterAreaColorDot" style="background:#7DB5D3"><input type="color" id="waterAreaColor" value="#7DB5D3"></div></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="waterAreaOpacity" min="0" max="100" step="1" value="45"><span id="waterAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">45%</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="waterAreaOpacity" min="0" max="100" step="1" value="45"><span id="waterAreaOpacityVal" style="font-size:11px;width:46px;text-align:right;">45%</span></div>
               </div>
             </div>
             <div class="layer-item" data-layer="green" draggable="true" style="margin-top:10px;">
@@ -641,7 +632,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="greenAreaColorDot" style="background:#7FAE8A"><input type="color" id="greenAreaColor" value="#7FAE8A"></div></div>
-                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="greenAreaOpacity" min="0" max="100" step="1" value="15"><span id="greenAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">15%</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="greenAreaOpacity" min="0" max="100" step="1" value="15"><span id="greenAreaOpacityVal" style="font-size:11px;width:46px;text-align:right;">15%</span></div>
               </div>
             </div>
             <div class="layer-item open" data-layer="contours" draggable="true" style="margin-top:10px;">
@@ -665,10 +656,10 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#10141B"><input type="color" id="contourColor" value="#10141B"></div></div>
-                <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
-                <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="10" max="200" step="5" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
-          <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="contourOpacity" min="0" max="100" step="1" value="80"><span id="contourOpacityVal" style="font-size:11px;width:36px;text-align:right;">80%</span></div>
-                <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="10" step="1" value="4"><span id="contourSmoothVal" style="font-size:11px;width:36px;text-align:right;">4</span></div>
+                <div class="cust-row"><label style="margin:0">Line Width (px)</label><input type="range" id="contourWidth" min="0.5" max="8" step="0.5" value="1.5"><span id="contourWidthVal" style="font-size:11px;width:48px;text-align:right;">1.5 px</span></div>
+                <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="5" max="350" step="5" value="24"><span id="contourDensityVal" style="font-size:11px;width:40px;text-align:right;">24</span></div>
+          <div class="cust-row"><label style="margin:0">Opacity (%)</label><input type="range" id="contourOpacity" min="0" max="100" step="1" value="80"><span id="contourOpacityVal" style="font-size:11px;width:46px;text-align:right;">80%</span></div>
+                <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="20" step="1" value="4"><span id="contourSmoothVal" style="font-size:11px;width:40px;text-align:right;">4</span></div>
               </div>
             </div>
           </div>
@@ -702,18 +693,18 @@
                 </select>
               </div>
               <div class="cust-row">
-                <label style="margin:0">Fill Opacity</label>
+                <label style="margin:0">Fill Opacity (%)</label>
                 <input type="range" id="pngGradOpacity" min="0" max="100" step="1" value="0">
                 <span id="pngGradOpacityVal" style="font-size:11px;width:36px;text-align:right;">0%</span>
               </div>
               <div class="cust-row">
-                <label style="margin:0">Gradient Shift</label>
-                <input type="range" id="pngGradShift" min="-50" max="50" step="1" value="0">
+                <label style="margin:0">Gradient Shift (%)</label>
+                <input type="range" id="pngGradShift" min="-80" max="80" step="1" value="0">
                 <span id="pngGradShiftVal" style="font-size:11px;width:44px;text-align:right;">0%</span>
               </div>
               <div class="cust-row">
-                <label style="margin:0">Gradient Scale</label>
-                <input type="range" id="pngGradScale" min="50" max="150" step="1" value="100">
+                <label style="margin:0">Gradient Scale (%)</label>
+                <input type="range" id="pngGradScale" min="30" max="200" step="1" value="100">
                 <span id="pngGradScaleVal" style="font-size:11px;width:44px;text-align:right;">100%</span>
               </div>
               <div class="gradient-preview" id="pngGradientPreview"></div>
@@ -721,7 +712,7 @@
             </div>
           </div>
         </div>
-        <button id="toExport" class="btn-main" style="margin-top:6px;">Continue to Export Design</button>
+        <button id="toExport" class="btn-main" style="margin-top:6px;">Continue to Export</button>
       </div>
 
       <div class="step-content" data-step="3">
@@ -747,7 +738,7 @@
         <label>Poster (PNG High-Res)</label>
         <label style="margin-top:10px; font-size:10px;">Resolution (Long Edge)</label>
         <div class="cust-row" style="margin-bottom:8px;">
-          <input type="range" id="pngResRange" min="500" max="5000" step="100" value="2000">
+          <input type="range" id="pngResRange" min="500" max="8000" step="100" value="2000">
           <span id="pngResVal" style="font-size:12px; font-weight:700; width:60px;">2000px</span>
         </div>
         <button id="btnPNG" class="btn-main" style="background:#2B3440; color:#F5F7FB;">Save PNG</button>
@@ -765,7 +756,7 @@
     contour: {
       enabled: true,
       density: 24,
-      width: 0.2,
+      width: 1.5,
       color: '#10141B',
       smooth: 4,
       opacity: 80
@@ -788,13 +779,13 @@
     },
     mapFeatures: {
       waterAreas: { enabled: false, color: '#7DB5D3', opacity: 45 },
-      rivers: { enabled: false, color: '#7DB5D3', width: 0.2, opacity: 85 },
+      rivers: { enabled: false, color: '#7DB5D3', width: 1.5, opacity: 85 },
       greenAreas: { enabled: false, color: '#7FAE8A', opacity: 15 },
-      roads: { enabled: false, color: '#C9A75A', width: 0.2, opacity: 75 },
+      roads: { enabled: false, color: '#C9A75A', width: 1.5, opacity: 75 },
       labels: {
         enabled: false,
         color: '#1E232B',
-        size: 0.32,
+        size: 0.4,
         font: 'system',
         opacity: 85,
         background: { enabled: true, color: '#F5F2EB' },
@@ -811,14 +802,16 @@
     osmData: null,
     osmStatus: { loaded: false, error: null, tiles: 1, ignored: false },
     previewDirty: false,
-    autoPreview: true
+    autoPreview: true,
+    terrainVersion: 0,
+    pngPreviewCache: { key: null, dataUrl: null }
   };
 
   const defaultDesign = {
     contour: {
       enabled: true,
       density: 24,
-      width: 0.2,
+      width: 1.5,
       color: '#10141B',
       smooth: 4,
       opacity: 80
@@ -841,13 +834,13 @@
     },
     mapFeatures: {
       waterAreas: { enabled: false, color: '#7DB5D3', opacity: 45 },
-      rivers: { enabled: false, color: '#7DB5D3', width: 0.2, opacity: 85 },
+      rivers: { enabled: false, color: '#7DB5D3', width: 1.5, opacity: 85 },
       greenAreas: { enabled: false, color: '#7FAE8A', opacity: 15 },
-      roads: { enabled: false, color: '#C9A75A', width: 0.2, opacity: 75 },
+      roads: { enabled: false, color: '#C9A75A', width: 1.5, opacity: 75 },
       labels: {
         enabled: false,
         color: '#1E232B',
-        size: 0.32,
+        size: 0.4,
         font: 'system',
         opacity: 85,
         background: { enabled: true, color: '#F5F2EB' },
@@ -895,7 +888,7 @@
 
   function getContourLineCount() {
     const desired = Math.max(4, Math.round(state.contour.density));
-    const minSpacing = Math.max(1.2, state.contour.width * 8);
+    const minSpacing = Math.max(1.2, pxToMm(state.contour.width) * 8);
     const maxLines = Math.max(4, Math.floor(Math.min(state.wMm, state.hMm) / minSpacing));
     return Math.max(4, Math.min(desired, maxLines));
   }
@@ -964,6 +957,10 @@
 
   function lerp(a, b, t) { return a + (b - a) * t; }
   function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
+  const PX_TO_MM = 0.264583;
+  const pxToMm = (value) => value * PX_TO_MM;
+  const formatPx = (value) => `${value.toFixed(1).replace(/\.0$/, '')} px`;
+  const formatMm = (value) => `${value.toFixed(2)} mm`;
   function smoothstep(t) {
     const clamped = clamp(t, 0, 1);
     return clamped * clamped * (3 - 2 * clamped);
@@ -1039,8 +1036,8 @@
   };
 
   const getScaledGradientT = (t) => {
-    const scale = Math.max(0.5, Math.min(1.5, (state.png.gradientScale ?? 100) / 100));
-    const shift = Math.max(-0.5, Math.min(0.5, (state.png.gradientShift ?? 0) / 100));
+    const scale = Math.max(0.3, Math.min(2.0, (state.png.gradientScale ?? 100) / 100));
+    const shift = Math.max(-0.8, Math.min(0.8, (state.png.gradientShift ?? 0) / 100));
     return clamp((t - 0.5) / scale + 0.5 + shift, 0, 1);
   };
 
@@ -1107,6 +1104,25 @@
 
   function getLayeredPreviewDataUrl() {
     if(!state.terrainData) return null;
+    const previewKey = JSON.stringify({
+      terrainVersion: state.terrainVersion,
+      wMm: state.wMm,
+      hMm: state.hMm,
+      contourDensity: state.contour.density,
+      contourWidth: state.contour.width,
+      scheme: state.png.scheme,
+      gradientOpacity: state.png.gradientOpacity,
+      gradientShift: state.png.gradientShift,
+      gradientScale: state.png.gradientScale,
+      reliefStrength: state.png.reliefStrength,
+      reliefWarm: state.png.reliefWarm,
+      reliefShadow: state.png.reliefShadow,
+      waterColor: state.mapFeatures?.waterAreas?.color,
+      greenColor: state.mapFeatures?.greenAreas?.color
+    });
+    if(state.pngPreviewCache?.key === previewKey && state.pngPreviewCache.dataUrl) {
+      return state.pngPreviewCache.dataUrl;
+    }
     const alpha = Math.round(255 * clamp(toUnitOpacity(state.png.gradientOpacity), 0, 1));
     const ratio = state.hMm / state.wMm;
     const target = 320;
@@ -1161,7 +1177,9 @@
     ctx.globalCompositeOperation = getCanvasBlendMode(state.png.blend);
     ctx.drawImage(gradientCanvas, 0, 0);
     ctx.restore();
-    return cv.toDataURL('image/png');
+    const dataUrl = cv.toDataURL('image/png');
+    state.pngPreviewCache = { key: previewKey, dataUrl };
+    return dataUrl;
   }
 
   function getContourSegments(level, widthMm, heightMm) {
@@ -2152,7 +2170,7 @@
 
   $('contourWidth').oninput = (e) => {
     state.contour.width = parseFloat(e.target.value);
-    $('contourWidthVal').innerText = state.contour.width.toFixed(2).replace(/\.00$/, '');
+    $('contourWidthVal').innerText = formatPx(state.contour.width);
     markPreviewDirty();
   };
 
@@ -2205,7 +2223,7 @@
   };
   $('riverWidth').oninput = (e) => {
     state.mapFeatures.rivers.width = parseFloat(e.target.value);
-    $('riverWidthVal').innerText = state.mapFeatures.rivers.width.toFixed(2).replace(/\.00$/, '');
+    $('riverWidthVal').innerText = formatPx(state.mapFeatures.rivers.width);
     markPreviewDirty();
   };
   $('riverOpacity').oninput = (e) => {
@@ -2240,7 +2258,7 @@
   };
   $('roadWidth').oninput = (e) => {
     state.mapFeatures.roads.width = parseFloat(e.target.value);
-    $('roadWidthVal').innerText = state.mapFeatures.roads.width.toFixed(2).replace(/\.00$/, '');
+    $('roadWidthVal').innerText = formatPx(state.mapFeatures.roads.width);
     markPreviewDirty();
   };
   $('roadOpacity').oninput = (e) => {
@@ -2275,7 +2293,7 @@
   };
   $('labelSize').oninput = (e) => {
     state.mapFeatures.labels.size = parseFloat(e.target.value);
-    $('labelSizeVal').innerText = state.mapFeatures.labels.size.toFixed(2).replace(/\.00$/, '');
+    $('labelSizeVal').innerText = formatMm(state.mapFeatures.labels.size);
     markPreviewDirty();
   };
   $('labelScaleToggle').onclick = function() {
@@ -2376,7 +2394,7 @@
     $('contourColor').value = state.contour.color;
     $('contourColor').parentElement.style.background = state.contour.color;
     $('contourWidth').value = state.contour.width;
-    $('contourWidthVal').innerText = state.contour.width.toFixed(2).replace(/\.00$/, '');
+    $('contourWidthVal').innerText = formatPx(state.contour.width);
     $('contourDensity').value = state.contour.density;
     $('contourDensityVal').innerText = state.contour.density;
     $('contourOpacity').value = state.contour.opacity;
@@ -2392,7 +2410,7 @@
     $('riverColor').value = state.mapFeatures.rivers.color;
     $('riverColorDot').style.background = state.mapFeatures.rivers.color;
     $('riverWidth').value = state.mapFeatures.rivers.width;
-    $('riverWidthVal').innerText = state.mapFeatures.rivers.width.toFixed(2).replace(/\.00$/, '');
+    $('riverWidthVal').innerText = formatPx(state.mapFeatures.rivers.width);
     $('riverOpacity').value = state.mapFeatures.rivers.opacity;
     $('riverOpacityVal').innerText = formatPercent(state.mapFeatures.rivers.opacity);
     $('greenAreaToggle').classList.toggle('on', state.mapFeatures.greenAreas.enabled);
@@ -2404,7 +2422,7 @@
     $('roadColor').value = state.mapFeatures.roads.color;
     $('roadColorDot').style.background = state.mapFeatures.roads.color;
     $('roadWidth').value = state.mapFeatures.roads.width;
-    $('roadWidthVal').innerText = state.mapFeatures.roads.width.toFixed(2).replace(/\.00$/, '');
+    $('roadWidthVal').innerText = formatPx(state.mapFeatures.roads.width);
     $('roadOpacity').value = state.mapFeatures.roads.opacity;
     $('roadOpacityVal').innerText = formatPercent(state.mapFeatures.roads.opacity);
     $('labelToggle').classList.toggle('on', state.mapFeatures.labels.enabled);
@@ -2416,7 +2434,7 @@
     $('labelOpacity').value = state.mapFeatures.labels.opacity;
     $('labelOpacityVal').innerText = formatPercent(state.mapFeatures.labels.opacity);
     $('labelSize').value = state.mapFeatures.labels.size;
-    $('labelSizeVal').innerText = state.mapFeatures.labels.size.toFixed(2).replace(/\.00$/, '');
+    $('labelSizeVal').innerText = formatMm(state.mapFeatures.labels.size);
     $('labelScaleToggle').classList.toggle('on', state.mapFeatures.labels.scaleByRank);
     $('labelFont').value = state.mapFeatures.labels.font;
     $('labelBoldToggle').classList.toggle('on', state.mapFeatures.labels.weight === 'bold');
@@ -2547,7 +2565,12 @@
       for(let i=0; i<smoothPasses; i++) h = smoothPass(h, rows, cols);
       let min=Infinity, max=-Infinity; h.forEach(v => { if(v<min) min=v; if(v>max) max=v; });
       state.terrainData = { rows, cols, h: h.map(z=>z-min), min, max, delta: max-min };
-    } catch(e) { state.terrainData = null; }
+      state.terrainVersion += 1;
+      state.pngPreviewCache = { key: null, dataUrl: null };
+    } catch(e) {
+      state.terrainData = null;
+      state.pngPreviewCache = { key: null, dataUrl: null };
+    }
   }
 
   function smoothPass(data, rows, cols) {
@@ -2603,7 +2626,7 @@
       },
       rivers: () => {
         if(!state.osmData || !state.mapFeatures.rivers.enabled || !state.osmData.waterLines.length) return '';
-        let out = `<g id="rivers" stroke="${state.mapFeatures.rivers.color}" stroke-width="${state.mapFeatures.rivers.width}" stroke-opacity="${toUnitOpacity(state.mapFeatures.rivers.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        let out = `<g id="rivers" stroke="${state.mapFeatures.rivers.color}" stroke-width="${state.mapFeatures.rivers.width}px" stroke-opacity="${toUnitOpacity(state.mapFeatures.rivers.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
         state.osmData.waterLines.forEach((line) => {
           const d = pathFromCoords(line, false);
           if(d) out += `<path d="${d}"/>`;
@@ -2612,7 +2635,7 @@
       },
       roads: () => {
         if(!state.osmData || !state.mapFeatures.roads.enabled || !state.osmData.roadLines.length) return '';
-        let out = `<g id="roads" stroke="${state.mapFeatures.roads.color}" stroke-width="${state.mapFeatures.roads.width}" stroke-opacity="${toUnitOpacity(state.mapFeatures.roads.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        let out = `<g id="roads" stroke="${state.mapFeatures.roads.color}" stroke-width="${state.mapFeatures.roads.width}px" stroke-opacity="${toUnitOpacity(state.mapFeatures.roads.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
         state.osmData.roadLines.forEach((line) => {
           const d = pathFromCoords(line, false);
           if(d) out += `<path d="${d}"/>`;
@@ -2628,7 +2651,7 @@
           return `<text x="${cx}" y="${cy}" text-anchor="middle" font-family="SF Pro Text, Segoe UI, Roboto, sans-serif" font-size="6" fill="#9AA3B2">Elevation data missing. Try generating again.</text>`;
         }
         const levels = getContourLevels();
-        let out = `<g id="contours" stroke="${state.contour.color}" stroke-width="${state.contour.width}" stroke-opacity="${toUnitOpacity(state.contour.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        let out = `<g id="contours" stroke="${state.contour.color}" stroke-width="${state.contour.width}px" stroke-opacity="${toUnitOpacity(state.contour.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
         levels.forEach(level => {
           const segments = getContourSegments(level, wMm, hMm);
           if(!segments.length) return;
@@ -2837,6 +2860,7 @@
   };
 
   $('btnDXF').onclick = () => {
+    buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: true });
     let dxf = "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
     const rgbToAci = ({ r, g, b }) => {
       const max = Math.max(r, g, b);
@@ -3024,7 +3048,7 @@
     }
     const e = +$('pngResRange').value, r = state.hMm/state.wMm;
     const w = state.wMm >= state.hMm ? e : Math.round(e/r), h = state.wMm >= state.hMm ? Math.round(e*r) : e;
-    const s = new XMLSerializer().serializeToString($('prevSvg'));
+    const s = buildSvgMarkup({ includeBackground: true, includeGradient: true, includeFrame: true });
     const img = new Image(), cv = document.createElement('canvas'); cv.width = w; cv.height = h;
     img.onload = () => { const ctx = cv.getContext('2d'); ctx.fillStyle=state.theme.background; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h); cv.toBlob(b => save(b, 'Topomapper.png')); };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
