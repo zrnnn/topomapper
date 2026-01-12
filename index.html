@@ -106,6 +106,38 @@
     .layer-item.open .chevron { transform: rotate(180deg); opacity: 1; color: var(--color-primary); }
     .layer-body { display: none; padding: 0 18px 18px 18px; background: rgba(10,12,18,0.7); }
     .layer-item.open .layer-body { display: block; }
+    .layer-item.dragging { opacity: 0.65; border-color: rgba(76,141,255,0.8); }
+    .drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-right: 6px; opacity: 0.5; cursor: grab; }
+    .drag-handle svg { width: 16px; height: 16px; }
+    .layer-head { cursor: pointer; }
+    .layer-head.drag-ready { cursor: grab; }
+
+    .stepper {
+      display: flex;
+      gap: 8px;
+      background: rgba(255,255,255,0.06);
+      padding: 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .stepper button {
+      border: none;
+      background: transparent;
+      color: var(--color-text-sec);
+      font-weight: 700;
+      font-size: 12px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+    .stepper button.active {
+      background: rgba(76,141,255,0.18);
+      color: var(--color-primary);
+      border: 1px solid rgba(76,141,255,0.35);
+    }
+    .step-content { display: none; }
+    .step-content.active { display: block; }
 
     /* CUSTOMIZER CONTROLS */
     .cust-row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; gap: 10px; }
@@ -251,20 +283,13 @@
     </div>
 
     <div class="group">
-      <label>Preview Styling</label>
+      <label>Step 1 · Map Frame</label>
       <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
         Contour styling, color presets, and map feature layers are adjusted in the preview panel after generation.
       </p>
     </div>
 
     <button id="btnGen" class="btn-main">Generate Preview</button>
-    <div class="group" style="margin-top:18px;">
-      <label>Offline Use</label>
-      <p style="font-size:11px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
-        Save this tool as a standalone HTML file and open it directly in Chrome.
-      </p>
-      <button id="btnDownload" class="btn-main" style="background:#3A3A3C;">Download HTML</button>
-    </div>
   </div>
 </div>
 
@@ -285,146 +310,187 @@
     <div class="preview-stage" id="previewArea"></div>
     <div class="export-side">
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h2 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-1px;">Export</h2>
+        <div>
+          <h2 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-1px;">Preview & Export</h2>
+          <div style="font-size:12px; color:var(--color-text-sec); margin-top:4px;">Step 2: Style · Step 3: Export</div>
+        </div>
         <button onclick="closeModal()" style="border:none;background:none;font-size:32px;cursor:pointer;color:var(--color-text-sec);">&times;</button>
       </div>
 
-      <div class="group">
-        <label>Preview Styling</label>
-        <div class="layer-item open">
-          <div class="layer-head">
-            <div class="layer-info">
-              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
-              <span>Contour Lines</span>
-            </div>
-          </div>
-          <div class="layer-body">
-            <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#D7E3FF"><input type="color" id="contourColor" value="#D7E3FF"></div></div>
-            <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
-            <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="8" max="60" step="2" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
-            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="contourOpacity" min="0.1" max="1" step="0.05" value="0.9"><span id="contourOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.9</span></div>
-            <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="4" step="1" value="1"><span id="contourSmoothVal" style="font-size:11px;width:36px;text-align:right;">1</span></div>
-          </div>
-        </div>
-        <div class="layer-item" style="margin-top:10px;">
-          <div class="layer-head">
-            <div class="layer-info">
-              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
-              <span>Color Preset</span>
-            </div>
-          </div>
-          <div class="layer-body">
-            <select id="presetSel" style="margin-bottom:12px;">
-              <option value="dark">Dark (Negative)</option>
-              <option value="bright">Bright (Positive)</option>
-              <option value="custom">Custom</option>
-            </select>
-            <div id="customPreset" style="display:none;">
-              <div class="cust-row">
-                <label style="margin:0">Background</label>
-                <div class="color-dot" id="bgColorDot" style="background:#141A22"><input type="color" id="bgColorPicker" value="#141A22"></div>
-                <input type="text" id="bgColorText" placeholder="#141A22 or rgb(20,26,34)" style="flex:1">
-              </div>
-              <div class="cust-row">
-                <label style="margin:0">Contour Lines</label>
-                <div class="color-dot" id="lineColorDot" style="background:#D7E3FF"><input type="color" id="lineColorPicker" value="#D7E3FF"></div>
-                <input type="text" id="lineColorText" placeholder="#D7E3FF or rgb(215,227,255)" style="flex:1">
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="stepper">
+        <button class="active" data-step-target="2">Step 2 · Styling</button>
+        <button data-step-target="3">Step 3 · Export</button>
       </div>
 
-      <div class="group">
-        <label>Map Features</label>
-        <div class="layer-item open">
-          <div class="layer-head">
-            <div class="layer-info">
-              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
-              <span>Water & Rivers</span>
+      <div class="step-content active" data-step="2">
+        <div class="group">
+          <label>Preview Styling</label>
+          <div class="layer-item" style="margin-top:10px;">
+            <div class="layer-head">
+              <div class="layer-info">
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+                <span>Color Preset</span>
+              </div>
             </div>
-          </div>
-          <div class="layer-body">
-            <div class="toggle-row">
-              <span style="font-weight:600; font-size:14px;">Water Areas</span>
-              <div class="ios-switch on" id="waterAreaToggle"></div>
-            </div>
-            <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="waterAreaColorDot" style="background:#4C86A8"><input type="color" id="waterAreaColor" value="#4C86A8"></div></div>
-            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="waterAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.45"><span id="waterAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.45</span></div>
-            <div class="toggle-row" style="margin-top:14px;">
-              <span style="font-weight:600; font-size:14px;">Rivers</span>
-              <div class="ios-switch on" id="riverToggle"></div>
-            </div>
-            <div class="cust-row"><label style="margin:0">Line Color</label><div class="color-dot" id="riverColorDot" style="background:#6BB4FF"><input type="color" id="riverColor" value="#6BB4FF"></div></div>
-            <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="riverWidth" min="0.05" max="0.6" step="0.05" value="0.25"><span id="riverWidthVal" style="font-size:11px;width:36px;text-align:right;">0.25</span></div>
-            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="riverOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="riverOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
-          </div>
-        </div>
-        <div class="layer-item" style="margin-top:10px;">
-          <div class="layer-head">
-            <div class="layer-info">
-              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
-              <span>Green Areas</span>
-            </div>
-          </div>
-          <div class="layer-body">
-            <div class="toggle-row">
-              <span style="font-weight:600; font-size:14px;">Parks & Forests</span>
-              <div class="ios-switch on" id="greenAreaToggle"></div>
-            </div>
-            <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="greenAreaColorDot" style="background:#4E7E5A"><input type="color" id="greenAreaColor" value="#4E7E5A"></div></div>
-            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="greenAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.35"><span id="greenAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
-          </div>
-        </div>
-        <div class="layer-item" style="margin-top:10px;">
-          <div class="layer-head">
-            <div class="layer-info">
-              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
-              <span>Roads & Place Names</span>
-            </div>
-          </div>
-          <div class="layer-body">
-            <div class="toggle-row">
-              <span style="font-weight:600; font-size:14px;">Road Lines</span>
-              <div class="ios-switch" id="roadToggle"></div>
-            </div>
-            <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" id="roadColorDot" style="background:#E7C36E"><input type="color" id="roadColor" value="#E7C36E"></div></div>
-            <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="roadWidth" min="0.05" max="0.6" step="0.05" value="0.35"><span id="roadWidthVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
-            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="roadOpacity" min="0.1" max="1" step="0.05" value="0.75"><span id="roadOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.75</span></div>
-            <div class="toggle-row" style="margin-top:14px;">
-              <span style="font-weight:600; font-size:14px;">Place Names</span>
-              <div class="ios-switch" id="labelToggle"></div>
-            </div>
-            <div class="cust-row"><label style="margin:0">Label Color</label><div class="color-dot" id="labelColorDot" style="background:#F5F7FB"><input type="color" id="labelColor" value="#F5F7FB"></div></div>
-            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="labelOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="labelOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
-            <div class="cust-row"><label style="margin:0">Font Size</label><input type="range" id="labelSize" min="0.2" max="1.5" step="0.1" value="0.32"><span id="labelSizeVal" style="font-size:11px;width:36px;text-align:right;">0.32</span></div>
-            <div class="cust-row"><label style="margin:0">Typeface</label>
-              <select id="labelFont">
-                <option value="system" selected>System Sans</option>
-                <option value="serif">Serif</option>
-                <option value="mono">Mono</option>
+            <div class="layer-body">
+              <select id="presetSel" style="margin-bottom:12px;">
+                <option value="dark">Dark (Negative)</option>
+                <option value="bright">Bright (Positive)</option>
+                <option value="custom">Custom</option>
               </select>
+              <div id="customPreset" style="display:none;">
+                <div class="cust-row">
+                  <label style="margin:0">Background</label>
+                  <div class="color-dot" id="bgColorDot" style="background:#141A22"><input type="color" id="bgColorPicker" value="#141A22"></div>
+                  <input type="text" id="bgColorText" placeholder="#141A22 or rgb(20,26,34)" style="flex:1">
+                </div>
+                <div class="cust-row">
+                  <label style="margin:0">Contour Lines</label>
+                  <div class="color-dot" id="lineColorDot" style="background:#D7E3FF"><input type="color" id="lineColorPicker" value="#D7E3FF"></div>
+                  <input type="text" id="lineColorText" placeholder="#D7E3FF or rgb(215,227,255)" style="flex:1">
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="group">
-        <label>Layer Order</label>
-        <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
-          Drag layers to reorder how features stack in the preview.
-        </p>
-        <div id="layerOrderList" class="layer-list">
-          <div class="layer-item" data-layer="green" draggable="true"><div class="layer-head"><div class="layer-info"><span>Green Areas</span></div></div></div>
-          <div class="layer-item" data-layer="water" draggable="true"><div class="layer-head"><div class="layer-info"><span>Water Areas</span></div></div></div>
-          <div class="layer-item" data-layer="rivers" draggable="true"><div class="layer-head"><div class="layer-info"><span>Rivers</span></div></div></div>
-          <div class="layer-item" data-layer="roads" draggable="true"><div class="layer-head"><div class="layer-info"><span>Roads</span></div></div></div>
-          <div class="layer-item" data-layer="contours" draggable="true"><div class="layer-head"><div class="layer-info"><span>Contour Lines</span></div></div></div>
-          <div class="layer-item" data-layer="labels" draggable="true"><div class="layer-head"><div class="layer-info"><span>Place Names</span></div></div></div>
+        <div class="group">
+          <label>Layer Stack (Drag to Reorder)</label>
+          <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
+            Grab the handle to move layers. Items higher in the list render above the ones below.
+          </p>
+          <div id="layerStack" class="layer-list">
+            <div class="layer-item" data-layer="labels" draggable="true">
+              <div class="layer-head drag-ready">
+                <div class="layer-info">
+                  <span class="drag-handle" title="Drag to reorder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h8M8 12h8M8 18h8"/></svg>
+                  </span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+                  <span>Place Names</span>
+                </div>
+              </div>
+              <div class="layer-body">
+                <div class="toggle-row">
+                  <span style="font-weight:600; font-size:14px;">Place Names</span>
+                  <div class="ios-switch" id="labelToggle"></div>
+                </div>
+                <div class="cust-row"><label style="margin:0">Label Color</label><div class="color-dot" id="labelColorDot" style="background:#F5F7FB"><input type="color" id="labelColor" value="#F5F7FB"></div></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="labelOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="labelOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
+                <div class="cust-row"><label style="margin:0">Font Size</label><input type="range" id="labelSize" min="0.2" max="1.5" step="0.1" value="0.32"><span id="labelSizeVal" style="font-size:11px;width:36px;text-align:right;">0.32</span></div>
+                <div class="cust-row"><label style="margin:0">Typeface</label>
+                  <select id="labelFont">
+                    <option value="system" selected>System Sans</option>
+                    <option value="serif">Serif</option>
+                    <option value="mono">Mono</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="layer-item" data-layer="roads" draggable="true" style="margin-top:10px;">
+              <div class="layer-head drag-ready">
+                <div class="layer-info">
+                  <span class="drag-handle" title="Drag to reorder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h8M8 12h8M8 18h8"/></svg>
+                  </span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+                  <span>Roads</span>
+                </div>
+              </div>
+              <div class="layer-body">
+                <div class="toggle-row">
+                  <span style="font-weight:600; font-size:14px;">Road Lines</span>
+                  <div class="ios-switch" id="roadToggle"></div>
+                </div>
+                <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" id="roadColorDot" style="background:#E7C36E"><input type="color" id="roadColor" value="#E7C36E"></div></div>
+                <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="roadWidth" min="0.05" max="0.6" step="0.05" value="0.35"><span id="roadWidthVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="roadOpacity" min="0.1" max="1" step="0.05" value="0.75"><span id="roadOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.75</span></div>
+              </div>
+            </div>
+            <div class="layer-item" data-layer="rivers" draggable="true" style="margin-top:10px;">
+              <div class="layer-head drag-ready">
+                <div class="layer-info">
+                  <span class="drag-handle" title="Drag to reorder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h8M8 12h8M8 18h8"/></svg>
+                  </span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+                  <span>Rivers</span>
+                </div>
+              </div>
+              <div class="layer-body">
+                <div class="toggle-row">
+                  <span style="font-weight:600; font-size:14px;">Rivers</span>
+                  <div class="ios-switch on" id="riverToggle"></div>
+                </div>
+                <div class="cust-row"><label style="margin:0">Line Color</label><div class="color-dot" id="riverColorDot" style="background:#6BB4FF"><input type="color" id="riverColor" value="#6BB4FF"></div></div>
+                <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="riverWidth" min="0.05" max="0.6" step="0.05" value="0.25"><span id="riverWidthVal" style="font-size:11px;width:36px;text-align:right;">0.25</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="riverOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="riverOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
+              </div>
+            </div>
+            <div class="layer-item" data-layer="water" draggable="true" style="margin-top:10px;">
+              <div class="layer-head drag-ready">
+                <div class="layer-info">
+                  <span class="drag-handle" title="Drag to reorder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h8M8 12h8M8 18h8"/></svg>
+                  </span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+                  <span>Water Areas</span>
+                </div>
+              </div>
+              <div class="layer-body">
+                <div class="toggle-row">
+                  <span style="font-weight:600; font-size:14px;">Water Areas</span>
+                  <div class="ios-switch on" id="waterAreaToggle"></div>
+                </div>
+                <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="waterAreaColorDot" style="background:#4C86A8"><input type="color" id="waterAreaColor" value="#4C86A8"></div></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="waterAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.45"><span id="waterAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.45</span></div>
+              </div>
+            </div>
+            <div class="layer-item" data-layer="green" draggable="true" style="margin-top:10px;">
+              <div class="layer-head drag-ready">
+                <div class="layer-info">
+                  <span class="drag-handle" title="Drag to reorder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h8M8 12h8M8 18h8"/></svg>
+                  </span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+                  <span>Green Areas</span>
+                </div>
+              </div>
+              <div class="layer-body">
+                <div class="toggle-row">
+                  <span style="font-weight:600; font-size:14px;">Parks & Forests</span>
+                  <div class="ios-switch on" id="greenAreaToggle"></div>
+                </div>
+                <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="greenAreaColorDot" style="background:#4E7E5A"><input type="color" id="greenAreaColor" value="#4E7E5A"></div></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="greenAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.35"><span id="greenAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
+              </div>
+            </div>
+            <div class="layer-item open" data-layer="contours" draggable="true" style="margin-top:10px;">
+              <div class="layer-head drag-ready">
+                <div class="layer-info">
+                  <span class="drag-handle" title="Drag to reorder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h8M8 12h8M8 18h8"/></svg>
+                  </span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+                  <span>Contour Lines</span>
+                </div>
+              </div>
+              <div class="layer-body">
+                <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#D7E3FF"><input type="color" id="contourColor" value="#D7E3FF"></div></div>
+                <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
+                <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="8" max="60" step="2" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
+                <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="contourOpacity" min="0.1" max="1" step="0.05" value="0.9"><span id="contourOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.9</span></div>
+                <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="4" step="1" value="1"><span id="contourSmoothVal" style="font-size:11px;width:36px;text-align:right;">1</span></div>
+              </div>
+            </div>
+          </div>
         </div>
+        <button id="toExport" class="btn-main" style="margin-top:6px;">Continue to Export</button>
       </div>
 
-      <div class="group">
+      <div class="step-content" data-step="3">
+        <button id="backToStyle" class="btn-main" style="background:#3A3A3C;">Back to Styling</button>
+        <div class="group" style="margin-top:20px;">
         <label>3D Print (3MF Terrain)</label>
         <p style="font-size:13px; color:var(--color-text-sec); margin-bottom:12px; line-height:1.5;">
           Creates a watertight relief mesh based on elevation data. Contours remain 2D for vector exports.
@@ -471,6 +537,7 @@
         </div>
         <button id="btnPNG" class="btn-main" style="background:#2B3440; color:#F5F7FB;">Save PNG</button>
       </div>
+      </div>
     </div>
   </div>
 </div>
@@ -504,7 +571,7 @@
       roads: { enabled: false, color: '#E7C36E', width: 0.35, opacity: 0.75 },
       labels: { enabled: false, color: '#F5F7FB', size: 0.32, font: 'system', opacity: 0.85 }
     },
-    layerOrder: ['green', 'water', 'rivers', 'roads', 'contours', 'labels'],
+    layerOrder: ['labels', 'roads', 'rivers', 'water', 'green', 'contours'],
     bbox: null,
     terrainData: null,
     contourPaths: [],
@@ -1033,20 +1100,38 @@
   document.querySelectorAll('.layer-head').forEach((head) => {
     head.onclick = (e) => {
       const item = e.currentTarget.closest('.layer-item');
+      if(item?.classList.contains('dragging')) return;
       item.classList.toggle('open');
     };
   });
 
-  const layerOrderList = $('layerOrderList');
-  if(layerOrderList) {
+  const setupLayerReorder = (container) => {
+    if(!container) return;
     let draggedItem = null;
-    layerOrderList.querySelectorAll('[draggable="true"]').forEach((item) => {
-      item.addEventListener('dragstart', () => {
+    const items = Array.from(container.querySelectorAll('[draggable="true"]'));
+    items.forEach((item) => {
+      let handleActive = false;
+      const dragHandle = item.querySelector('.drag-handle');
+      if(dragHandle) {
+        dragHandle.addEventListener('pointerdown', () => { handleActive = true; });
+        dragHandle.addEventListener('pointerup', () => { handleActive = false; });
+        dragHandle.addEventListener('pointerleave', () => { handleActive = false; });
+      }
+      item.addEventListener('dragstart', (e) => {
+        if(!handleActive) {
+          e.preventDefault();
+          return;
+        }
         draggedItem = item;
-        item.classList.add('open');
+        item.classList.add('dragging');
+        if(e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'move';
+        }
       });
       item.addEventListener('dragend', () => {
+        item.classList.remove('dragging');
         draggedItem = null;
+        handleActive = false;
       });
       item.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -1054,19 +1139,34 @@
       item.addEventListener('drop', (e) => {
         e.preventDefault();
         if(!draggedItem || draggedItem === item) return;
-        const items = Array.from(layerOrderList.children);
-        const draggedIndex = items.indexOf(draggedItem);
-        const targetIndex = items.indexOf(item);
+        const siblings = Array.from(container.children).filter(el => el.dataset.layer);
+        const draggedIndex = siblings.indexOf(draggedItem);
+        const targetIndex = siblings.indexOf(item);
         if(draggedIndex < targetIndex) {
-          layerOrderList.insertBefore(draggedItem, item.nextSibling);
+          container.insertBefore(draggedItem, item.nextSibling);
         } else {
-          layerOrderList.insertBefore(draggedItem, item);
+          container.insertBefore(draggedItem, item);
         }
-        state.layerOrder = Array.from(layerOrderList.children).map(el => el.dataset.layer);
+        state.layerOrder = Array.from(container.children).filter(el => el.dataset.layer).map(el => el.dataset.layer);
         if(state.terrainData) renderSVG();
       });
     });
-  }
+  };
+
+  const layerStack = $('layerStack');
+  setupLayerReorder(layerStack);
+
+  const stepButtons = document.querySelectorAll('[data-step-target]');
+  const stepContents = document.querySelectorAll('.step-content');
+  const setStep = (step) => {
+    stepButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.stepTarget === step));
+    stepContents.forEach(section => section.classList.toggle('active', section.dataset.step === step));
+  };
+  stepButtons.forEach(btn => btn.addEventListener('click', () => setStep(btn.dataset.stepTarget)));
+  const toExport = $('toExport');
+  if(toExport) toExport.addEventListener('click', () => setStep('3'));
+  const backToStyle = $('backToStyle');
+  if(backToStyle) backToStyle.addEventListener('click', () => setStep('2'));
 
   const presets = {
     dark: { background: '#141A22', line: '#D7E3FF' },
@@ -1364,10 +1464,10 @@
   $('pngGradEndDot').style.background = state.png.gradientEnd;
   $('pngLayerToggle').classList.toggle('on', state.png.layered);
   $('pngLayerOptions').style.display = state.png.layered ? 'block' : 'none';
-  if(layerOrderList) {
+  if(layerStack) {
     state.layerOrder.forEach((key) => {
-      const item = layerOrderList.querySelector(`[data-layer="${key}"]`);
-      if(item) layerOrderList.appendChild(item);
+      const item = layerStack.querySelector(`[data-layer="${key}"]`);
+      if(item) layerStack.appendChild(item);
     });
   }
   updateGradientPreview();
@@ -1425,6 +1525,7 @@
     }
     renderSVG();
     idle();
+    setStep('2');
     $('modal').classList.add('open');
   };
 
@@ -1552,7 +1653,7 @@
       }
     };
 
-    state.layerOrder.forEach((key) => {
+    state.layerOrder.slice().reverse().forEach((key) => {
       if(layers[key]) {
         svg += layers[key]();
       }
@@ -1682,11 +1783,22 @@
     const objs = []; let objId = 1;
 
     // 1. Terrain Mesh (Watertight)
-    const res = 140, tm = { v:[], t:[] }, idxMap = new Map();
+    const res = 220, tm = { v:[], t:[] }, idxMap = new Map();
+    const gridSize = res + 1;
+    let heightGrid = new Float32Array(gridSize * gridSize);
+    for(let r=0; r<=res; r++) {
+      for(let c=0; c<=res; c++) {
+        heightGrid[r * gridSize + c] = getZInterpolated(c / res, r / res);
+      }
+    }
+    const meshSmoothPasses = 2;
+    for(let i=0; i<meshSmoothPasses; i++) {
+      heightGrid = smoothPass(heightGrid, gridSize, gridSize);
+    }
     const isIn = (x,y) => { if(['rect','din_l','din_p','sq'].includes(state.shape)) return true; const dx=x-state.wMm/2, dy=y-state.hMm/2; return (dx*dx+dy*dy)<=(state.wMm/2)**2; };
     for(let r=0;r<=res;r++) for(let c=0;c<=res;c++) {
       const x=c/res*state.wMm, y=r/res*state.hMm; if(!isIn(x,y)) continue;
-      const z=2.0 + (getZInterpolated(c/res, r/res) * zScale);
+      const z=2.0 + (heightGrid[r * gridSize + c] * zScale);
       idxMap.set(`${r},${c}`, {t: tm.v.push([x,y,z])-1, b: tm.v.push([x,y,0])-1 });
     }
     for(let r=0;r<res;r++) for(let c=0;c<res;c++) {
@@ -1715,11 +1827,6 @@
     zip.folder("_rels").file(".rels", `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rel1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" Target="3D/3dmodel.model"/></Relationships>`);
     save(await zip.generateAsync({type:"blob"}), 'Topomapper_Terrain.3mf');
     idle();
-  };
-
-  $('btnDownload').onclick = () => {
-    const html = '<!doctype html>\n' + document.documentElement.outerHTML;
-    save(new Blob([html], { type: 'text/html' }), 'topomapper.html');
   };
 
   window.closeModal = () => $('modal').classList.remove('open');
