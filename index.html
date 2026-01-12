@@ -13,13 +13,13 @@
   <style>
     :root {
       /* Dark mode tokens */
-      --color-bg: #0B0F14;
-      --color-panel: rgba(20, 24, 32, 0.98);
+      --color-bg: #141A22;
+      --color-panel: rgba(28, 34, 44, 0.96);
       --color-primary: #4C8DFF;
       --color-primary-hover: #346FE0;
-      --color-text: #F5F7FB;
-      --color-text-sec: #9AA3B2;
-      --color-border: rgba(255, 255, 255, 0.08);
+      --color-text: #F2F4F8;
+      --color-text-sec: #A0A9B8;
+      --color-border: rgba(255, 255, 255, 0.1);
       --radius-ios: 22px;
       --sidebar-w: 400px;
       --header-h: 72px;
@@ -46,7 +46,7 @@
 
     /* MAP AREA */
     .viewport { position: relative; flex: 1; height: 100%; }
-    #map { width: 100%; height: 100%; z-index: 0; background: #0A0D12; filter: contrast(1.45) saturate(1.28) brightness(1.12); transition: filter 0.3s ease; }
+    #map { width: 100%; height: 100%; z-index: 0; background: #10141B; filter: contrast(1.08) saturate(1.05) brightness(1.05); transition: filter 0.3s ease; }
 
     /* SIDEBAR (iOS Floating Panel) */
     .sidebar {
@@ -251,51 +251,10 @@
     </div>
 
     <div class="group">
-      <label>Contour Settings</label>
-      <div class="layer-item open">
-        <div class="layer-head">
-          <div class="layer-info">
-            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
-            <span>Contour Lines</span>
-          </div>
-        </div>
-        <div class="layer-body">
-          <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#D7E3FF"><input type="color" id="contourColor" value="#D7E3FF"></div></div>
-          <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
-          <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="8" max="60" step="2" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
-          <div class="cust-row"><label style="margin:0">Detail</label><input type="range" id="contourDetail" min="0.6" max="2" step="0.1" value="1"><span id="contourDetailVal" style="font-size:11px;width:36px;text-align:right;">1.0</span></div>
-          <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="4" step="1" value="1"><span id="contourSmoothVal" style="font-size:11px;width:36px;text-align:right;">1</span></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="group">
-      <label>Color Preset</label>
-      <select id="presetSel" style="margin-bottom:12px;">
-        <option value="dark">Dark (Negative)</option>
-        <option value="bright">Bright (Positive)</option>
-        <option value="custom">Custom</option>
-      </select>
-      <div id="customPreset" style="display:none;">
-        <div class="cust-row">
-          <label style="margin:0">Background</label>
-          <div class="color-dot" id="bgColorDot" style="background:#0B0F14"><input type="color" id="bgColorPicker" value="#0B0F14"></div>
-          <input type="text" id="bgColorText" placeholder="#0B0F14 or rgb(11,15,20)" style="flex:1">
-        </div>
-        <div class="cust-row">
-          <label style="margin:0">Contour Lines</label>
-          <div class="color-dot" id="lineColorDot" style="background:#D7E3FF"><input type="color" id="lineColorPicker" value="#D7E3FF"></div>
-          <input type="text" id="lineColorText" placeholder="#D7E3FF or rgb(215,227,255)" style="flex:1">
-        </div>
-      </div>
-    </div>
-
-    <div class="group">
-      <div class="layer-item" style="padding: 10px 14px; display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:600; font-size:14px;">Auto-Scale Contours</span>
-        <div class="ios-switch on" id="autoScaleToggle"></div>
-      </div>
-      <p style="font-size:11px; color:var(--color-text-sec); margin-top:8px;">Keeps line spacing readable while preserving detail.</p>
+      <label>Preview Styling</label>
+      <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
+        Contour styling, color presets, and map feature layers are adjusted in the preview panel after generation.
+      </p>
     </div>
 
     <button id="btnGen" class="btn-main">Generate Preview</button>
@@ -328,6 +287,141 @@
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h2 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-1px;">Export</h2>
         <button onclick="closeModal()" style="border:none;background:none;font-size:32px;cursor:pointer;color:var(--color-text-sec);">&times;</button>
+      </div>
+
+      <div class="group">
+        <label>Preview Styling</label>
+        <div class="layer-item open">
+          <div class="layer-head">
+            <div class="layer-info">
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+              <span>Contour Lines</span>
+            </div>
+          </div>
+          <div class="layer-body">
+            <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#D7E3FF"><input type="color" id="contourColor" value="#D7E3FF"></div></div>
+            <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
+            <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="8" max="60" step="2" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
+            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="contourOpacity" min="0.1" max="1" step="0.05" value="0.9"><span id="contourOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.9</span></div>
+            <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="4" step="1" value="1"><span id="contourSmoothVal" style="font-size:11px;width:36px;text-align:right;">1</span></div>
+          </div>
+        </div>
+        <div class="layer-item" style="margin-top:10px;">
+          <div class="layer-head">
+            <div class="layer-info">
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+              <span>Color Preset</span>
+            </div>
+          </div>
+          <div class="layer-body">
+            <select id="presetSel" style="margin-bottom:12px;">
+              <option value="dark">Dark (Negative)</option>
+              <option value="bright">Bright (Positive)</option>
+              <option value="custom">Custom</option>
+            </select>
+            <div id="customPreset" style="display:none;">
+              <div class="cust-row">
+                <label style="margin:0">Background</label>
+                <div class="color-dot" id="bgColorDot" style="background:#141A22"><input type="color" id="bgColorPicker" value="#141A22"></div>
+                <input type="text" id="bgColorText" placeholder="#141A22 or rgb(20,26,34)" style="flex:1">
+              </div>
+              <div class="cust-row">
+                <label style="margin:0">Contour Lines</label>
+                <div class="color-dot" id="lineColorDot" style="background:#D7E3FF"><input type="color" id="lineColorPicker" value="#D7E3FF"></div>
+                <input type="text" id="lineColorText" placeholder="#D7E3FF or rgb(215,227,255)" style="flex:1">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <label>Map Features</label>
+        <div class="layer-item open">
+          <div class="layer-head">
+            <div class="layer-info">
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+              <span>Water & Rivers</span>
+            </div>
+          </div>
+          <div class="layer-body">
+            <div class="toggle-row">
+              <span style="font-weight:600; font-size:14px;">Water Areas</span>
+              <div class="ios-switch on" id="waterAreaToggle"></div>
+            </div>
+            <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="waterAreaColorDot" style="background:#4C86A8"><input type="color" id="waterAreaColor" value="#4C86A8"></div></div>
+            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="waterAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.45"><span id="waterAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.45</span></div>
+            <div class="toggle-row" style="margin-top:14px;">
+              <span style="font-weight:600; font-size:14px;">Rivers</span>
+              <div class="ios-switch on" id="riverToggle"></div>
+            </div>
+            <div class="cust-row"><label style="margin:0">Line Color</label><div class="color-dot" id="riverColorDot" style="background:#6BB4FF"><input type="color" id="riverColor" value="#6BB4FF"></div></div>
+            <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="riverWidth" min="0.05" max="0.6" step="0.05" value="0.25"><span id="riverWidthVal" style="font-size:11px;width:36px;text-align:right;">0.25</span></div>
+            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="riverOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="riverOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
+          </div>
+        </div>
+        <div class="layer-item" style="margin-top:10px;">
+          <div class="layer-head">
+            <div class="layer-info">
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+              <span>Green Areas</span>
+            </div>
+          </div>
+          <div class="layer-body">
+            <div class="toggle-row">
+              <span style="font-weight:600; font-size:14px;">Parks & Forests</span>
+              <div class="ios-switch on" id="greenAreaToggle"></div>
+            </div>
+            <div class="cust-row"><label style="margin:0">Fill</label><div class="color-dot" id="greenAreaColorDot" style="background:#4E7E5A"><input type="color" id="greenAreaColor" value="#4E7E5A"></div></div>
+            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="greenAreaOpacity" min="0.1" max="0.9" step="0.05" value="0.35"><span id="greenAreaOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
+          </div>
+        </div>
+        <div class="layer-item" style="margin-top:10px;">
+          <div class="layer-head">
+            <div class="layer-info">
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+              <span>Roads & Place Names</span>
+            </div>
+          </div>
+          <div class="layer-body">
+            <div class="toggle-row">
+              <span style="font-weight:600; font-size:14px;">Road Lines</span>
+              <div class="ios-switch" id="roadToggle"></div>
+            </div>
+            <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" id="roadColorDot" style="background:#E7C36E"><input type="color" id="roadColor" value="#E7C36E"></div></div>
+            <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="roadWidth" min="0.05" max="0.6" step="0.05" value="0.35"><span id="roadWidthVal" style="font-size:11px;width:36px;text-align:right;">0.35</span></div>
+            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="roadOpacity" min="0.1" max="1" step="0.05" value="0.75"><span id="roadOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.75</span></div>
+            <div class="toggle-row" style="margin-top:14px;">
+              <span style="font-weight:600; font-size:14px;">Place Names</span>
+              <div class="ios-switch" id="labelToggle"></div>
+            </div>
+            <div class="cust-row"><label style="margin:0">Label Color</label><div class="color-dot" id="labelColorDot" style="background:#F5F7FB"><input type="color" id="labelColor" value="#F5F7FB"></div></div>
+            <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="labelOpacity" min="0.1" max="1" step="0.05" value="0.85"><span id="labelOpacityVal" style="font-size:11px;width:36px;text-align:right;">0.85</span></div>
+            <div class="cust-row"><label style="margin:0">Font Size</label><input type="range" id="labelSize" min="0.2" max="1.5" step="0.1" value="0.32"><span id="labelSizeVal" style="font-size:11px;width:36px;text-align:right;">0.32</span></div>
+            <div class="cust-row"><label style="margin:0">Typeface</label>
+              <select id="labelFont">
+                <option value="system" selected>System Sans</option>
+                <option value="serif">Serif</option>
+                <option value="mono">Mono</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <label>Layer Order</label>
+        <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
+          Drag layers to reorder how features stack in the preview.
+        </p>
+        <div id="layerOrderList" class="layer-list">
+          <div class="layer-item" data-layer="green" draggable="true"><div class="layer-head"><div class="layer-info"><span>Green Areas</span></div></div></div>
+          <div class="layer-item" data-layer="water" draggable="true"><div class="layer-head"><div class="layer-info"><span>Water Areas</span></div></div></div>
+          <div class="layer-item" data-layer="rivers" draggable="true"><div class="layer-head"><div class="layer-info"><span>Rivers</span></div></div></div>
+          <div class="layer-item" data-layer="roads" draggable="true"><div class="layer-head"><div class="layer-info"><span>Roads</span></div></div></div>
+          <div class="layer-item" data-layer="contours" draggable="true"><div class="layer-head"><div class="layer-info"><span>Contour Lines</span></div></div></div>
+          <div class="layer-item" data-layer="labels" draggable="true"><div class="layer-head"><div class="layer-info"><span>Place Names</span></div></div></div>
+        </div>
       </div>
 
       <div class="group">
@@ -388,11 +482,10 @@
     wMm: 200, hMm: 140, shape: 'rect',
     contour: {
       density: 24,
-      detail: 1,
       width: 0.2,
       color: '#D7E3FF',
-      autoScale: true,
-      smooth: 1
+      smooth: 1,
+      opacity: 0.9
     },
     png: {
       layered: false,
@@ -401,12 +494,21 @@
     },
     theme: {
       preset: 'dark',
-      background: '#0B0F14',
+      background: '#141A22',
       line: '#D7E3FF'
     },
+    mapFeatures: {
+      waterAreas: { enabled: true, color: '#4C86A8', opacity: 0.45 },
+      rivers: { enabled: true, color: '#6BB4FF', width: 0.25, opacity: 0.85 },
+      greenAreas: { enabled: true, color: '#4E7E5A', opacity: 0.35 },
+      roads: { enabled: false, color: '#E7C36E', width: 0.35, opacity: 0.75 },
+      labels: { enabled: false, color: '#F5F7FB', size: 0.32, font: 'system', opacity: 0.85 }
+    },
+    layerOrder: ['green', 'water', 'rivers', 'roads', 'contours', 'labels'],
     bbox: null,
     terrainData: null,
-    contourPaths: []
+    contourPaths: [],
+    osmData: null
   };
 
   const $ = id => document.getElementById(id);
@@ -438,9 +540,9 @@
   }
 
   function getContourLineCount() {
-    const desired = Math.max(4, Math.round(state.contour.density * state.contour.detail));
-    const minSpacing = state.contour.autoScale ? Math.max(1.2, state.contour.width * 8) : 0;
-    const maxLines = minSpacing ? Math.max(4, Math.floor(Math.min(state.wMm, state.hMm) / minSpacing)) : desired;
+    const desired = Math.max(4, Math.round(state.contour.density));
+    const minSpacing = Math.max(1.2, state.contour.width * 8);
+    const maxLines = Math.max(4, Math.floor(Math.min(state.wMm, state.hMm) / minSpacing));
     return Math.max(4, Math.min(desired, maxLines));
   }
 
@@ -737,9 +839,160 @@
     return pts;
   }
 
+  function projectToSvg(lat, lon) {
+    if(!state.bbox) return [0, 0];
+    const { sw, ne } = state.bbox;
+    const x = ((lon - sw.lng) / (ne.lng - sw.lng)) * state.wMm;
+    const y = ((ne.lat - lat) / (ne.lat - sw.lat)) * state.hMm;
+    return [x, y];
+  }
+
+  function pathFromCoords(coords, closePath) {
+    if(!coords.length) return '';
+    const d = coords.map((pt, idx) => `${idx ? 'L' : 'M'} ${pt[0].toFixed(2)} ${pt[1].toFixed(2)}`).join(' ');
+    return closePath ? `${d} Z` : d;
+  }
+
+  function normalizeRing(coords) {
+    if(coords.length < 3) return coords;
+    const first = coords[0];
+    const last = coords[coords.length - 1];
+    const closed = Math.hypot(first[0] - last[0], first[1] - last[1]) < 1e-6;
+    return closed ? coords : [...coords, first];
+  }
+
+  function getShapePathD() {
+    const w = state.wMm;
+    const h = state.hMm;
+    if(['rect','din_l','din_p','sq'].includes(state.shape)) {
+      return `M 0,0 H ${w} V ${h} H 0 Z`;
+    }
+    if(state.shape === 'circle') {
+      const r = w / 2;
+      return `M ${w / 2},${h / 2} m -${r},0 a ${r},${r} 0 1,0 ${w},0 a ${r},${r} 0 1,0 -${w},0`;
+    }
+    if(state.shape === 'hex') {
+      const r = w / 2;
+      const cx = w / 2;
+      const cy = h / 2;
+      const pts = [];
+      for(let i=0; i<6; i++) {
+        const a = i * Math.PI / 3 - Math.PI / 6;
+        pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+      }
+      return `M ${pts[0][0]},${pts[0][1]} ` + pts.slice(1).map(p=>`L ${p[0]},${p[1]}`).join(' ') + ' Z';
+    }
+    return `M 0,0 H ${w} V ${h} H 0 Z`;
+  }
+
+  async function fetchMapFeatures(sw, ne) {
+    try {
+      const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
+      const query = `[out:json][timeout:25];
+      (
+        way["natural"="water"](${bbox});
+        way["waterway"="riverbank"](${bbox});
+        relation["natural"="water"](${bbox});
+        relation["waterway"="riverbank"](${bbox});
+        way["waterway"~"river|stream|canal"](${bbox});
+        way["landuse"~"forest|grass|meadow|recreation_ground"](${bbox});
+        way["leisure"~"park|garden"](${bbox});
+        way["natural"~"wood|grassland"](${bbox});
+        relation["landuse"~"forest|grass|meadow|recreation_ground"](${bbox});
+        relation["leisure"~"park|garden"](${bbox});
+        relation["natural"~"wood|grassland"](${bbox});
+        way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service"](${bbox});
+        relation["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service"](${bbox});
+        node["place"~"city|town|village|suburb|hamlet|neighbourhood"](${bbox});
+      );
+      out geom;`;
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(query)}`
+      });
+      const data = await res.json();
+      const waterPolygons = [];
+      const greenPolygons = [];
+      const waterLines = [];
+      const roadLines = [];
+      const places = [];
+
+      const greenLanduse = new Set(['forest', 'grass', 'meadow', 'recreation_ground']);
+      const greenLeisure = new Set(['park', 'garden']);
+      const greenNatural = new Set(['wood', 'grassland']);
+      const waterLinesSet = new Set(['river', 'stream', 'canal']);
+
+      const toSvgCoords = (geometry) => geometry.map(p => projectToSvg(p.lat, p.lon));
+
+      data.elements.forEach((el) => {
+        const tags = el.tags || {};
+        if(el.type === 'node' && tags.name && tags.place) {
+          places.push({ name: tags.name, lat: el.lat, lon: el.lon, place: tags.place });
+          return;
+        }
+        if(el.type === 'way' && Array.isArray(el.geometry)) {
+          const coords = toSvgCoords(el.geometry);
+          if(tags.waterway && waterLinesSet.has(tags.waterway)) {
+            waterLines.push(coords);
+            return;
+          }
+          if(tags.highway) {
+            roadLines.push(coords);
+            return;
+          }
+          const isWater = tags.natural === 'water' || tags.waterway === 'riverbank';
+          const isGreen = greenLanduse.has(tags.landuse) || greenLeisure.has(tags.leisure) || greenNatural.has(tags.natural);
+          if(isWater) {
+            waterPolygons.push(normalizeRing(coords));
+            return;
+          }
+          if(isGreen) {
+            greenPolygons.push(normalizeRing(coords));
+          }
+          return;
+        }
+        if(el.type === 'relation' && Array.isArray(el.members)) {
+          const relationPolys = el.members
+            .filter(m => m.role === 'outer' && Array.isArray(m.geometry))
+            .map(m => normalizeRing(toSvgCoords(m.geometry)));
+          const isWater = tags.natural === 'water' || tags.waterway === 'riverbank';
+          const isGreen = greenLanduse.has(tags.landuse) || greenLeisure.has(tags.leisure) || greenNatural.has(tags.natural);
+          if(isWater) {
+            waterPolygons.push(...relationPolys);
+          }
+          if(isGreen) {
+            greenPolygons.push(...relationPolys);
+          }
+          if(tags.highway) {
+            const relationLines = el.members
+              .filter(m => Array.isArray(m.geometry))
+              .map(m => toSvgCoords(m.geometry));
+            roadLines.push(...relationLines);
+          }
+        }
+      });
+
+      const placeRank = { city: 1, town: 2, village: 3, suburb: 4, neighbourhood: 5, hamlet: 6 };
+      places.sort((a, b) => (placeRank[a.place] || 99) - (placeRank[b.place] || 99));
+      state.osmData = {
+        waterPolygons,
+        greenPolygons,
+        waterLines,
+        roadLines,
+        places: places.slice(0, 28)
+      };
+    } catch(e) {
+      state.osmData = { waterPolygons: [], greenPolygons: [], waterLines: [], roadLines: [], places: [] };
+    }
+  }
+
   // --- MAP & SEARCH ---
   const map = L.map('map', { zoomControl:false, preferCanvas:true }).setView([48.137, 11.575], 14);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom:19 }).addTo(map);
+  L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    attribution: '&copy; OpenTopoMap contributors &copy; OpenStreetMap'
+  }).addTo(map);
 
   let timer;
   let activeSearch = null;
@@ -777,13 +1030,46 @@
   });
 
   // --- UI CONSTRUCTION ---
-  document.querySelector('.layer-head').onclick = (e) => {
-    const item = e.currentTarget.closest('.layer-item');
-    item.classList.toggle('open');
-  };
+  document.querySelectorAll('.layer-head').forEach((head) => {
+    head.onclick = (e) => {
+      const item = e.currentTarget.closest('.layer-item');
+      item.classList.toggle('open');
+    };
+  });
+
+  const layerOrderList = $('layerOrderList');
+  if(layerOrderList) {
+    let draggedItem = null;
+    layerOrderList.querySelectorAll('[draggable="true"]').forEach((item) => {
+      item.addEventListener('dragstart', () => {
+        draggedItem = item;
+        item.classList.add('open');
+      });
+      item.addEventListener('dragend', () => {
+        draggedItem = null;
+      });
+      item.addEventListener('dragover', (e) => {
+        e.preventDefault();
+      });
+      item.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if(!draggedItem || draggedItem === item) return;
+        const items = Array.from(layerOrderList.children);
+        const draggedIndex = items.indexOf(draggedItem);
+        const targetIndex = items.indexOf(item);
+        if(draggedIndex < targetIndex) {
+          layerOrderList.insertBefore(draggedItem, item.nextSibling);
+        } else {
+          layerOrderList.insertBefore(draggedItem, item);
+        }
+        state.layerOrder = Array.from(layerOrderList.children).map(el => el.dataset.layer);
+        if(state.terrainData) renderSVG();
+      });
+    });
+  }
 
   const presets = {
-    dark: { background: '#0B0F14', line: '#D7E3FF' },
+    dark: { background: '#141A22', line: '#D7E3FF' },
     bright: { background: '#F5F2EB', line: '#10141B' }
   };
 
@@ -884,9 +1170,9 @@
     if(state.terrainData) renderSVG();
   };
 
-  $('contourDetail').oninput = (e) => {
-    state.contour.detail = parseFloat(e.target.value);
-    $('contourDetailVal').innerText = state.contour.detail.toFixed(1);
+  $('contourOpacity').oninput = (e) => {
+    state.contour.opacity = parseFloat(e.target.value);
+    $('contourOpacityVal').innerText = state.contour.opacity.toFixed(2).replace(/\.00$/, '');
     if(state.terrainData) renderSVG();
   };
 
@@ -896,7 +1182,100 @@
     if(state.terrainData) renderSVG();
   };
 
-  $('autoScaleToggle').onclick = function() { state.contour.autoScale = !state.contour.autoScale; this.classList.toggle('on'); if(state.terrainData) renderSVG(); };
+  $('waterAreaToggle').onclick = function() {
+    state.mapFeatures.waterAreas.enabled = !state.mapFeatures.waterAreas.enabled;
+    this.classList.toggle('on', state.mapFeatures.waterAreas.enabled);
+    if(state.terrainData) renderSVG();
+  };
+  $('waterAreaColor').oninput = (e) => {
+    state.mapFeatures.waterAreas.color = e.target.value;
+    $('waterAreaColorDot').style.background = state.mapFeatures.waterAreas.color;
+    if(state.terrainData) renderSVG();
+  };
+  $('waterAreaOpacity').oninput = (e) => {
+    state.mapFeatures.waterAreas.opacity = parseFloat(e.target.value);
+    $('waterAreaOpacityVal').innerText = state.mapFeatures.waterAreas.opacity.toFixed(2).replace(/\.00$/, '');
+    if(state.terrainData) renderSVG();
+  };
+  $('riverToggle').onclick = function() {
+    state.mapFeatures.rivers.enabled = !state.mapFeatures.rivers.enabled;
+    this.classList.toggle('on', state.mapFeatures.rivers.enabled);
+    if(state.terrainData) renderSVG();
+  };
+  $('riverColor').oninput = (e) => {
+    state.mapFeatures.rivers.color = e.target.value;
+    $('riverColorDot').style.background = state.mapFeatures.rivers.color;
+    if(state.terrainData) renderSVG();
+  };
+  $('riverWidth').oninput = (e) => {
+    state.mapFeatures.rivers.width = parseFloat(e.target.value);
+    $('riverWidthVal').innerText = state.mapFeatures.rivers.width.toFixed(2).replace(/\.00$/, '');
+    if(state.terrainData) renderSVG();
+  };
+  $('riverOpacity').oninput = (e) => {
+    state.mapFeatures.rivers.opacity = parseFloat(e.target.value);
+    $('riverOpacityVal').innerText = state.mapFeatures.rivers.opacity.toFixed(2).replace(/\.00$/, '');
+    if(state.terrainData) renderSVG();
+  };
+  $('greenAreaToggle').onclick = function() {
+    state.mapFeatures.greenAreas.enabled = !state.mapFeatures.greenAreas.enabled;
+    this.classList.toggle('on', state.mapFeatures.greenAreas.enabled);
+    if(state.terrainData) renderSVG();
+  };
+  $('greenAreaColor').oninput = (e) => {
+    state.mapFeatures.greenAreas.color = e.target.value;
+    $('greenAreaColorDot').style.background = state.mapFeatures.greenAreas.color;
+    if(state.terrainData) renderSVG();
+  };
+  $('greenAreaOpacity').oninput = (e) => {
+    state.mapFeatures.greenAreas.opacity = parseFloat(e.target.value);
+    $('greenAreaOpacityVal').innerText = state.mapFeatures.greenAreas.opacity.toFixed(2).replace(/\.00$/, '');
+    if(state.terrainData) renderSVG();
+  };
+  $('roadToggle').onclick = function() {
+    state.mapFeatures.roads.enabled = !state.mapFeatures.roads.enabled;
+    this.classList.toggle('on', state.mapFeatures.roads.enabled);
+    if(state.terrainData) renderSVG();
+  };
+  $('roadColor').oninput = (e) => {
+    state.mapFeatures.roads.color = e.target.value;
+    $('roadColorDot').style.background = state.mapFeatures.roads.color;
+    if(state.terrainData) renderSVG();
+  };
+  $('roadWidth').oninput = (e) => {
+    state.mapFeatures.roads.width = parseFloat(e.target.value);
+    $('roadWidthVal').innerText = state.mapFeatures.roads.width.toFixed(2).replace(/\.00$/, '');
+    if(state.terrainData) renderSVG();
+  };
+  $('roadOpacity').oninput = (e) => {
+    state.mapFeatures.roads.opacity = parseFloat(e.target.value);
+    $('roadOpacityVal').innerText = state.mapFeatures.roads.opacity.toFixed(2).replace(/\.00$/, '');
+    if(state.terrainData) renderSVG();
+  };
+  $('labelToggle').onclick = function() {
+    state.mapFeatures.labels.enabled = !state.mapFeatures.labels.enabled;
+    this.classList.toggle('on', state.mapFeatures.labels.enabled);
+    if(state.terrainData) renderSVG();
+  };
+  $('labelColor').oninput = (e) => {
+    state.mapFeatures.labels.color = e.target.value;
+    $('labelColorDot').style.background = state.mapFeatures.labels.color;
+    if(state.terrainData) renderSVG();
+  };
+  $('labelOpacity').oninput = (e) => {
+    state.mapFeatures.labels.opacity = parseFloat(e.target.value);
+    $('labelOpacityVal').innerText = state.mapFeatures.labels.opacity.toFixed(2).replace(/\.00$/, '');
+    if(state.terrainData) renderSVG();
+  };
+  $('labelSize').oninput = (e) => {
+    state.mapFeatures.labels.size = parseFloat(e.target.value);
+    $('labelSizeVal').innerText = state.mapFeatures.labels.size.toFixed(2).replace(/\.00$/, '');
+    if(state.terrainData) renderSVG();
+  };
+  $('labelFont').onchange = (e) => {
+    state.mapFeatures.labels.font = e.target.value;
+    if(state.terrainData) renderSVG();
+  };
   const updateGradientPreview = () => {
     $('pngGradientPreview').style.background = `linear-gradient(90deg, ${state.png.gradientStart}, ${state.png.gradientEnd})`;
   };
@@ -946,11 +1325,51 @@
   $('lineColorText').value = state.theme.line;
   $('bgColorDot').style.background = state.theme.background;
   $('lineColorDot').style.background = state.theme.line;
+  $('contourOpacity').value = state.contour.opacity;
+  $('contourOpacityVal').innerText = state.contour.opacity.toFixed(2).replace(/\.00$/, '');
   $('customPreset').style.display = state.theme.preset === 'custom' ? 'block' : 'none';
+  $('waterAreaToggle').classList.toggle('on', state.mapFeatures.waterAreas.enabled);
+  $('waterAreaColor').value = state.mapFeatures.waterAreas.color;
+  $('waterAreaColorDot').style.background = state.mapFeatures.waterAreas.color;
+  $('waterAreaOpacity').value = state.mapFeatures.waterAreas.opacity;
+  $('waterAreaOpacityVal').innerText = state.mapFeatures.waterAreas.opacity.toFixed(2).replace(/\.00$/, '');
+  $('riverToggle').classList.toggle('on', state.mapFeatures.rivers.enabled);
+  $('riverColor').value = state.mapFeatures.rivers.color;
+  $('riverColorDot').style.background = state.mapFeatures.rivers.color;
+  $('riverWidth').value = state.mapFeatures.rivers.width;
+  $('riverWidthVal').innerText = state.mapFeatures.rivers.width.toFixed(2).replace(/\.00$/, '');
+  $('riverOpacity').value = state.mapFeatures.rivers.opacity;
+  $('riverOpacityVal').innerText = state.mapFeatures.rivers.opacity.toFixed(2).replace(/\.00$/, '');
+  $('greenAreaToggle').classList.toggle('on', state.mapFeatures.greenAreas.enabled);
+  $('greenAreaColor').value = state.mapFeatures.greenAreas.color;
+  $('greenAreaColorDot').style.background = state.mapFeatures.greenAreas.color;
+  $('greenAreaOpacity').value = state.mapFeatures.greenAreas.opacity;
+  $('greenAreaOpacityVal').innerText = state.mapFeatures.greenAreas.opacity.toFixed(2).replace(/\.00$/, '');
+  $('roadToggle').classList.toggle('on', state.mapFeatures.roads.enabled);
+  $('roadColor').value = state.mapFeatures.roads.color;
+  $('roadColorDot').style.background = state.mapFeatures.roads.color;
+  $('roadWidth').value = state.mapFeatures.roads.width;
+  $('roadWidthVal').innerText = state.mapFeatures.roads.width.toFixed(2).replace(/\.00$/, '');
+  $('roadOpacity').value = state.mapFeatures.roads.opacity;
+  $('roadOpacityVal').innerText = state.mapFeatures.roads.opacity.toFixed(2).replace(/\.00$/, '');
+  $('labelToggle').classList.toggle('on', state.mapFeatures.labels.enabled);
+  $('labelColor').value = state.mapFeatures.labels.color;
+  $('labelColorDot').style.background = state.mapFeatures.labels.color;
+  $('labelOpacity').value = state.mapFeatures.labels.opacity;
+  $('labelOpacityVal').innerText = state.mapFeatures.labels.opacity.toFixed(2).replace(/\.00$/, '');
+  $('labelSize').value = state.mapFeatures.labels.size;
+  $('labelSizeVal').innerText = state.mapFeatures.labels.size.toFixed(2).replace(/\.00$/, '');
+  $('labelFont').value = state.mapFeatures.labels.font;
   $('pngGradStartDot').style.background = state.png.gradientStart;
   $('pngGradEndDot').style.background = state.png.gradientEnd;
   $('pngLayerToggle').classList.toggle('on', state.png.layered);
   $('pngLayerOptions').style.display = state.png.layered ? 'block' : 'none';
+  if(layerOrderList) {
+    state.layerOrder.forEach((key) => {
+      const item = layerOrderList.querySelector(`[data-layer="${key}"]`);
+      if(item) layerOrderList.appendChild(item);
+    });
+  }
   updateGradientPreview();
   applyTheme();
 
@@ -995,6 +1414,8 @@
     msg('Fetching Elevation Data...');
     const {sw, ne} = state.bbox;
     await fetchTerrain(sw, ne);
+    msg('Fetching Map Features...');
+    await fetchMapFeatures(sw, ne);
     if(!state.terrainData) {
       renderSVG();
       idle();
@@ -1009,9 +1430,7 @@
 
   async function fetchTerrain(sw, ne) {
     try {
-      const base = 120;
-      const scaled = Math.round(base * Math.min(2, Math.max(0.6, state.contour.detail)));
-      const rows = Math.max(80, Math.min(200, scaled));
+      const rows = 120;
       const cols = rows;
       const locs=[];
       const dLat = (ne.lat-sw.lat)/(rows-1), dLon = (ne.lng-sw.lng)/(cols-1);
@@ -1020,8 +1439,8 @@
       const j = await res.json();
       let h = j.results.map(x=>x.elevation);
       // Smooth based on detail: higher detail keeps more variation.
-      const smoothPasses = Math.round(6 - (state.contour.detail * 2));
-      for(let i=0; i<Math.max(2, smoothPasses); i++) h = smoothPass(h, rows, cols);
+      const smoothPasses = 4;
+      for(let i=0; i<smoothPasses; i++) h = smoothPass(h, rows, cols);
       let min=Infinity, max=-Infinity; h.forEach(v => { if(v<min) min=v; if(v>max) max=v; });
       state.terrainData = { rows, cols, h: h.map(z=>z-min), min, max, delta: max-min };
     } catch(e) { state.terrainData = null; }
@@ -1044,6 +1463,9 @@
   function renderSVG() {
     const {wMm, hMm} = state;
     let svg = `<svg id="prevSvg" width="${wMm}mm" height="${hMm}mm" viewBox="0 0 ${wMm} ${hMm}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
+    const clipPathD = getShapePathD();
+    svg += `<defs><clipPath id="shapeClip"><path d="${clipPathD}"/></clipPath></defs>`;
+    svg += `<g clip-path="url(#shapeClip)">`;
     svg += `<rect width="100%" height="100%" fill="${state.theme.background}"/>`;
     if(state.png.layered && state.terrainData) {
       const previewUrl = getLayeredPreviewDataUrl();
@@ -1051,30 +1473,93 @@
         svg += `<image href="${previewUrl}" x="0" y="0" width="${wMm}" height="${hMm}" preserveAspectRatio="none" />`;
       }
     }
-    svg += `<rect x="0.5" y="0.5" width="${wMm - 1}" height="${hMm - 1}" fill="none" stroke="rgba(36,48,65,0.6)" stroke-width="0.5" />`;
 
-    state.contourPaths = [];
-    if(state.terrainData && state.terrainData.delta > 0) {
-      const levels = getContourLevels();
-      svg += `<g id="contours" stroke="${state.contour.color}" stroke-width="${state.contour.width}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
-      levels.forEach(level => {
-        const segments = getContourSegments(level, wMm, hMm);
-        if(!segments.length) return;
-        const polylines = buildPolylines(segments);
-        polylines.forEach(line => {
-          const smoothed = state.contour.smooth ? smoothPolyline(line, state.contour.smooth) : line;
-          if(smoothed.length < 2) return;
-          state.contourPaths.push(smoothed);
-          const path = smoothed.map((pt, idx) => `${idx ? 'L' : 'M'} ${pt[0].toFixed(2)} ${pt[1].toFixed(2)}`).join(' ');
-          svg += `<path d="${path}" />`;
+    const layers = {
+      green: () => {
+        if(!state.osmData || !state.mapFeatures.greenAreas.enabled || !state.osmData.greenPolygons.length) return '';
+        let out = `<g id="greenAreas" fill="${state.mapFeatures.greenAreas.color}" fill-opacity="${state.mapFeatures.greenAreas.opacity}">`;
+        state.osmData.greenPolygons.forEach((poly) => {
+          const d = pathFromCoords(poly, true);
+          if(d) out += `<path d="${d}"/>`;
         });
-      });
-      svg += `</g>`;
-    } else {
-      const cx = wMm / 2;
-      const cy = hMm / 2;
-      svg += `<text x="${cx}" y="${cy}" text-anchor="middle" font-family="SF Pro Text, Segoe UI, Roboto, sans-serif" font-size="6" fill="#9AA3B2">Elevation data missing. Try generating again.</text>`;
-    }
+        return out + `</g>`;
+      },
+      water: () => {
+        if(!state.osmData || !state.mapFeatures.waterAreas.enabled || !state.osmData.waterPolygons.length) return '';
+        let out = `<g id="waterAreas" fill="${state.mapFeatures.waterAreas.color}" fill-opacity="${state.mapFeatures.waterAreas.opacity}">`;
+        state.osmData.waterPolygons.forEach((poly) => {
+          const d = pathFromCoords(poly, true);
+          if(d) out += `<path d="${d}"/>`;
+        });
+        return out + `</g>`;
+      },
+      rivers: () => {
+        if(!state.osmData || !state.mapFeatures.rivers.enabled || !state.osmData.waterLines.length) return '';
+        let out = `<g id="rivers" stroke="${state.mapFeatures.rivers.color}" stroke-width="${state.mapFeatures.rivers.width}" stroke-opacity="${state.mapFeatures.rivers.opacity}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        state.osmData.waterLines.forEach((line) => {
+          const d = pathFromCoords(line, false);
+          if(d) out += `<path d="${d}"/>`;
+        });
+        return out + `</g>`;
+      },
+      roads: () => {
+        if(!state.osmData || !state.mapFeatures.roads.enabled || !state.osmData.roadLines.length) return '';
+        let out = `<g id="roads" stroke="${state.mapFeatures.roads.color}" stroke-width="${state.mapFeatures.roads.width}" stroke-opacity="${state.mapFeatures.roads.opacity}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        state.osmData.roadLines.forEach((line) => {
+          const d = pathFromCoords(line, false);
+          if(d) out += `<path d="${d}"/>`;
+        });
+        return out + `</g>`;
+      },
+      contours: () => {
+        state.contourPaths = [];
+        if(!state.terrainData || state.terrainData.delta <= 0) {
+          const cx = wMm / 2;
+          const cy = hMm / 2;
+          return `<text x="${cx}" y="${cy}" text-anchor="middle" font-family="SF Pro Text, Segoe UI, Roboto, sans-serif" font-size="6" fill="#9AA3B2">Elevation data missing. Try generating again.</text>`;
+        }
+        const levels = getContourLevels();
+        let out = `<g id="contours" stroke="${state.contour.color}" stroke-width="${state.contour.width}" stroke-opacity="${state.contour.opacity}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+        levels.forEach(level => {
+          const segments = getContourSegments(level, wMm, hMm);
+          if(!segments.length) return;
+          const polylines = buildPolylines(segments);
+          polylines.forEach(line => {
+            const smoothed = state.contour.smooth ? smoothPolyline(line, state.contour.smooth) : line;
+            if(smoothed.length < 2) return;
+            state.contourPaths.push(smoothed);
+            const path = smoothed.map((pt, idx) => `${idx ? 'L' : 'M'} ${pt[0].toFixed(2)} ${pt[1].toFixed(2)}`).join(' ');
+            out += `<path d="${path}" />`;
+          });
+        });
+        return out + `</g>`;
+      },
+      labels: () => {
+        if(!state.osmData || !state.mapFeatures.labels.enabled || !state.osmData.places.length) return '';
+        const fontFamilies = {
+          system: 'SF Pro Text, Segoe UI, Roboto, sans-serif',
+          serif: 'Georgia, Times New Roman, serif',
+          mono: 'SF Mono, Menlo, Consolas, monospace'
+        };
+        const fontFamily = fontFamilies[state.mapFeatures.labels.font] || fontFamilies.system;
+        const halo = state.theme.background;
+        let out = `<g id="placeLabels" font-family="${fontFamily}" font-size="${state.mapFeatures.labels.size}mm" text-anchor="middle" fill="${state.mapFeatures.labels.color}" fill-opacity="${state.mapFeatures.labels.opacity}" paint-order="stroke">`;
+        state.osmData.places.forEach((place) => {
+          const [x, y] = projectToSvg(place.lat, place.lon);
+          out += `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" stroke="${halo}" stroke-width="0.6">${place.name}</text>`;
+        });
+        return out + `</g>`;
+      }
+    };
+
+    state.layerOrder.forEach((key) => {
+      if(layers[key]) {
+        svg += layers[key]();
+      }
+    });
+
+    svg += `</g>`;
+    svg += `<rect x="0.5" y="0.5" width="${wMm - 1}" height="${hMm - 1}" fill="none" stroke="rgba(36,48,65,0.6)" stroke-width="0.5" />`;
     svg += `</svg>`;
     $('previewArea').innerHTML = svg;
     updatePngRangeInfo();
