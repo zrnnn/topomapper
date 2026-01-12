@@ -7,6 +7,7 @@
 
   <!-- Libs -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Merriweather:wght@400;700&family=Roboto+Mono:wght@400;600&family=Nunito:wght@400;700&family=Roboto+Condensed:wght@400;700&family=Bebas+Neue&display=swap" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
@@ -42,14 +43,14 @@
       border-bottom: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px);
     }
     .top-brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 20px; letter-spacing: -0.6px; text-decoration: none; color: var(--color-text); }
-    .top-logo { width: auto; height: auto; object-fit: contain; }
+    .top-logo { width: auto; height: 50px; object-fit: contain; }
     .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: var(--color-text-sec); }
     .status-pill.ok { color: #9BE2B7; border-color: rgba(155,226,183,0.4); background: rgba(155,226,183,0.12); }
     .status-pill.error { color: #FF9A9A; border-color: rgba(255,154,154,0.4); background: rgba(255,154,154,0.12); }
 
     /* MAP AREA */
     .viewport { position: relative; flex: 1; height: 100%; }
-    #map { width: 100%; height: 100%; z-index: 0; background: #10141B; filter: contrast(1.1) saturate(0.85) brightness(0.92) hue-rotate(210deg); transition: filter 0.3s ease; }
+    #map { width: 100%; height: 100%; z-index: 0; background: #10141B; filter: grayscale(1) contrast(1.05) brightness(1.08) sepia(0.12) hue-rotate(190deg) saturate(0.6); transition: filter 0.3s ease; }
 
     /* SIDEBAR (iOS Floating Panel) */
     .sidebar {
@@ -111,6 +112,14 @@
     .layer-body { display: none; padding: 0 18px 18px 18px; background: rgba(10,12,18,0.7); }
     .layer-item.open .layer-body { display: block; }
     .layer-item.dragging { opacity: 0.65; border-color: rgba(76,141,255,0.8); }
+    .layer-insert-indicator {
+      height: 2px;
+      margin: 6px 16px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(76,141,255,0), rgba(76,141,255,0.9), rgba(76,141,255,0));
+      box-shadow: 0 0 6px rgba(76,141,255,0.5);
+      display: none;
+    }
     .drag-handle {
       display: inline-flex;
       align-items: center;
@@ -309,13 +318,23 @@
       flex-direction: column;
       align-items: stretch;
       justify-content: stretch;
+      position: relative;
       padding: clamp(16px, 2vw, 40px);
       overflow: hidden;
       gap: 16px;
     }
-    #previewArea { flex: 1; display: flex; align-items: center; justify-content: center; }
+    #previewArea { flex: 1; display: flex; align-items: center; justify-content: center; padding: 10%; }
     #previewArea svg { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
-    .preview-controls { display: flex; justify-content: center; }
+    .preview-controls {
+      position: absolute;
+      left: 50%;
+      bottom: 5px;
+      transform: translateX(-50%);
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      pointer-events: auto;
+    }
     .btn-secondary.preview-toggle {
       min-width: 220px;
       display: inline-flex;
@@ -353,9 +372,7 @@
 
 <div class="sidebar">
   <div class="sidebar-header">
-    <a href="#" class="brand">
-      <img src="assets/logo.png" alt="Topomapper logo">
-    </a>
+    <a href="#" class="brand">Topomapper</a>
   </div>
   <div class="scroll-content">
     <div class="group">
@@ -410,7 +427,9 @@
     <div class="preview-stage">
       <div id="previewArea"></div>
       <div class="preview-controls">
-        <button id="refreshPreview" class="btn-secondary preview-toggle">Auto Preview On</button>
+        <button id="undoStep2" class="btn-secondary" type="button" aria-label="Undo last change">Undo</button>
+        <button id="refreshPreview" class="btn-secondary preview-toggle" type="button">Auto Preview On</button>
+        <button id="redoStep2" class="btn-secondary" type="button" aria-label="Redo last change">Redo</button>
       </div>
     </div>
     <div class="export-side">
@@ -626,9 +645,9 @@
               <div class="layer-body">
                 <div class="cust-row"><label style="margin:0">Color</label><div class="color-dot" style="background:#10141B"><input type="color" id="contourColor" value="#10141B"></div></div>
                 <div class="cust-row"><label style="margin:0">Line Width</label><input type="range" id="contourWidth" min="0.05" max="0.6" step="0.05" value="0.2"><span id="contourWidthVal" style="font-size:11px;width:36px;text-align:right;">0.2</span></div>
-                <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="8" max="60" step="2" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
+                <div class="cust-row"><label style="margin:0">Density</label><input type="range" id="contourDensity" min="10" max="200" step="5" value="24"><span id="contourDensityVal" style="font-size:11px;width:36px;text-align:right;">24</span></div>
           <div class="cust-row"><label style="margin:0">Opacity</label><input type="range" id="contourOpacity" min="0" max="100" step="1" value="80"><span id="contourOpacityVal" style="font-size:11px;width:36px;text-align:right;">80%</span></div>
-                <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="4" step="1" value="4"><span id="contourSmoothVal" style="font-size:11px;width:36px;text-align:right;">4</span></div>
+                <div class="cust-row"><label style="margin:0">Smoothing</label><input type="range" id="contourSmooth" min="0" max="10" step="1" value="4"><span id="contourSmoothVal" style="font-size:11px;width:36px;text-align:right;">4</span></div>
               </div>
             </div>
           </div>
@@ -663,8 +682,8 @@
               </div>
               <div class="cust-row">
                 <label style="margin:0">Fill Opacity</label>
-                <input type="range" id="pngGradOpacity" min="0" max="100" step="1" value="90">
-                <span id="pngGradOpacityVal" style="font-size:11px;width:36px;text-align:right;">90%</span>
+                <input type="range" id="pngGradOpacity" min="0" max="100" step="1" value="0">
+                <span id="pngGradOpacityVal" style="font-size:11px;width:36px;text-align:right;">0%</span>
               </div>
               <div class="cust-row">
                 <label style="margin:0">Gradient Shift</label>
@@ -734,7 +753,7 @@
       layered: true,
       scheme: 'color',
       blend: 'normal',
-      gradientOpacity: 90,
+      gradientOpacity: 0,
       gradientShift: 0,
       gradientScale: 100,
       reliefStrength: 0.48,
@@ -765,6 +784,7 @@
     },
     layerOrder: ['labels', 'roads', 'rivers', 'water', 'green', 'contours'],
     bbox: null,
+    renderBbox: null,
     terrainData: null,
     contourPaths: [],
     osmData: null,
@@ -786,7 +806,7 @@
       layered: true,
       scheme: 'color',
       blend: 'normal',
-      gradientOpacity: 90,
+      gradientOpacity: 0,
       gradientShift: 0,
       gradientScale: 100,
       reliefStrength: 0.48,
@@ -822,6 +842,8 @@
   const msg = t => { $('loaderText').innerText=t; $('loader').classList.add('active'); };
   const idle = () => $('loader').classList.remove('active');
   const refreshPreviewBtn = $('refreshPreview');
+  const undoStep2Btn = $('undoStep2');
+  const redoStep2Btn = $('redoStep2');
   const mapDataNotice = $('mapDataNotice');
   const mapDataNoticeText = $('mapDataNoticeText');
   const mapDataNoticeClose = $('mapDataNoticeClose');
@@ -921,6 +943,30 @@
 
   function lerp(a, b, t) { return a + (b - a) * t; }
   function clamp(val, min, max) { return Math.min(max, Math.max(min, val)); }
+  function smoothstep(t) {
+    const clamped = clamp(t, 0, 1);
+    return clamped * clamped * (3 - 2 * clamped);
+  }
+
+  function getSmoothedBandColor(zNorm, boundaries, bandColors) {
+    const band = findBandIndex(zNorm, boundaries);
+    let color = bandColors[band];
+    const lower = boundaries[band];
+    const upper = boundaries[band + 1];
+    const bandSpan = Math.max(upper - lower, 1e-6);
+    const blendWindow = Math.min(0.04, bandSpan * 0.35);
+    if(blendWindow > 0) {
+      if(band > 0) {
+        const t = smoothstep((zNorm - lower) / blendWindow);
+        color = mixColor(bandColors[band - 1], color, t);
+      }
+      if(band < bandColors.length - 1) {
+        const t = smoothstep((upper - zNorm) / blendWindow);
+        color = mixColor(color, bandColors[band + 1], 1 - t);
+      }
+    }
+    return { band, color };
+  }
 
   function gradientColor(startColor, endColor, t) {
     const s = colorToRgb(startColor);
@@ -1077,11 +1123,11 @@
       for(let x=0; x<w; x++) {
         const nx = w === 1 ? 0 : x / (w - 1);
         const zNorm = getZInterpolated(nx, ny);
-        const band = findBandIndex(zNorm, boundaries);
+        const { color: bandColor } = getSmoothedBandColor(zNorm, boundaries, bandColors);
         const height = state.terrainData.min + zNorm;
         const elevationT = range.maxZ === range.minZ ? 0 : (height - range.minZ) / (range.maxZ - range.minZ);
         const shade = getHillshade(nx, ny, step, zNorm);
-        const color = applyReliefOverlay(bandColors[band], shade, elevationT);
+        const color = applyReliefOverlay(bandColor, shade, elevationT);
         const idx = (y * w + x) * 4;
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -1270,8 +1316,9 @@
   }
 
   function projectToSvg(lat, lon) {
-    if(!state.bbox) return [0, 0];
-    const { sw, ne } = state.bbox;
+    const bbox = state.renderBbox || state.bbox;
+    if(!bbox) return [0, 0];
+    const { sw, ne } = bbox;
     const x = ((lon - sw.lng) / (ne.lng - sw.lng)) * state.wMm;
     const y = ((ne.lat - lat) / (ne.lat - sw.lat)) * state.hMm;
     return [x, y];
@@ -1610,12 +1657,16 @@
     }
     syncLayerOrder(container);
     markPreviewDirty();
+    pushHistoryState();
   };
 
   const setupLayerReorder = (container) => {
     if(!container) return;
     let draggedItem = null;
     let dragPreview = null;
+    const insertIndicator = document.createElement('div');
+    insertIndicator.className = 'layer-insert-indicator';
+    container.appendChild(insertIndicator);
     const items = Array.from(container.querySelectorAll('[draggable="true"]'));
     items.forEach((item) => {
       let handleActive = false;
@@ -1639,6 +1690,7 @@
         }
         draggedItem = item;
         item.classList.add('dragging');
+        insertIndicator.style.display = 'none';
         if(e.dataTransfer) {
           e.dataTransfer.effectAllowed = 'move';
           dragPreview = item.cloneNode(true);
@@ -1660,9 +1712,17 @@
           dragPreview.remove();
           dragPreview = null;
         }
+        insertIndicator.style.display = 'none';
       });
       item.addEventListener('dragover', (e) => {
         e.preventDefault();
+        if(!draggedItem) return;
+        const target = e.currentTarget;
+        if(!target || target === draggedItem) return;
+        const rect = target.getBoundingClientRect();
+        const insertBefore = e.clientY < rect.top + rect.height / 2;
+        insertIndicator.style.display = 'block';
+        container.insertBefore(insertIndicator, insertBefore ? target : target.nextSibling);
       });
       item.addEventListener('drop', (e) => {
         e.preventDefault();
@@ -1677,6 +1737,8 @@
         }
         syncLayerOrder(container);
         markPreviewDirty();
+        pushHistoryState();
+        insertIndicator.style.display = 'none';
       });
     });
     syncLayerOrder(container);
@@ -1706,6 +1768,22 @@
       }
     });
   }
+  if(undoStep2Btn) {
+    undoStep2Btn.addEventListener('click', () => {
+      if(historyState.past.length <= 1) return;
+      const current = historyState.past.pop();
+      historyState.future.push(current);
+      applyHistorySnapshot(historyState.past[historyState.past.length - 1]);
+    });
+  }
+  if(redoStep2Btn) {
+    redoStep2Btn.addEventListener('click', () => {
+      const snapshot = historyState.future.pop();
+      if(!snapshot) return;
+      historyState.past.push(snapshot);
+      applyHistorySnapshot(snapshot);
+    });
+  }
   if(mapDataNoticeClose) {
     mapDataNoticeClose.addEventListener('click', () => {
       hideMapNotice();
@@ -1730,6 +1808,7 @@
       state.layerOrder = [...defaultDesign.layerOrder];
       syncUiFromState();
       markPreviewDirty();
+      pushHistoryState();
     });
   }
 
@@ -1807,6 +1886,48 @@
   };
 
   let previewTimer = null;
+  const historyState = { past: [], future: [] };
+  const historyLimit = 5;
+  let isRestoringHistory = false;
+
+  const getDesignSnapshot = () => JSON.stringify({
+    theme: state.theme,
+    contour: state.contour,
+    png: state.png,
+    mapFeatures: state.mapFeatures,
+    layerOrder: state.layerOrder
+  });
+
+  const updateHistoryButtons = () => {
+    if(undoStep2Btn) undoStep2Btn.disabled = historyState.past.length <= 1;
+    if(redoStep2Btn) redoStep2Btn.disabled = historyState.future.length === 0;
+  };
+
+  const pushHistoryState = () => {
+    if(isRestoringHistory) return;
+    const snapshot = getDesignSnapshot();
+    const last = historyState.past[historyState.past.length - 1];
+    if(snapshot === last) return;
+    historyState.past.push(snapshot);
+    if(historyState.past.length > historyLimit) historyState.past.shift();
+    historyState.future = [];
+    updateHistoryButtons();
+  };
+
+  const applyHistorySnapshot = (snapshot) => {
+    if(!snapshot) return;
+    isRestoringHistory = true;
+    const parsed = JSON.parse(snapshot);
+    state.theme = parsed.theme;
+    state.contour = parsed.contour;
+    state.png = parsed.png;
+    state.mapFeatures = parsed.mapFeatures;
+    state.layerOrder = parsed.layerOrder;
+    syncUiFromState();
+    isRestoringHistory = false;
+    updateHistoryButtons();
+  };
+
   const updateAutoPreviewButton = () => {
     if(!refreshPreviewBtn) return;
     const label = state.autoPreview ? 'Auto Preview On' : 'Auto Preview Off';
@@ -1901,11 +2022,13 @@
   };
 
   const getOverlayAlignmentStatus = () => {
-    if(!state.bbox || !state.terrainData) return null;
+    const bbox = state.renderBbox || state.bbox;
+    if(!bbox || !state.terrainData) return null;
     const alignmentPoints = [
-      { lat: state.bbox.ne.lat, lon: state.bbox.sw.lng, expected: [0, 0] },
-      { lat: state.bbox.ne.lat, lon: state.bbox.ne.lng, expected: [state.wMm, 0] },
-      { lat: state.bbox.sw.lat, lon: state.bbox.sw.lng, expected: [0, state.hMm] }
+      { lat: bbox.ne.lat, lon: bbox.sw.lng, expected: [0, 0] },
+      { lat: bbox.ne.lat, lon: bbox.ne.lng, expected: [state.wMm, 0] },
+      { lat: bbox.sw.lat, lon: bbox.sw.lng, expected: [0, state.hMm] },
+      { lat: (bbox.sw.lat + bbox.ne.lat) / 2, lon: (bbox.sw.lng + bbox.ne.lng) / 2, expected: [state.wMm / 2, state.hMm / 2] }
     ];
     let maxDelta = 0;
     alignmentPoints.forEach((pt) => {
@@ -1915,6 +2038,14 @@
       maxDelta = Math.max(maxDelta, Math.hypot(dx, dy));
     });
     return { ok: maxDelta <= 0.5, delta: maxDelta };
+  };
+
+  const ensureOverlayAlignment = async () => {
+    if(!state.renderBbox) return;
+    const alignmentStatus = getOverlayAlignmentStatus();
+    if(alignmentStatus?.ok) return;
+    const { sw, ne } = state.renderBbox;
+    await fetchMapFeatures(sw, ne);
   };
 
   const updateMapDataStatus = ({ announce = false, loading = false } = {}) => {
@@ -2290,6 +2421,22 @@
     updateAutoPreviewButton();
   };
   syncUiFromState();
+  pushHistoryState();
+  updateHistoryButtons();
+
+  const step2Content = document.querySelector('.step-content[data-step="2"]');
+  if(step2Content) {
+    step2Content.querySelectorAll('input, select').forEach((control) => {
+      control.addEventListener('change', () => {
+        pushHistoryState();
+      });
+    });
+    step2Content.addEventListener('click', (event) => {
+      if(event.target?.classList?.contains('ios-switch')) {
+        pushHistoryState();
+      }
+    });
+  }
 
   function updateVf() {
     state.wMm = +$('dimW').value; state.hMm = +$('dimH').value;
@@ -2331,6 +2478,12 @@
   // --- GENERATION PIPELINE ---
   $('btnGen').onclick = async () => {
     msg('Fetching Elevation Data...');
+    if(state.bbox) {
+      state.renderBbox = {
+        sw: { ...state.bbox.sw },
+        ne: { ...state.bbox.ne }
+      };
+    }
     const {sw, ne} = state.bbox;
     await fetchTerrain(sw, ne);
     msg('Fetching Map Features...');
@@ -2351,6 +2504,7 @@
       state.osmStatus.ignored = true;
       updateMapDataStatus();
     }
+    await ensureOverlayAlignment();
     renderSVG();
     idle();
     setStep('2');
@@ -2471,12 +2625,12 @@
       labels: () => {
         if(!state.osmData || !state.mapFeatures.labels.enabled || !state.osmData.places.length) return '';
         const fontFamilies = {
-          system: 'SF Pro Text, Segoe UI, Roboto, sans-serif',
-          serif: 'Georgia, Times New Roman, serif',
-          mono: 'SF Mono, Menlo, Consolas, monospace',
-          rounded: '"SF Pro Rounded", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif',
-          condensed: '"Arial Narrow", "Helvetica Neue Condensed", "Roboto Condensed", sans-serif',
-          display: '"Impact", "Haettenschweiler", "Franklin Gothic Heavy", sans-serif'
+          system: 'Inter, SF Pro Text, Segoe UI, Roboto, sans-serif',
+          serif: 'Merriweather, Georgia, Times New Roman, serif',
+          mono: '"Roboto Mono", "SF Mono", Menlo, Consolas, monospace',
+          rounded: 'Nunito, "Arial Rounded MT Bold", "Trebuchet MS", sans-serif',
+          condensed: '"Roboto Condensed", "Arial Narrow", "Helvetica Neue Condensed", sans-serif',
+          display: '"Bebas Neue", "Impact", "Haettenschweiler", "Franklin Gothic Heavy", sans-serif'
         };
         const fontFamily = fontFamilies[state.mapFeatures.labels.font] || fontFamilies.system;
         const haloEnabled = state.mapFeatures.labels.background.enabled;
@@ -2823,11 +2977,11 @@
       for(let x=0; x<w; x++) {
         const nx = w === 1 ? 0 : x / (w - 1);
         const zNorm = getZInterpolated(nx, ny);
-        const band = findBandIndex(zNorm, boundaries);
+        const { color: bandColor } = getSmoothedBandColor(zNorm, boundaries, bandColors);
         const height = state.terrainData.min + zNorm;
         const elevationT = range.maxZ === range.minZ ? 0 : (height - range.minZ) / (range.maxZ - range.minZ);
         const shade = getHillshade(nx, ny, step, zNorm);
-        const color = applyReliefOverlay(bandColors[band], shade, elevationT);
+        const color = applyReliefOverlay(bandColor, shade, elevationT);
         const idx = (y * w + x) * 4;
         data[idx] = color.r;
         data[idx + 1] = color.g;
