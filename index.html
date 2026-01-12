@@ -185,7 +185,7 @@
       height: 12px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,0.16);
-      background: linear-gradient(90deg, #0B0F14, #F5F7FB);
+      background: linear-gradient(90deg, #0B1B2C, #7CA6C7);
       box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
       margin-top: 8px;
     }
@@ -491,16 +491,16 @@
               <div class="ios-switch" id="pngLayerToggle"></div>
             </div>
             <p style="font-size:11px; color:var(--color-text-sec); margin:0; line-height:1.4;">
-              Fills each contour level with a gradient-mapped tone based on the lowest/highest points in the current frame.
+              Fills each contour level with a relief-style gradient and hillshade projection based on the lowest/highest points in the frame.
             </p>
             <div id="pngLayerOptions" style="display:none;">
               <div class="cust-row">
                 <label style="margin:0">Start Color (Low)</label>
-                <div class="color-dot" id="pngGradStartDot" style="background:#0B0F14"><input type="color" id="pngGradStart" value="#0B0F14"></div>
+                <div class="color-dot" id="pngGradStartDot" style="background:#0B1B2C"><input type="color" id="pngGradStart" value="#0B1B2C"></div>
               </div>
               <div class="cust-row">
                 <label style="margin:0">End Color (High)</label>
-                <div class="color-dot" id="pngGradEndDot" style="background:#F5F7FB"><input type="color" id="pngGradEnd" value="#F5F7FB"></div>
+                <div class="color-dot" id="pngGradEndDot" style="background:#7CA6C7"><input type="color" id="pngGradEnd" value="#7CA6C7"></div>
               </div>
               <div class="cust-row">
                 <label style="margin:0">Gradient Opacity</label>
@@ -562,9 +562,12 @@
     },
     png: {
       layered: false,
-      gradientStart: '#0B0F14',
-      gradientEnd: '#F5F7FB',
-      gradientOpacity: 0.9
+      gradientStart: '#0B1B2C',
+      gradientEnd: '#7CA6C7',
+      gradientOpacity: 0.9,
+      reliefStrength: 0.48,
+      reliefWarm: '#F3A15F',
+      reliefShadow: '#0A1624'
     },
     theme: {
       preset: 'dark',
@@ -696,6 +699,53 @@
     };
   }
 
+  function mixColor(base, overlay, t) {
+    const tt = clamp(t, 0, 1);
+    return {
+      r: Math.round(lerp(base.r, overlay.r, tt)),
+      g: Math.round(lerp(base.g, overlay.g, tt)),
+      b: Math.round(lerp(base.b, overlay.b, tt))
+    };
+  }
+
+  const reliefLight = (() => {
+    const v = { x: -0.62, y: -0.48, z: 0.6 };
+    const len = Math.hypot(v.x, v.y, v.z) || 1;
+    return { x: v.x / len, y: v.y / len, z: v.z / len };
+  })();
+
+  function getHillshade(nx, ny, step, centerZ) {
+    if(!state.terrainData) return 0.5;
+    const safeStep = Math.max(1e-6, step);
+    const z0 = centerZ ?? getZInterpolated(nx, ny);
+    const zRight = getZInterpolated(Math.min(1, nx + safeStep), ny);
+    const zDown = getZInterpolated(nx, Math.min(1, ny + safeStep));
+    const dzdx = (zRight - z0) / safeStep;
+    const dzdy = (zDown - z0) / safeStep;
+    const relief = clamp(state.terrainData.delta / 700, 0.35, 1.25);
+    const nxv = -dzdx * relief;
+    const nyv = -dzdy * relief;
+    const nzv = 1;
+    const len = Math.hypot(nxv, nyv, nzv) || 1;
+    const dot = (nxv / len) * reliefLight.x + (nyv / len) * reliefLight.y + (nzv / len) * reliefLight.z;
+    const ambient = 0.36;
+    const lit = Math.max(0, dot);
+    return clamp(ambient + lit * (1 - ambient), 0, 1);
+  }
+
+  function applyReliefOverlay(baseColor, shade, elevationT) {
+    const strength = clamp(state.png.reliefStrength ?? 0.45, 0, 1);
+    if(strength <= 0) return baseColor;
+    const warm = colorToRgb(state.png.reliefWarm);
+    const shadow = colorToRgb(state.png.reliefShadow);
+    const highlight = clamp((shade - 0.5) * 2, 0, 1) * strength;
+    const shadowMix = clamp((0.5 - shade) * 2, 0, 1) * strength;
+    const peakBoost = clamp((elevationT - 0.6) / 0.4, 0, 1) * (strength * 0.45);
+    let color = mixColor(baseColor, warm, clamp(highlight + peakBoost, 0, 1));
+    color = mixColor(color, shadow, shadowMix);
+    return color;
+  }
+
   function getLayeredPreviewDataUrl() {
     if(!state.terrainData) return null;
     const alpha = Math.round(255 * clamp(state.png.gradientOpacity ?? 1, 0, 1));
@@ -724,13 +774,17 @@
     const ctx = cv.getContext('2d');
     const imgData = ctx.createImageData(w, h);
     const data = imgData.data;
+    const step = 1 / Math.max(state.terrainData.cols - 1, state.terrainData.rows - 1);
     for(let y=0; y<h; y++) {
       const ny = h === 1 ? 0 : y / (h - 1);
       for(let x=0; x<w; x++) {
         const nx = w === 1 ? 0 : x / (w - 1);
         const zNorm = getZInterpolated(nx, ny);
         const band = findBandIndex(zNorm, boundaries);
-        const color = bandColors[band];
+        const height = state.terrainData.min + zNorm;
+        const elevationT = range.maxZ === range.minZ ? 0 : (height - range.minZ) / (range.maxZ - range.minZ);
+        const shade = getHillshade(nx, ny, step, zNorm);
+        const color = applyReliefOverlay(bandColors[band], shade, elevationT);
         const idx = (y * w + x) * 4;
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -1680,14 +1734,16 @@
     return out;
   }
 
-  function renderSVG() {
+  function buildSvgMarkup({ includeBackground = true, includeGradient = true, includeFrame = true } = {}) {
     const {wMm, hMm} = state;
     let svg = `<svg id="prevSvg" width="${wMm}mm" height="${hMm}mm" viewBox="0 0 ${wMm} ${hMm}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
     const clipPathD = getShapePathD();
     svg += `<defs><clipPath id="shapeClip"><path d="${clipPathD}"/></clipPath></defs>`;
     svg += `<g clip-path="url(#shapeClip)">`;
-    svg += `<rect width="100%" height="100%" fill="${state.theme.background}"/>`;
-    if(state.png.layered && state.terrainData) {
+    if(includeBackground) {
+      svg += `<rect width="100%" height="100%" fill="${state.theme.background}"/>`;
+    }
+    if(includeGradient && state.png.layered && state.terrainData) {
       const previewUrl = getLayeredPreviewDataUrl();
       if(previewUrl) {
         svg += `<image href="${previewUrl}" x="0" y="0" width="${wMm}" height="${hMm}" preserveAspectRatio="none" />`;
@@ -1779,8 +1835,15 @@
     });
 
     svg += `</g>`;
-    svg += `<rect x="0.5" y="0.5" width="${wMm - 1}" height="${hMm - 1}" fill="none" stroke="rgba(36,48,65,0.6)" stroke-width="0.5" />`;
+    if(includeFrame) {
+      svg += `<rect x="0.5" y="0.5" width="${wMm - 1}" height="${hMm - 1}" fill="none" stroke="rgba(36,48,65,0.6)" stroke-width="0.5" />`;
+    }
     svg += `</svg>`;
+    return svg;
+  }
+
+  function renderSVG() {
+    const svg = buildSvgMarkup({ includeBackground: true, includeGradient: true, includeFrame: true });
     $('previewArea').innerHTML = svg;
     updatePngRangeInfo();
   }
@@ -1816,6 +1879,15 @@
       dxf += `0\nLWPOLYLINE\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n90\n${outPts.length}\n70\n${closed ? 1 : 0}\n`;
       outPts.forEach(p => dxf += `10\n${p[0].toFixed(4)}\n20\n${(state.hMm - p[1]).toFixed(4)}\n`);
     };
+    const writeText = (layer, text, x, y, height, color) => {
+      if(!text) return;
+      const rgb = colorToRgb(color);
+      const aci = rgbToAci(rgb);
+      const trueColor = (rgb.r << 16) + (rgb.g << 8) + rgb.b;
+      const safeText = String(text).replace(/[\r\n\t]+/g, ' ').trim();
+      if(!safeText) return;
+      dxf += `0\nTEXT\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n10\n${x.toFixed(4)}\n20\n${(state.hMm - y).toFixed(4)}\n40\n${height.toFixed(4)}\n1\n${safeText}\n50\n0\n`;
+    };
     if(!state.contourPaths.length) {
       alert('Generate contours first.');
       return;
@@ -1833,6 +1905,12 @@
       }
       if(state.mapFeatures.roads.enabled) {
         state.osmData.roadLines.forEach(line => writePolyline('ROADS', line, state.mapFeatures.roads.color, false));
+      }
+      if(state.mapFeatures.labels.enabled && state.osmData.places?.length) {
+        state.osmData.places.forEach((place) => {
+          const [x, y] = projectToSvg(place.lat, place.lon);
+          writeText('LABELS', place.name, x, y, state.mapFeatures.labels.size, state.mapFeatures.labels.color);
+        });
       }
     }
     writePolyline('FRAME', [[0,0],[state.wMm,0],[state.wMm,state.hMm],[0,state.hMm],[0,0]], state.contour.color, true);
@@ -1856,6 +1934,18 @@
       }
     }
     return Math.max(0, Math.min(boundaries.length - 2, lo));
+  }
+
+  function drawSvgOnCanvas(ctx, svgMarkup, w, h) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve();
+      };
+      img.onerror = reject;
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgMarkup)));
+    });
   }
 
   function exportLayeredPng() {
@@ -1895,13 +1985,17 @@
 
     const imgData = ctx.createImageData(w, h);
     const data = imgData.data;
+    const step = 1 / Math.max(state.terrainData.cols - 1, state.terrainData.rows - 1);
     for(let y=0; y<h; y++) {
       const ny = h === 1 ? 0 : y / (h - 1);
       for(let x=0; x<w; x++) {
         const nx = w === 1 ? 0 : x / (w - 1);
         const zNorm = getZInterpolated(nx, ny);
         const band = findBandIndex(zNorm, boundaries);
-        const color = bandColors[band];
+        const height = state.terrainData.min + zNorm;
+        const elevationT = range.maxZ === range.minZ ? 0 : (height - range.minZ) / (range.maxZ - range.minZ);
+        const shade = getHillshade(nx, ny, step, zNorm);
+        const color = applyReliefOverlay(bandColors[band], shade, elevationT);
         const idx = (y * w + x) * 4;
         data[idx] = color.r;
         data[idx + 1] = color.g;
@@ -1910,7 +2004,10 @@
       }
     }
     ctx.putImageData(imgData, 0, 0);
-    cv.toBlob(b => save(b, 'Topomapper_Layered.png'));
+    const overlaySvg = buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: true });
+    drawSvgOnCanvas(ctx, overlaySvg, w, h)
+      .then(() => cv.toBlob(b => save(b, 'Topomapper_Layered.png')))
+      .catch(() => cv.toBlob(b => save(b, 'Topomapper_Layered.png')));
   }
 
   $('btnPNG').onclick = () => {
