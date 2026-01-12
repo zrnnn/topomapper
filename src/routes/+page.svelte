@@ -356,7 +356,7 @@
       </div>
 
       <div class="step-content" data-step="3">
-        <button id="backToStyle" class="btn-main" style="background:#3A3A3C;">Back to Design</button>
+        <button id="backToStyle" class="btn-main">Back to Design</button>
         <div class="group" style="margin-top:20px;">
         <div class="ui-label">3D Print (3MF Terrain)</div>
         <p style="font-size:13px; color:var(--color-text-sec); margin-bottom:12px; line-height:1.5;">
@@ -371,17 +371,17 @@
 
       <div class="group">
         <div class="ui-label">Laser / Vector (DXF)</div>
-        <button id="btnDXF" class="btn-main" style="background:#3A3A3C;">Download DXF</button>
+        <button id="btnDXF" class="btn-main">Download DXF</button>
       </div>
 
       <div class="group">
         <div class="ui-label">Poster (PNG High-Res)</div>
         <label class="ui-label" for="pngResRange" style="margin-top:10px; font-size:10px;">Resolution (Long Edge)</label>
         <div class="cust-row" style="margin-bottom:8px;">
-          <input type="range" id="pngResRange" min="500" max="8000" step="100" value="2000">
+          <input type="range" id="pngResRange" min="500" max="5000" step="100" value="2000">
           <span id="pngResVal" style="font-size:12px; font-weight:700; width:60px;">2000px</span>
         </div>
-        <button id="btnPNG" class="btn-main" style="background:#2B3440; color:#F5F7FB;">Save PNG</button>
+        <button id="btnPNG" class="btn-main" style="color:#F5F7FB;">Save PNG</button>
       </div>
       </div>
     </div>

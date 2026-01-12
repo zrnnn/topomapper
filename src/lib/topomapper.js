@@ -175,7 +175,8 @@ export function initTopomapper() {
       const desired = Math.max(4, Math.round(state.contour.density));
       const minSpacing = Math.max(1.2, pxToMm(state.contour.width) * 8);
       const maxLines = Math.max(4, Math.floor(Math.min(state.wMm, state.hMm) / minSpacing));
-      return Math.max(4, Math.min(desired, maxLines));
+      const hardMax = 100;
+      return Math.max(4, Math.min(desired, Math.min(maxLines, hardMax)));
     }
 
     function getContourLevels(minNorm = 0, maxNorm = state.terrainData?.delta ?? 0) {
@@ -423,7 +424,12 @@ export function initTopomapper() {
       }
       const alpha = Math.round(255 * clamp(toUnitOpacity(state.png.gradientOpacity), 0, 1));
       const ratio = state.hMm / state.wMm;
-      const target = 320;
+      const previewEl = $('previewArea');
+      const previewW = previewEl?.clientWidth || 0;
+      const previewH = previewEl?.clientHeight || 0;
+      const base = Math.min(previewW, previewH);
+      let target = base ? Math.round(base * 0.4) : 320;
+      target = clamp(target, 180, 360);
       let w = target;
       let h = Math.max(1, Math.round(target * ratio));
       if(h > target) {
@@ -2176,6 +2182,20 @@ export function initTopomapper() {
       return [[0,0],[w,0],[w,h],[0,h]];
     };
 
+    const clipCanvasToShape = (ctx, widthPx, heightPx) => {
+      const poly = getClipPolygon();
+      if(!poly?.length) return;
+      ctx.beginPath();
+      poly.forEach((pt, idx) => {
+        const x = (pt[0] / state.wMm) * widthPx;
+        const y = (pt[1] / state.hMm) * heightPx;
+        if(idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.closePath();
+      ctx.clip();
+    };
+
     const clipPolygon = (subject, clip) => {
       let output = subject.slice();
       const isInside = (pt, edgeStart, edgeEnd) => {
@@ -2468,6 +2488,7 @@ export function initTopomapper() {
       const ctx = cv.getContext('2d');
       ctx.fillStyle = state.theme.background;
       ctx.fillRect(0, 0, w, h);
+      clipCanvasToShape(ctx, w, h);
 
       const range = getShapeHeightRange();
       if(!range) {
@@ -2499,11 +2520,22 @@ export function initTopomapper() {
       const stepY = h > 1 ? 1 / (h - 1) : 1;
       const relief = clamp(state.terrainData.delta / 700, 0.35, 1.25);
       const ambient = 0.36;
+      const bgRgb = colorToRgb(state.theme.background);
       for(let y=0; y<h; y++) {
         const rowOffset = y * w;
         const rowOffsetDown = (y + 1 < h ? (y + 1) : y) * w;
         for(let x=0; x<w; x++) {
           const idx = rowOffset + x;
+          const xMm = (x / Math.max(1, w - 1)) * state.wMm;
+          const yMm = (y / Math.max(1, h - 1)) * state.hMm;
+          if(!isInShape(xMm, yMm)) {
+            const pixel = idx * 4;
+            data[pixel] = bgRgb.r;
+            data[pixel + 1] = bgRgb.g;
+            data[pixel + 2] = bgRgb.b;
+            data[pixel + 3] = 255;
+            continue;
+          }
           const zNorm = heightMap[idx];
           const { color: bandColor } = getSmoothedBandColor(zNorm, boundaries, bandColors);
           const height = state.terrainData.min + zNorm;
@@ -2528,7 +2560,7 @@ export function initTopomapper() {
         }
       }
       ctx.putImageData(imgData, 0, 0);
-      const overlaySvg = buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: true });
+      const overlaySvg = buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: false });
       drawSvgOnCanvas(ctx, overlaySvg, w, h)
         .then(() => cv.toBlob(b => save(b, 'Topomapper_Layered.png')))
         .catch(() => cv.toBlob(b => save(b, 'Topomapper_Layered.png')));
@@ -2541,9 +2573,9 @@ export function initTopomapper() {
       }
       const e = +$('pngResRange').value, r = state.hMm/state.wMm;
       const w = state.wMm >= state.hMm ? e : Math.round(e/r), h = state.wMm >= state.hMm ? Math.round(e*r) : e;
-      const s = buildSvgMarkup({ includeBackground: true, includeGradient: true, includeFrame: true });
+      const s = buildSvgMarkup({ includeBackground: true, includeGradient: true, includeFrame: false });
       const img = new Image(), cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-      img.onload = () => { const ctx = cv.getContext('2d'); ctx.fillStyle=state.theme.background; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h); cv.toBlob(b => save(b, 'Topomapper.png')); };
+      img.onload = () => { const ctx = cv.getContext('2d'); ctx.fillStyle=state.theme.background; ctx.fillRect(0,0,w,h); clipCanvasToShape(ctx, w, h); ctx.drawImage(img,0,0,w,h); cv.toBlob(b => save(b, 'Topomapper.png')); };
       img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
     };
 
@@ -2587,6 +2619,34 @@ export function initTopomapper() {
           if(!idxMap.get(`${r},${c+1}`)) tm.t.push([tr.t,br.t,tr.b],[tr.b,br.t,br.b]);
         }
       }
+
+      // Walls and base fill from clip polygon to ensure watertight mesh
+      const clipPoly = getClipPolygon();
+      if(polygonArea(clipPoly) < 0) clipPoly.reverse();
+      const wallTopIdx = [];
+      const wallBottomIdx = [];
+      clipPoly.forEach((pt) => {
+        const nx = Math.max(0, Math.min(1, pt[0] / state.wMm));
+        const ny = Math.max(0, Math.min(1, pt[1] / state.hMm));
+        const edgeZ = 2.0 + getZInterpolated(nx, ny) * zScale;
+        const topIndex = tm.v.push([pt[0], pt[1], edgeZ]) - 1;
+        const bottomIndex = tm.v.push([pt[0], pt[1], 0]) - 1;
+        wallTopIdx.push(topIndex);
+        wallBottomIdx.push(bottomIndex);
+      });
+      for(let i=0; i<wallTopIdx.length; i++) {
+        const ni = (i + 1) % wallTopIdx.length;
+        const t0 = wallTopIdx[i], t1 = wallTopIdx[ni];
+        const b0 = wallBottomIdx[i], b1 = wallBottomIdx[ni];
+        tm.t.push([t0, b0, t1], [t1, b0, b1]);
+      }
+      if(wallBottomIdx.length >= 3) {
+        const baseAnchor = wallBottomIdx[0];
+        for(let i=1; i<wallBottomIdx.length - 1; i++) {
+          tm.t.push([baseAnchor, wallBottomIdx[i+1], wallBottomIdx[i]]);
+        }
+      }
+
       objs.push({id:objId++, name:'Terrain', mesh:tm});
 
       let resXml='', buildXml='';
