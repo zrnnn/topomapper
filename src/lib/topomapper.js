@@ -2737,7 +2737,8 @@ export function initTopomapper() {
 
         // 1. Terrain Mesh (Watertight)
         const baseThickness = 2.0;
-        const res = 220;
+        const resInput = $('meshRes');
+        const res = Math.max(80, Math.min(600, Math.round(parseFloat(resInput?.value) || 220)));
         const tm = { v:[], t:[] };
         const vertexCache = new Map();
         const gridSize = res + 1;
@@ -2789,7 +2790,12 @@ export function initTopomapper() {
           return idx;
         };
         const addTri = (a, b, c) => {
-          const area2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+          const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+          const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+          const cx = ab[1] * ac[2] - ab[2] * ac[1];
+          const cy = ab[2] * ac[0] - ab[0] * ac[2];
+          const cz = ab[0] * ac[1] - ab[1] * ac[0];
+          const area2 = Math.hypot(cx, cy, cz);
           if(area2 < 1e-6) return;
           const ia = getVertexIndex(a);
           const ib = getVertexIndex(b);
@@ -2817,6 +2823,13 @@ export function initTopomapper() {
             addTopTri(ordered[0], ordered[i], ordered[i + 1]);
           }
         };
+        const triangulateBottom = (poly) => {
+          if(!poly || poly.length < 3) return;
+          const ordered = polygonAreaClosed(poly) < 0 ? poly.slice().reverse() : poly;
+          for(let i=1; i<ordered.length-1; i++) {
+            addBottomTri(ordered[0], ordered[i], ordered[i + 1]);
+          }
+        };
 
         for(let r=0; r<res; r++) {
           const y0 = (r / res) * state.hMm;
@@ -2831,22 +2844,43 @@ export function initTopomapper() {
           }
         }
 
-        for(let i=1; i<clipCcw.length-1; i++) {
-          addBottomTri(clipCcw[0], clipCcw[i + 1], clipCcw[i]);
+        const edgeKey = (a, b) => (a < b ? `${a},${b}` : `${b},${a}`);
+        const edgeCount = new Map();
+        tm.t.forEach((tri) => {
+          const [a, b, c] = tri;
+          [ [a, b], [b, c], [c, a] ].forEach(([u, v]) => {
+            const key = edgeKey(u, v);
+            edgeCount.set(key, (edgeCount.get(key) || 0) + 1);
+          });
+        });
+        const boundaryEdges = [];
+        edgeCount.forEach((count, key) => {
+          if(count !== 1) return;
+          const [a, b] = key.split(',').map(Number);
+          boundaryEdges.push([a, b]);
+        });
+
+        for(let r=0; r<res; r++) {
+          const y0 = (r / res) * state.hMm;
+          const y1 = ((r + 1) / res) * state.hMm;
+          for(let c=0; c<res; c++) {
+            const x0 = (c / res) * state.wMm;
+            const x1 = ((c + 1) / res) * state.wMm;
+            const triA = [[x0, y0], [x1, y0], [x0, y1]];
+            const triB = [[x1, y0], [x1, y1], [x0, y1]];
+            triangulateBottom(clipPolygon(triA, clipCcw));
+            triangulateBottom(clipPolygon(triB, clipCcw));
+          }
         }
 
-        for(let i=0; i<clipCcw.length; i++) {
-          const p0 = clipCcw[i];
-          const p1 = clipCcw[(i + 1) % clipCcw.length];
-          const z0 = baseThickness + sampleHeight(p0[0], p0[1]) * zScale;
-          const z1 = baseThickness + sampleHeight(p1[0], p1[1]) * zScale;
-          const top0 = [p0[0], p0[1], z0];
-          const top1 = [p1[0], p1[1], z1];
-          const bottom0 = [p0[0], p0[1], 0];
-          const bottom1 = [p1[0], p1[1], 0];
+        boundaryEdges.forEach(([a, b]) => {
+          const top0 = tm.v[a];
+          const top1 = tm.v[b];
+          const bottom0 = [top0[0], top0[1], 0];
+          const bottom1 = [top1[0], top1[1], 0];
           addTri(top0, bottom0, bottom1);
           addTri(top0, bottom1, top1);
-        }
+        });
 
         objs.push({id:objId++, name:'Terrain', mesh:tm});
 

@@ -401,6 +401,7 @@
         <div class="input-grid">
            <div><label class="ui-label" for="socketMm">Socket (mm)</label><input type="text" id="socketMm" value="2.0" disabled></div>
            <div><label class="ui-label" for="targetH">Relief Hub</label><input type="number" id="targetH" value="10"></div>
+           <div><label class="ui-label" for="meshRes">Mesh Resolution</label><input type="number" id="meshRes" value="220" min="80" max="600"></div>
         </div>
         <button id="btn3MF" class="btn-main" style="margin-top:10px;">Download 3MF</button>
       </div>
