@@ -7,18 +7,18 @@ export function initTopomapper() {
       wMm: 200, hMm: 140, shape: 'rect',
       contour: {
         enabled: true,
-        density: 24,
+        density: 40,
         width: 0.2,
-        color: '#10141B',
+        color: '#000000',
         smooth: 4,
-        opacity: 80,
+        opacity: 100,
         emphasisEvery: 10
       },
       png: {
-        layered: true,
+        layered: false,
         scheme: 'color',
         blend: 'normal',
-        gradientOpacity: 0,
+        gradientOpacity: 50,
         gradientShift: 0,
         gradientScale: 100,
         reliefStrength: 0.48,
@@ -27,14 +27,14 @@ export function initTopomapper() {
       },
       theme: {
         preset: 'bright',
-        background: '#F5F2EB',
-        line: '#10141B'
+        background: '#FFFFFF',
+        line: '#000000'
       },
       mapFeatures: {
-        waterAreas: { enabled: false, color: '#7DB5D3', opacity: 45 },
-        rivers: { enabled: false, color: '#7DB5D3', width: 0.2, opacity: 85 },
+        waterAreas: { enabled: true, color: '#7A7A7A', opacity: 100 },
+        rivers: { enabled: true, color: '#7A7A7A', width: 0.2, opacity: 100 },
         greenAreas: { enabled: false, color: '#7FAE8A', opacity: 15 },
-        roads: { enabled: false, color: '#5B3A1C', width: 0.2, opacity: 75 },
+        roads: { enabled: true, color: '#4A4A4A', width: 0.2, opacity: 100 },
         labels: {
           enabled: false,
           color: '#1E232B',
@@ -63,18 +63,18 @@ export function initTopomapper() {
     const defaultDesign = {
       contour: {
         enabled: true,
-        density: 24,
+        density: 40,
         width: 0.2,
-        color: '#10141B',
+        color: '#000000',
         smooth: 4,
-        opacity: 80,
+        opacity: 100,
         emphasisEvery: 10
       },
       png: {
-        layered: true,
+        layered: false,
         scheme: 'color',
         blend: 'normal',
-        gradientOpacity: 0,
+        gradientOpacity: 50,
         gradientShift: 0,
         gradientScale: 100,
         reliefStrength: 0.48,
@@ -83,14 +83,14 @@ export function initTopomapper() {
       },
       theme: {
         preset: 'bright',
-        background: '#F5F2EB',
-        line: '#10141B'
+        background: '#FFFFFF',
+        line: '#000000'
       },
       mapFeatures: {
-        waterAreas: { enabled: false, color: '#7DB5D3', opacity: 45 },
-        rivers: { enabled: false, color: '#7DB5D3', width: 0.2, opacity: 85 },
+        waterAreas: { enabled: true, color: '#7A7A7A', opacity: 100 },
+        rivers: { enabled: true, color: '#7A7A7A', width: 0.2, opacity: 100 },
         greenAreas: { enabled: false, color: '#7FAE8A', opacity: 15 },
-        roads: { enabled: false, color: '#5B3A1C', width: 0.2, opacity: 75 },
+        roads: { enabled: true, color: '#4A4A4A', width: 0.2, opacity: 100 },
         labels: {
           enabled: false,
           color: '#1E232B',
@@ -146,6 +146,63 @@ export function initTopomapper() {
     const mapDataNotice = $('mapDataNotice');
     const mapDataNoticeText = $('mapDataNoticeText');
     const mapDataNoticeClose = $('mapDataNoticeClose');
+    const exportStatus = $('exportStatus');
+    const exportStatusLabel = $('exportStatusLabel');
+    const exportStatusSteps = exportStatus ? Array.from(exportStatus.querySelectorAll('[data-export-step]')) : [];
+    const exportPhaseOrder = ['prepare', 'render', 'save'];
+    const exportPhaseLabels = {
+      prepare: 'Preparing',
+      render: 'Rendering',
+      save: 'Saving',
+      done: 'Complete'
+    };
+    let exportStatusTimer = null;
+    const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const setExportStatus = (phase, label) => {
+      if(!exportStatus) return;
+      exportStatus.classList.add('active');
+      exportStatus.classList.toggle('done', phase === 'done');
+      const labelText = exportPhaseLabels[phase] ?? 'Working';
+      exportStatusLabel.innerText = label ? `${label} · ${labelText}` : labelText;
+      const currentIndex = exportPhaseOrder.indexOf(phase);
+      exportStatusSteps.forEach((step) => {
+        const stepIndex = exportPhaseOrder.indexOf(step.dataset.exportStep);
+        if(phase === 'done') {
+          step.classList.add('is-done');
+          step.classList.remove('is-active');
+          return;
+        }
+        step.classList.toggle('is-active', stepIndex === currentIndex);
+        step.classList.toggle('is-done', stepIndex > -1 && currentIndex > stepIndex);
+      });
+    };
+    const clearExportStatus = () => {
+      if(!exportStatus) return;
+      if(exportStatusTimer) {
+        clearTimeout(exportStatusTimer);
+        exportStatusTimer = null;
+      }
+      exportStatus.classList.remove('active', 'done');
+      exportStatusLabel.innerText = 'Idle';
+      exportStatusSteps.forEach(step => step.classList.remove('is-active', 'is-done'));
+    };
+    const runExportFlow = async (label, task) => {
+      if(!task) return;
+      if(exportStatusTimer) {
+        clearTimeout(exportStatusTimer);
+        exportStatusTimer = null;
+      }
+      setExportStatus('prepare', label);
+      await nextFrame();
+      setExportStatus('render', label);
+      const onSave = async () => {
+        setExportStatus('save', label);
+        await nextFrame();
+      };
+      await task(onSave);
+      setExportStatus('done', label);
+      exportStatusTimer = setTimeout(clearExportStatus, 2200);
+    };
 
     // --- HELPERS: SCALING & INTERPOLATION ---
     function getZInterpolated(nx, ny) {
@@ -760,6 +817,8 @@ export function initTopomapper() {
       'https://overpass.nchc.org.tw/api/interpreter'
     ];
 
+    const OVERPASS_REQUEST_TIMEOUT_MS = 12000;
+    const OSM_TOTAL_TIMEOUT_MS = 20000;
     const buildOverpassQuery = (bbox) => `[out:json][timeout:25];
       (
         way["natural"="water"](${bbox});
@@ -863,7 +922,7 @@ export function initTopomapper() {
       });
     };
 
-    const fetchOverpass = async (query) => {
+    const fetchOverpass = async (query, signal) => {
       let lastError = null;
       for(const server of overpassServers) {
         try {
@@ -872,8 +931,10 @@ export function initTopomapper() {
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: `data=${encodeURIComponent(query)}`
-            }
+              body: `data=${encodeURIComponent(query)}`,
+              signal
+            },
+            OVERPASS_REQUEST_TIMEOUT_MS
           );
         } catch (err) {
           lastError = err;
@@ -905,11 +966,16 @@ export function initTopomapper() {
         return true;
       }
       updateMapDataStatus({ announce: true, loading: true });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), OSM_TOTAL_TIMEOUT_MS);
       const attemptFetch = async (bboxes) => {
         const osmData = buildEmptyOsmData();
         for(const bbox of bboxes) {
+          if(controller.signal.aborted) {
+            throw new DOMException('Aborted', 'AbortError');
+          }
           const bboxStr = `${bbox.sw.lat},${bbox.sw.lng},${bbox.ne.lat},${bbox.ne.lng}`;
-          const data = await fetchOverpass(buildOverpassQuery(bboxStr));
+          const data = await fetchOverpass(buildOverpassQuery(bboxStr), controller.signal);
           parseOverpassElements(data.elements || [], osmData);
         }
         const placeRank = { city: 1, town: 2, village: 3, suburb: 4, neighbourhood: 5, hamlet: 6 };
@@ -937,6 +1003,12 @@ export function initTopomapper() {
         if(cacheId) osmCache.set(cacheId, { data: state.osmData, tiles: state.osmStatus.tiles });
         return true;
       } catch (err) {
+        if(controller.signal.aborted) {
+          state.osmData = buildEmptyOsmData();
+          state.osmStatus.error = 'Map data request timed out. Try again or proceed without map data.';
+          updateMapDataStatus({ announce: true });
+          return false;
+        }
         try {
           const tiledBboxes = getTiledBboxes(sw, ne);
           state.osmData = await attemptFetch(tiledBboxes);
@@ -946,15 +1018,28 @@ export function initTopomapper() {
           if(cacheId) osmCache.set(cacheId, { data: state.osmData, tiles: state.osmStatus.tiles });
           return true;
         } catch (tileErr) {
+          if(controller.signal.aborted) {
+            state.osmData = buildEmptyOsmData();
+            state.osmStatus.error = 'Map data request timed out. Try again or proceed without map data.';
+            updateMapDataStatus({ announce: true });
+            return false;
+          }
           state.osmData = buildEmptyOsmData();
           state.osmStatus.error = 'Roads, rivers or areas could not be loaded. Please try a smaller area or retry.';
           updateMapDataStatus({ announce: true });
           return false;
         }
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
 
     // --- MAP & SEARCH ---
+    const DEFAULT_LOCATION = {
+      name: 'Schloss Neuschwanstein, Germany',
+      center: [10.7498, 47.5576],
+      zoom: 13
+    };
     const map = new maplibregl.Map({
       container: 'map',
       style: {
@@ -973,10 +1058,12 @@ export function initTopomapper() {
         },
         layers: [{ id: 'opentopo', type: 'raster', source: 'opentopo' }]
       },
-      center: [86.925, 27.9881],
-      zoom: 12
+      center: DEFAULT_LOCATION.center,
+      zoom: DEFAULT_LOCATION.zoom
     });
 
+    const searchInput = $('searchInp');
+    if(searchInput) searchInput.value = DEFAULT_LOCATION.name;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
     map.on('load', () => {
       map.resize();
@@ -1228,13 +1315,13 @@ export function initTopomapper() {
         }
       },
       bright: {
-        background: '#F5F2EB',
-        line: '#10141B',
+        background: '#FFFFFF',
+        line: '#000000',
         mapFeatures: {
-          waterAreas: '#7DB5D3',
-          rivers: '#7DB5D3',
+          waterAreas: '#7A7A7A',
+          rivers: '#7A7A7A',
           greenAreas: '#7FAE8A',
-          roads: '#5B3A1C',
+          roads: '#4A4A4A',
           labels: '#1E232B'
         }
       },
@@ -2301,93 +2388,96 @@ export function initTopomapper() {
       return poly;
     };
 
-    $('btnDXF').onclick = () => {
-      buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: true });
-      let dxf = "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
-      const rgbToAci = ({ r, g, b }) => {
-        const max = Math.max(r, g, b);
-        const min = Math.min(r, g, b);
-        if(max < 40) return 7;
-        if(max - min < 20 && max > 200) return 7;
-        if(r >= g && r >= b) {
-          if(g > 200 && b < 120) return 2;
-          if(b > 200 && g < 120) return 6;
-          return 1;
-        }
-        if(g >= r && g >= b) {
-          if(b > 200) return 4;
-          return 3;
-        }
-        if(b >= r && b >= g) return 5;
-        return 7;
-      };
-      const writePolyline = (layer, pts, color, forceClosed = null) => {
-        if(pts.length < 2) return;
-        const first = pts[0];
-        const last = pts[pts.length - 1];
-        const closed = forceClosed ?? (Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.01);
-        const outPts = closed ? pts.slice(0, -1) : pts;
-        const rgb = colorToRgb(color);
-        const aci = rgbToAci(rgb);
-        const trueColor = (rgb.r << 16) + (rgb.g << 8) + rgb.b;
-        dxf += `0\nLWPOLYLINE\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n90\n${outPts.length}\n70\n${closed ? 1 : 0}\n`;
-        outPts.forEach(p => dxf += `10\n${p[0].toFixed(4)}\n20\n${(state.hMm - p[1]).toFixed(4)}\n`);
-      };
-      const writeText = (layer, text, x, y, height, color) => {
-        if(!text) return;
-        const rgb = colorToRgb(color);
-        const aci = rgbToAci(rgb);
-        const trueColor = (rgb.r << 16) + (rgb.g << 8) + rgb.b;
-        const safeText = String(text).replace(/[\r\n\t]+/g, ' ').trim();
-        if(!safeText) return;
-        dxf += `0\nTEXT\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n10\n${x.toFixed(4)}\n20\n${(state.hMm - y).toFixed(4)}\n40\n${height.toFixed(4)}\n1\n${safeText}\n50\n0\n`;
-      };
+    $('btnDXF').onclick = async () => {
       if(!state.contourPaths.length) {
         alert('Generate contours first.');
         return;
       }
-      const clipPoly = getClipPolygon();
-      if(polygonArea(clipPoly) < 0) clipPoly.reverse();
-      if(state.contour.enabled) {
-        state.contourPaths.forEach(path => {
-          clipPolylineToPolygon(path, clipPoly).forEach(seg => writePolyline('CONTOURS', seg, state.contour.color, false));
-        });
-      }
-      if(state.osmData) {
-        if(state.mapFeatures.greenAreas.enabled) {
-          state.osmData.greenPolygons.forEach(poly => {
-            const clipped = clipPolygon(poly, clipPoly);
-            if(clipped.length >= 3) writePolyline('GREEN_AREAS', ensureClosed(clipped), state.mapFeatures.greenAreas.color, true);
+      await runExportFlow('DXF', async (onSave) => {
+        buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: true });
+        let dxf = "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
+        const rgbToAci = ({ r, g, b }) => {
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          if(max < 40) return 7;
+          if(max - min < 20 && max > 200) return 7;
+          if(r >= g && r >= b) {
+            if(g > 200 && b < 120) return 2;
+            if(b > 200 && g < 120) return 6;
+            return 1;
+          }
+          if(g >= r && g >= b) {
+            if(b > 200) return 4;
+            return 3;
+          }
+          if(b >= r && b >= g) return 5;
+          return 7;
+        };
+        const writePolyline = (layer, pts, color, forceClosed = null) => {
+          if(pts.length < 2) return;
+          const first = pts[0];
+          const last = pts[pts.length - 1];
+          const closed = forceClosed ?? (Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.01);
+          const outPts = closed ? pts.slice(0, -1) : pts;
+          const rgb = colorToRgb(color);
+          const aci = rgbToAci(rgb);
+          const trueColor = (rgb.r << 16) + (rgb.g << 8) + rgb.b;
+          dxf += `0\nLWPOLYLINE\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n90\n${outPts.length}\n70\n${closed ? 1 : 0}\n`;
+          outPts.forEach(p => dxf += `10\n${p[0].toFixed(4)}\n20\n${(state.hMm - p[1]).toFixed(4)}\n`);
+        };
+        const writeText = (layer, text, x, y, height, color) => {
+          if(!text) return;
+          const rgb = colorToRgb(color);
+          const aci = rgbToAci(rgb);
+          const trueColor = (rgb.r << 16) + (rgb.g << 8) + rgb.b;
+          const safeText = String(text).replace(/[\r\n\t]+/g, ' ').trim();
+          if(!safeText) return;
+          dxf += `0\nTEXT\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n10\n${x.toFixed(4)}\n20\n${(state.hMm - y).toFixed(4)}\n40\n${height.toFixed(4)}\n1\n${safeText}\n50\n0\n`;
+        };
+        const clipPoly = getClipPolygon();
+        if(polygonArea(clipPoly) < 0) clipPoly.reverse();
+        if(state.contour.enabled) {
+          state.contourPaths.forEach(path => {
+            clipPolylineToPolygon(path, clipPoly).forEach(seg => writePolyline('CONTOURS', seg, state.contour.color, false));
           });
         }
-        if(state.mapFeatures.waterAreas.enabled) {
-          state.osmData.waterPolygons.forEach(poly => {
-            const clipped = clipPolygon(poly, clipPoly);
-            if(clipped.length >= 3) writePolyline('WATER_AREAS', ensureClosed(clipped), state.mapFeatures.waterAreas.color, true);
-          });
+        if(state.osmData) {
+          if(state.mapFeatures.greenAreas.enabled) {
+            state.osmData.greenPolygons.forEach(poly => {
+              const clipped = clipPolygon(poly, clipPoly);
+              if(clipped.length >= 3) writePolyline('GREEN_AREAS', ensureClosed(clipped), state.mapFeatures.greenAreas.color, true);
+            });
+          }
+          if(state.mapFeatures.waterAreas.enabled) {
+            state.osmData.waterPolygons.forEach(poly => {
+              const clipped = clipPolygon(poly, clipPoly);
+              if(clipped.length >= 3) writePolyline('WATER_AREAS', ensureClosed(clipped), state.mapFeatures.waterAreas.color, true);
+            });
+          }
+          if(state.mapFeatures.rivers.enabled) {
+            state.osmData.waterLines.forEach(line => {
+              clipPolylineToPolygon(line, clipPoly).forEach(seg => writePolyline('RIVERS', seg, state.mapFeatures.rivers.color, false));
+            });
+          }
+          if(state.mapFeatures.roads.enabled) {
+            state.osmData.roadLines.forEach(line => {
+              clipPolylineToPolygon(line, clipPoly).forEach(seg => writePolyline('ROADS', seg, state.mapFeatures.roads.color, false));
+            });
+          }
+          if(state.mapFeatures.labels.enabled && state.osmData.labels?.length) {
+            state.osmData.labels.forEach((place) => {
+              const [x, y] = projectToSvg(place.lat, place.lon);
+              const inside = clipPolygon([[x, y], [x + 0.01, y], [x + 0.01, y + 0.01]], clipPoly).length;
+              if(!inside) return;
+              writeText('LABELS', place.name, x, y, getLabelSize(place), state.mapFeatures.labels.color);
+            });
+          }
         }
-        if(state.mapFeatures.rivers.enabled) {
-          state.osmData.waterLines.forEach(line => {
-            clipPolylineToPolygon(line, clipPoly).forEach(seg => writePolyline('RIVERS', seg, state.mapFeatures.rivers.color, false));
-          });
-        }
-        if(state.mapFeatures.roads.enabled) {
-          state.osmData.roadLines.forEach(line => {
-            clipPolylineToPolygon(line, clipPoly).forEach(seg => writePolyline('ROADS', seg, state.mapFeatures.roads.color, false));
-          });
-        }
-        if(state.mapFeatures.labels.enabled && state.osmData.labels?.length) {
-          state.osmData.labels.forEach((place) => {
-            const [x, y] = projectToSvg(place.lat, place.lon);
-            const inside = clipPolygon([[x, y], [x + 0.01, y], [x + 0.01, y + 0.01]], clipPoly).length;
-            if(!inside) return;
-            writeText('LABELS', place.name, x, y, getLabelSize(place), state.mapFeatures.labels.color);
-          });
-        }
-      }
-      writePolyline('FRAME', ensureClosed(clipPoly), state.contour.color, true);
-      dxf += "0\nENDSEC\n0\nEOF";
-      save(new Blob([dxf], {type:'application/dxf'}), 'Topomapper.dxf');
+        writePolyline('FRAME', ensureClosed(clipPoly), state.contour.color, true);
+        dxf += "0\nENDSEC\n0\nEOF";
+        if(onSave) await onSave();
+        save(new Blob([dxf], {type:'application/dxf'}), 'Topomapper.dxf');
+      });
     };
 
     function findBandIndex(value, boundaries) {
@@ -2472,34 +2562,13 @@ export function initTopomapper() {
       return heightMap;
     }
 
-    function exportLayeredPng() {
-      if(!state.terrainData) {
-        alert('Generate contours first.');
-        return;
-      }
-      const alpha = Math.round(255 * clamp(toUnitOpacity(state.png.gradientOpacity), 0, 1));
-      const e = +$('pngResRange').value;
-      const r = state.hMm / state.wMm;
-      const w = state.wMm >= state.hMm ? e : Math.round(e / r);
-      const h = state.wMm >= state.hMm ? Math.round(e * r) : e;
-      const cv = document.createElement('canvas');
-      cv.width = w;
-      cv.height = h;
-      const ctx = cv.getContext('2d');
-      ctx.fillStyle = state.theme.background;
-      ctx.fillRect(0, 0, w, h);
-      clipCanvasToShape(ctx, w, h);
-
+    const buildLayeredGradientCanvas = (w, h, alpha) => {
+      if(!state.terrainData) return { canvas: null, error: 'data' };
+      if(alpha <= 0) return { canvas: null, error: null };
       const range = getShapeHeightRange();
-      if(!range) {
-        alert('Elevation data missing.');
-        return;
-      }
+      if(!range) return { canvas: null, error: 'data' };
       const boundaries = [range.minNorm, ...getContourLevels(range.minNorm, range.maxNorm), range.maxNorm];
-      if(boundaries.length < 2) {
-        alert('Contour range too small for height band export.');
-        return;
-      }
+      if(boundaries.length < 2) return { canvas: null, error: 'range' };
       const bandCount = Math.max(2, boundaries.length - 1);
       const bandColors = [];
       for(let i=0; i<boundaries.length - 1; i++) {
@@ -2510,32 +2579,22 @@ export function initTopomapper() {
       }
 
       const heightMap = buildHeightMap(w, h);
-      if(!heightMap) {
-        alert('Elevation data missing.');
-        return;
-      }
+      if(!heightMap) return { canvas: null, error: 'data' };
+      const cv = document.createElement('canvas');
+      cv.width = w;
+      cv.height = h;
+      const ctx = cv.getContext('2d');
       const imgData = ctx.createImageData(w, h);
       const data = imgData.data;
       const stepX = w > 1 ? 1 / (w - 1) : 1;
       const stepY = h > 1 ? 1 / (h - 1) : 1;
       const relief = clamp(state.terrainData.delta / 700, 0.35, 1.25);
       const ambient = 0.36;
-      const bgRgb = colorToRgb(state.theme.background);
       for(let y=0; y<h; y++) {
         const rowOffset = y * w;
         const rowOffsetDown = (y + 1 < h ? (y + 1) : y) * w;
         for(let x=0; x<w; x++) {
           const idx = rowOffset + x;
-          const xMm = (x / Math.max(1, w - 1)) * state.wMm;
-          const yMm = (y / Math.max(1, h - 1)) * state.hMm;
-          if(!isInShape(xMm, yMm)) {
-            const pixel = idx * 4;
-            data[pixel] = bgRgb.r;
-            data[pixel + 1] = bgRgb.g;
-            data[pixel + 2] = bgRgb.b;
-            data[pixel + 3] = 255;
-            continue;
-          }
           const zNorm = heightMap[idx];
           const { color: bandColor } = getSmoothedBandColor(zNorm, boundaries, bandColors);
           const height = state.terrainData.min + zNorm;
@@ -2560,23 +2619,106 @@ export function initTopomapper() {
         }
       }
       ctx.putImageData(imgData, 0, 0);
-      const overlaySvg = buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: false });
-      drawSvgOnCanvas(ctx, overlaySvg, w, h)
-        .then(() => cv.toBlob(b => save(b, 'Topomapper_Layered.png')))
-        .catch(() => cv.toBlob(b => save(b, 'Topomapper_Layered.png')));
-    }
+      return { canvas: cv, error: null };
+    };
 
-    $('btnPNG').onclick = () => {
-      if(state.png.layered) {
-        exportLayeredPng();
+    async function exportLayeredPng(onSave) {
+      if(!state.terrainData) {
+        alert('Generate contours first.');
         return;
       }
-      const e = +$('pngResRange').value, r = state.hMm/state.wMm;
-      const w = state.wMm >= state.hMm ? e : Math.round(e/r), h = state.wMm >= state.hMm ? Math.round(e*r) : e;
+      const e = +$('pngResRange').value;
+      const r = state.hMm / state.wMm;
+      const w = state.wMm >= state.hMm ? e : Math.round(e / r);
+      const h = state.wMm >= state.hMm ? Math.round(e * r) : e;
+      const cv = document.createElement('canvas');
+      cv.width = w;
+      cv.height = h;
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = state.theme.background;
+      ctx.fillRect(0, 0, w, h);
+
+      const maxEdge = Math.max(w, h);
+      const targetEdge = Math.min(maxEdge, 1600);
+      const scale = maxEdge > 0 ? targetEdge / maxEdge : 1;
+      const gradW = Math.max(1, Math.round(w * scale));
+      const gradH = Math.max(1, Math.round(h * scale));
+      const alpha = Math.round(255 * clamp(toUnitOpacity(state.png.gradientOpacity), 0, 1));
+      const gradientResult = buildLayeredGradientCanvas(gradW, gradH, alpha);
+      if(gradientResult.error === 'data') {
+        alert('Elevation data missing.');
+        return;
+      }
+      if(gradientResult.error === 'range') {
+        alert('Contour range too small for height band export.');
+        return;
+      }
+      if(gradientResult.canvas) {
+        ctx.save();
+        clipCanvasToShape(ctx, w, h);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.globalCompositeOperation = getCanvasBlendMode(state.png.blend);
+        ctx.drawImage(gradientResult.canvas, 0, 0, w, h);
+        ctx.restore();
+      }
+
+      const overlaySvg = buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: false });
+      try {
+        await drawSvgOnCanvas(ctx, overlaySvg, w, h);
+      } catch (e) {
+        // best effort, proceed without overlay on failure
+      }
+      if(onSave) await onSave();
+      await new Promise((resolve) => {
+        cv.toBlob((b) => {
+          save(b, 'Topomapper_Layered.png');
+          resolve();
+        });
+      });
+    }
+
+    const exportSvgPng = async (onSave) => {
+      const e = +$('pngResRange').value;
+      const r = state.hMm / state.wMm;
+      const w = state.wMm >= state.hMm ? e : Math.round(e / r);
+      const h = state.wMm >= state.hMm ? Math.round(e * r) : e;
       const s = buildSvgMarkup({ includeBackground: true, includeGradient: true, includeFrame: false });
-      const img = new Image(), cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-      img.onload = () => { const ctx = cv.getContext('2d'); ctx.fillStyle=state.theme.background; ctx.fillRect(0,0,w,h); clipCanvasToShape(ctx, w, h); ctx.drawImage(img,0,0,w,h); cv.toBlob(b => save(b, 'Topomapper.png')); };
-      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
+      const img = new Image();
+      const cv = document.createElement('canvas');
+      cv.width = w;
+      cv.height = h;
+      await new Promise((resolve, reject) => {
+        img.onload = () => {
+          const ctx = cv.getContext('2d');
+          ctx.fillStyle = state.theme.background;
+          ctx.fillRect(0, 0, w, h);
+          clipCanvasToShape(ctx, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve();
+        };
+        img.onerror = reject;
+        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
+      });
+      if(onSave) await onSave();
+      await new Promise((resolve) => {
+        cv.toBlob((b) => {
+          save(b, 'Topomapper.png');
+          resolve();
+        });
+      });
+    };
+
+    $('btnPNG').onclick = async () => {
+      if(state.png.layered) {
+        if(!state.terrainData) {
+          alert('Generate contours first.');
+          return;
+        }
+        await runExportFlow('PNG', exportLayeredPng);
+        return;
+      }
+      await runExportFlow('PNG', exportSvgPng);
     };
 
     $('btn3MF').onclick = async () => {
@@ -2584,84 +2726,146 @@ export function initTopomapper() {
         alert('Generate contours first.');
         return;
       }
-      msg('Generating Assembly...'); await new Promise(r=>setTimeout(r,100));
-      const zip = new JSZip(), targetH = +$('targetH').value;
-      let zScale = state.terrainData && state.terrainData.delta > 0 ? targetH / state.terrainData.delta : 1;
-      const objs = []; let objId = 1;
+      await runExportFlow('3MF', async (onSave) => {
+        msg('Generating Assembly...');
+        await new Promise(r => setTimeout(r, 100));
+        const zip = new JSZip();
+        const targetH = +$('targetH').value;
+        let zScale = state.terrainData && state.terrainData.delta > 0 ? targetH / state.terrainData.delta : 1;
+        const objs = [];
+        let objId = 1;
 
-      // 1. Terrain Mesh (Watertight)
-      const res = 220, tm = { v:[], t:[] }, idxMap = new Map();
-      const gridSize = res + 1;
-      let heightGrid = new Float32Array(gridSize * gridSize);
-      for(let r=0; r<=res; r++) {
-        for(let c=0; c<=res; c++) {
-          heightGrid[r * gridSize + c] = getZInterpolated(c / res, r / res);
+        // 1. Terrain Mesh (Watertight)
+        const baseThickness = 2.0;
+        const res = 220;
+        const tm = { v:[], t:[] };
+        const vertexCache = new Map();
+        const gridSize = res + 1;
+        let heightGrid = new Float32Array(gridSize * gridSize);
+        for(let r=0; r<=res; r++) {
+          for(let c=0; c<=res; c++) {
+            heightGrid[r * gridSize + c] = getZInterpolated(c / res, r / res);
+          }
         }
-      }
-      const meshSmoothPasses = 2;
-      for(let i=0; i<meshSmoothPasses; i++) {
-        heightGrid = smoothPass(heightGrid, gridSize, gridSize);
-      }
-      const isIn = (x, y) => isInShape(x, y);
-      for(let r=0;r<=res;r++) for(let c=0;c<=res;c++) {
-        const x=c/res*state.wMm, y=r/res*state.hMm; if(!isIn(x,y)) continue;
-        const z=2.0 + (heightGrid[r * gridSize + c] * zScale);
-        idxMap.set(`${r},${c}`, {t: tm.v.push([x,y,z])-1, b: tm.v.push([x,y,0])-1 });
-      }
-      for(let r=0;r<res;r++) for(let c=0;c<res;c++) {
-        const tl=idxMap.get(`${r},${c}`), tr=idxMap.get(`${r},${c+1}`), bl=idxMap.get(`${r+1},${c}`), br=idxMap.get(`${r+1},${c+1}`);
-        if(tl&&tr&&bl&&br) {
-          tm.t.push([tl.t,bl.t,tr.t],[tr.t,bl.t,br.t]);
-          tm.t.push([tl.b,tr.b,bl.b],[tr.b,br.b,bl.b]);
-          if(!idxMap.get(`${r-1},${c}`)) tm.t.push([tl.t,tr.t,tl.b],[tl.b,tr.t,tr.b]);
-          if(!idxMap.get(`${r+1},${c}`)) tm.t.push([bl.t,bl.b,br.t],[br.t,bl.b,br.b]);
-          if(!idxMap.get(`${r},${c-1}`)) tm.t.push([tl.t,tl.b,bl.t],[bl.t,bl.b,tl.t]);
-          if(!idxMap.get(`${r},${c+1}`)) tm.t.push([tr.t,br.t,tr.b],[tr.b,br.t,br.b]);
+        const meshSmoothPasses = 2;
+        for(let i=0; i<meshSmoothPasses; i++) {
+          heightGrid = smoothPass(heightGrid, gridSize, gridSize);
         }
-      }
+        const polygonAreaClosed = (poly) => {
+          let sum = 0;
+          for(let i=0; i<poly.length; i++) {
+            const a = poly[i];
+            const b = poly[(i + 1) % poly.length];
+            sum += a[0] * b[1] - b[0] * a[1];
+          }
+          return sum / 2;
+        };
+        const sampleHeight = (xMm, yMm) => {
+          const nx = Math.max(0, Math.min(1, xMm / state.wMm));
+          const ny = Math.max(0, Math.min(1, yMm / state.hMm));
+          const gx = nx * res;
+          const gy = ny * res;
+          const c0 = Math.max(0, Math.min(res, Math.floor(gx)));
+          const r0 = Math.max(0, Math.min(res, Math.floor(gy)));
+          const c1 = Math.min(res, c0 + 1);
+          const r1 = Math.min(res, r0 + 1);
+          const tx = gx - c0;
+          const ty = gy - r0;
+          const h00 = heightGrid[r0 * gridSize + c0];
+          const h01 = heightGrid[r0 * gridSize + c1];
+          const h10 = heightGrid[r1 * gridSize + c0];
+          const h11 = heightGrid[r1 * gridSize + c1];
+          const top = h00 * (1 - tx) + h01 * tx;
+          const bottom = h10 * (1 - tx) + h11 * tx;
+          return top * (1 - ty) + bottom * ty;
+        };
+        const vertexKey = (v) => `${v[0].toFixed(4)},${v[1].toFixed(4)},${v[2].toFixed(4)}`;
+        const getVertexIndex = (v) => {
+          const key = vertexKey(v);
+          const existing = vertexCache.get(key);
+          if(existing !== undefined) return existing;
+          const idx = tm.v.push(v) - 1;
+          vertexCache.set(key, idx);
+          return idx;
+        };
+        const addTri = (a, b, c) => {
+          const area2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+          if(area2 < 1e-6) return;
+          const ia = getVertexIndex(a);
+          const ib = getVertexIndex(b);
+          const ic = getVertexIndex(c);
+          if(ia === ib || ib === ic || ia === ic) return;
+          tm.t.push([ia, ib, ic]);
+        };
+        const addTopTri = (p0, p1, p2) => {
+          const v0 = [p0[0], p0[1], baseThickness + sampleHeight(p0[0], p0[1]) * zScale];
+          const v1 = [p1[0], p1[1], baseThickness + sampleHeight(p1[0], p1[1]) * zScale];
+          const v2 = [p2[0], p2[1], baseThickness + sampleHeight(p2[0], p2[1]) * zScale];
+          addTri(v0, v1, v2);
+        };
+        const addBottomTri = (p0, p1, p2) => {
+          addTri([p0[0], p0[1], 0], [p1[0], p1[1], 0], [p2[0], p2[1], 0]);
+        };
 
-      // Walls and base fill from clip polygon to ensure watertight mesh
-      const clipPoly = getClipPolygon();
-      if(polygonArea(clipPoly) < 0) clipPoly.reverse();
-      const wallTopIdx = [];
-      const wallBottomIdx = [];
-      clipPoly.forEach((pt) => {
-        const nx = Math.max(0, Math.min(1, pt[0] / state.wMm));
-        const ny = Math.max(0, Math.min(1, pt[1] / state.hMm));
-        const edgeZ = 2.0 + getZInterpolated(nx, ny) * zScale;
-        const topIndex = tm.v.push([pt[0], pt[1], edgeZ]) - 1;
-        const bottomIndex = tm.v.push([pt[0], pt[1], 0]) - 1;
-        wallTopIdx.push(topIndex);
-        wallBottomIdx.push(bottomIndex);
+        const clipPoly = getClipPolygon();
+        if(polygonArea(clipPoly) < 0) clipPoly.reverse();
+        const clipCcw = polygonAreaClosed(clipPoly) < 0 ? clipPoly.slice().reverse() : clipPoly.slice();
+        const triangulateTop = (poly) => {
+          if(!poly || poly.length < 3) return;
+          const ordered = polygonAreaClosed(poly) < 0 ? poly.slice().reverse() : poly;
+          for(let i=1; i<ordered.length-1; i++) {
+            addTopTri(ordered[0], ordered[i], ordered[i + 1]);
+          }
+        };
+
+        for(let r=0; r<res; r++) {
+          const y0 = (r / res) * state.hMm;
+          const y1 = ((r + 1) / res) * state.hMm;
+          for(let c=0; c<res; c++) {
+            const x0 = (c / res) * state.wMm;
+            const x1 = ((c + 1) / res) * state.wMm;
+            const triA = [[x0, y0], [x1, y0], [x0, y1]];
+            const triB = [[x1, y0], [x1, y1], [x0, y1]];
+            triangulateTop(clipPolygon(triA, clipCcw));
+            triangulateTop(clipPolygon(triB, clipCcw));
+          }
+        }
+
+        for(let i=1; i<clipCcw.length-1; i++) {
+          addBottomTri(clipCcw[0], clipCcw[i + 1], clipCcw[i]);
+        }
+
+        for(let i=0; i<clipCcw.length; i++) {
+          const p0 = clipCcw[i];
+          const p1 = clipCcw[(i + 1) % clipCcw.length];
+          const z0 = baseThickness + sampleHeight(p0[0], p0[1]) * zScale;
+          const z1 = baseThickness + sampleHeight(p1[0], p1[1]) * zScale;
+          const top0 = [p0[0], p0[1], z0];
+          const top1 = [p1[0], p1[1], z1];
+          const bottom0 = [p0[0], p0[1], 0];
+          const bottom1 = [p1[0], p1[1], 0];
+          addTri(top0, bottom0, bottom1);
+          addTri(top0, bottom1, top1);
+        }
+
+        objs.push({id:objId++, name:'Terrain', mesh:tm});
+
+        let resXml='', buildXml='';
+        objs.forEach(o => {
+          let vS='', tS=''; o.mesh.v.forEach(v=> vS+=`<vertex x="${v[0].toFixed(3)}" y="${v[1].toFixed(3)}" z="${v[2].toFixed(3)}" />`);
+          o.mesh.t.forEach(t=> tS+=`<triangle v1="${t[0]}" v2="${t[1]}" v3="${t[2]}" />`);
+          resXml += `<object id="${o.id}" name="${o.name}" type="model"><mesh><vertices>${vS}</vertices><triangles>${tS}</triangles></mesh></object>`;
+          buildXml += `<item objectid="${o.id}" />`;
+        });
+        const xml = `<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" xml:lang="en" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources>${resXml}</resources><build>${buildXml}</build></model>`;
+        zip.file("3D/3dmodel.model", xml);
+        zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>`);
+        zip.folder("_rels").file(".rels", `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rel1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" Target="3D/3dmodel.model"/></Relationships>`);
+        const blob = await zip.generateAsync({type:"blob"});
+        if(onSave) await onSave();
+        save(blob, 'Topomapper_Terrain.3mf');
+        idle();
       });
-      for(let i=0; i<wallTopIdx.length; i++) {
-        const ni = (i + 1) % wallTopIdx.length;
-        const t0 = wallTopIdx[i], t1 = wallTopIdx[ni];
-        const b0 = wallBottomIdx[i], b1 = wallBottomIdx[ni];
-        tm.t.push([t0, b0, t1], [t1, b0, b1]);
-      }
-      if(wallBottomIdx.length >= 3) {
-        const baseAnchor = wallBottomIdx[0];
-        for(let i=1; i<wallBottomIdx.length - 1; i++) {
-          tm.t.push([baseAnchor, wallBottomIdx[i+1], wallBottomIdx[i]]);
-        }
-      }
-
-      objs.push({id:objId++, name:'Terrain', mesh:tm});
-
-      let resXml='', buildXml='';
-      objs.forEach(o => {
-        let vS='', tS=''; o.mesh.v.forEach(v=> vS+=`<vertex x="${v[0].toFixed(3)}" y="${v[1].toFixed(3)}" z="${v[2].toFixed(3)}" />`);
-        o.mesh.t.forEach(t=> tS+=`<triangle v1="${t[0]}" v2="${t[1]}" v3="${t[2]}" />`);
-        resXml += `<object id="${o.id}" name="${o.name}" type="model"><mesh><vertices>${vS}</vertices><triangles>${tS}</triangles></mesh></object>`;
-        buildXml += `<item objectid="${o.id}" />`;
-      });
-      const xml = `<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" xml:lang="en" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources>${resXml}</resources><build>${buildXml}</build></model>`;
-      zip.file("3D/3dmodel.model", xml);
-      zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>`);
-      zip.folder("_rels").file(".rels", `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rel1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" Target="3D/3dmodel.model"/></Relationships>`);
-      save(await zip.generateAsync({type:"blob"}), 'Topomapper_Terrain.3mf');
-      idle();
     };
 
     window.closeModal = () => $('modal').classList.remove('open');

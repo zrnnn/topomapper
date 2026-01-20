@@ -23,6 +23,24 @@
 
 <div class="sidebar">
   <div class="scroll-content">
+    <div class="hero">
+      <div class="hero-eyebrow">Topo Studio</div>
+      <h1 class="hero-title">Generate contour maps ready for print.</h1>
+      <p class="hero-copy">Choose a place, frame it, design the layers, then export in one flow.</p>
+      <div class="hero-flow">
+        <span>Generate</span>
+        <span>Design</span>
+        <span>Export</span>
+      </div>
+      <div class="hero-card">
+        <div class="hero-card-map"></div>
+        <div class="hero-card-meta">
+          <div class="hero-card-title">Schloss Neuschwanstein</div>
+          <div class="hero-card-sub">200 x 140 mm &middot; Contours</div>
+        </div>
+      </div>
+    </div>
+
     <div class="group">
       <label class="ui-label" for="searchInp">Location Search</label>
       <div class="search-container">
@@ -31,28 +49,35 @@
       </div>
     </div>
 
-    <div class="group">
-      <label class="ui-label" for="shapeSel">Format & Dimension</label>
-      <select id="shapeSel" style="margin-bottom:12px;">
-        <option value="rect">Rectangle</option>
-        <option value="din_l">DIN Landscape</option>
-        <option value="din_p">DIN Portrait</option>
-        <option value="sq">Square</option>
-        <option value="circle">Circle</option>
-        <option value="hex">Hexagon</option>
-      </select>
-      <div class="input-grid">
-        <div><label class="ui-label" for="dimW">Width (mm)</label><input type="number" id="dimW" value="200"></div>
-        <div><label class="ui-label" for="dimH">Height (mm)</label><input type="number" id="dimH" value="140"></div>
+    <details class="accordion" id="advancedControls">
+      <summary>
+        <span>Frame & Dimensions</span>
+        <span class="accordion-meta">Advanced</span>
+      </summary>
+      <div class="accordion-body">
+        <div class="group">
+          <label class="ui-label" for="shapeSel">Format</label>
+          <select id="shapeSel" style="margin-bottom:12px;">
+            <option value="rect">Rectangle</option>
+            <option value="din_l">DIN Landscape</option>
+            <option value="din_p">DIN Portrait</option>
+            <option value="sq">Square</option>
+            <option value="circle">Circle</option>
+            <option value="hex">Hexagon</option>
+          </select>
+          <div class="input-grid">
+            <div><label class="ui-label" for="dimW">Width (mm)</label><input type="number" id="dimW" value="200"></div>
+            <div><label class="ui-label" for="dimH">Height (mm)</label><input type="number" id="dimH" value="140"></div>
+          </div>
+        </div>
+        <div class="group">
+          <span class="ui-label">Step 1 - Choose Frame</span>
+          <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
+            Fine-tune contours, colors, and map layers after the preview loads.
+          </p>
+        </div>
       </div>
-    </div>
-
-    <div class="group">
-      <span class="ui-label">Step 1 - Choose Frame</span>
-      <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
-        Contour styling, color presets, and map feature layers are adjusted in the preview panel after generation.
-      </p>
-    </div>
+    </details>
 
     <button id="btnGen" class="btn-main">Generate Preview</button>
     <div class="sidebar-footer">
@@ -334,8 +359,8 @@
               </div>
               <div class="cust-row">
                 <label class="ui-label" for="pngGradOpacity" style="margin:0">Fill Opacity (%)</label>
-                <input type="range" id="pngGradOpacity" min="0" max="100" step="1" value="0">
-                <span id="pngGradOpacityVal" style="font-size:11px;width:36px;text-align:right;">0%</span>
+                <input type="range" id="pngGradOpacity" min="0" max="100" step="1" value="50">
+                <span id="pngGradOpacityVal" style="font-size:11px;width:36px;text-align:right;">50%</span>
               </div>
               <div class="cust-row">
                 <label class="ui-label" for="pngGradShift" style="margin:0">Gradient Shift (%)</label>
@@ -357,6 +382,17 @@
 
       <div class="step-content" data-step="3">
         <button id="backToStyle" class="btn-main">Back to Design</button>
+        <div class="export-status" id="exportStatus">
+          <div class="export-status-head">
+            <span class="export-status-title">Export Status</span>
+            <span class="export-status-label" id="exportStatusLabel">Idle</span>
+          </div>
+          <div class="export-timeline">
+            <div class="export-step" data-export-step="prepare"><span class="export-dot"></span><span>Prepare</span></div>
+            <div class="export-step" data-export-step="render"><span class="export-dot"></span><span>Render</span></div>
+            <div class="export-step" data-export-step="save"><span class="export-dot"></span><span>Save</span></div>
+          </div>
+        </div>
         <div class="group" style="margin-top:20px;">
         <div class="ui-label">3D Print (3MF Terrain)</div>
         <p style="font-size:13px; color:var(--color-text-sec); margin-bottom:12px; line-height:1.5;">
