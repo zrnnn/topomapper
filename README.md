@@ -1,6 +1,20 @@
 ﻿# Topomapper (dev)
 
-Interactive topographic map generator built with SvelteKit and MapLibre GL JS.
+Interactive 2D map and 3D print-model generator built with SvelteKit and MapLibre GL JS. It remains a static GitHub Pages app; no React migration or application server is required.
+
+## Workflow
+
+1. Search for a place and frame an area. Continue to choose **2D map** or **3D print**. Large selections display a warning before loading.
+2. For 2D, choose Alpine Atlas, Urban Figureground, Midnight Blueprint, Contour Study, Shaded Landscape, or Laser Linework. Advanced layer order, colors, line widths, shading and label controls remain available. Export PNG (raster), SVG (vector with optional embedded shading), or DXF (editable outlines in millimetres).
+3. For 3D, choose Landscape, City Block (flat base), or Terrain Study. Set print width, mesh quality, terrain/building/street/water/river/green layers, and advanced relief/base/embossing settings. Update the model, orbit the preview, then export the exact same fused geometry as 3MF, STL or OBJ.
+
+### Printable model behavior
+
+- Manifold WebAssembly fuses all selected solids in a worker. Streets, rivers, water and green areas are actual terrain-following raised geometry. Internal overlapping surfaces are removed. 3MF stores face colors; STL and OBJ are geometry-only.
+- Building footprints and area multipolygons retain courtyard/island holes. Buildings use OSM height, levels × 3 m, then the adjustable fallback height. Roofs are flat; buildings extend into the terrain and have a minimum 0.4 mm visible rise. Relief height and building height exaggeration are independently controlled. These are cartographic models, not detailed architectural or survey replicas.
+- Changing settings invalidates export until the new preview succeeds. Failed jobs never export a partial model. Unavailable OSM data blocks selected overlay layers; disable them for terrain-only output or reload the area. Empty mapped layers are reported.
+- Mesh quality is bounded to 40–240 samples per side, print width to 50–400 mm, buildings to 3,000 and street/river input to 40,000 points. Workers have a 90-second limit and can be cancelled. Progress reports the modeling phase; network operations remain indeterminate where total work is unknown.
+- 3D geometry, rendering and compression are lazy-loaded. Models are north-up, Z-up and sized in millimetres. Verify scale, minimum feature sizes, materials and support requirements in your slicer before printing. Surface colors are not a guarantee of multi-material slicing support.
 
 ## Requirements
 
@@ -51,7 +65,7 @@ Elevation uses [Mapzen terrain tiles](https://registry.opendata.aws/terrain-tile
 This is a development release candidate, not a production deployment. Before tagging a stable release:
 
 - Check exports in an independent CAD application and 3MF slicer, plus real Safari/Firefox and touch devices.
-- Add project save/restore, automated browser coverage, and correct OSM multipolygon inner-ring handling.
+- Add project save/restore and automated end-to-end browser coverage. Expand fixtures for unusual/incomplete OSM relations and dense urban areas.
 - Further split the large imperative UI module and move raster shading off the main thread. MapLibre still dominates the initial map bundle.
 - The dependency audit currently retains three low-severity findings in the SvelteKit → cookie build/server chain. No high/critical findings remain after compatible updates; this deployment is static and does not run a cookie-handling server. Do not apply the audit's suggested downgrade to an obsolete SvelteKit release.
 
@@ -80,4 +94,5 @@ If the repo name changes, update `paths.base` in `svelte.config.js`.
 - Core app logic is in `src/lib/topomapper.js`.
 - Global styles are in `src/app.css`.
 - Static assets (logo/icon) are in `static/assets`.
-- Contour styling includes a "Bold Every Nth" slider (0-20, default 10). Set to 0 to disable emphasis; the selected interval doubles the stroke width of the matching contour lines.
+- Contour styling includes a "Bold Every Nth" slider (0–20, default 0). Presets use fine 0.10–0.12 mm lines without bold bands; advanced emphasis remains available.
+- Location results use an opaque, scrollable panel above the sidebar controls. Search runs on Search/Enter, not on every keystroke.

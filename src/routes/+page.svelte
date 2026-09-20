@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
+  import { DESIGN_PRESETS } from '$lib/presets';
+  import { MODEL_PRESETS } from '$lib/model';
 
   onMount(() => {
     let cancelled = false;
@@ -20,7 +22,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" />
 </svelte:head>
 
-<div id="loader" class="loader"><div class="spinner"></div><span id="loaderText">Loading...</span></div>
+<div id="loader" class="loader"><div class="spinner"></div><span id="loaderText">Loading...</span><progress id="loaderProgress" max="100" aria-label="Operation progress"></progress></div>
 
 <header class="top-header">
   <a class="top-brand" href={base + '/'}>
@@ -32,11 +34,11 @@
   <div class="scroll-content">
     <div class="hero">
       <div class="hero-eyebrow">Topo Studio</div>
-      <h1 class="hero-title">Generate contour maps ready for print.</h1>
-      <p class="hero-copy">Choose a place, frame it, design the layers, then export in one flow.</p>
+      <h1 class="hero-title">Your place. On paper or in 3D.</h1>
+      <p class="hero-copy">Choose an area, pick 2D or 3D, then customize and export.</p>
       <div class="hero-flow">
-        <span>Generate</span>
-        <span>Design</span>
+        <span>Area</span>
+        <span>2D / 3D</span>
         <span>Export</span>
       </div>
       <div class="hero-card">
@@ -94,8 +96,9 @@
     </div>
   </div>
   <div class="generation-actions">
-    <div id="generationStatus" class="status-text" role="status" aria-live="polite">Move the map to frame your area, then generate.</div>
-    <button id="btnGen" class="btn-main">Generate Preview</button>
+    <div id="generationStatus" class="status-text" role="status" aria-live="polite">Move the map to frame your area, then continue.</div>
+    <progress id="generationProgress" max="100" hidden aria-label="Area data progress"></progress>
+    <button id="btnGen" class="btn-main">Continue · choose output</button>
     <button id="cancelGeneration" class="btn-secondary" type="button" hidden>Cancel generation</button>
     <button id="previousPreview" class="btn-secondary" type="button" hidden>Open previous preview</button>
   </div>
@@ -113,11 +116,16 @@
   </div>
 </div>
 
+<dialog id="purposeDialog" class="purpose-dialog"><form method="dialog"><div class="section-heading"><span class="ui-label">Step 2 · What are you making?</span><button class="btn-secondary" aria-label="Cancel output choice">×</button></div><p id="areaSummary" class="control-help"></p><div class="purpose-grid"><button id="choose2d" type="button" class="purpose-card"><strong>2D map</strong><span>Paper, posters & laser work</span><small>Shaded raster · PNG · SVG · DXF · contour lines</small></button><button id="choose3d" type="button" class="purpose-card"><strong>3D print</strong><span>A physical landscape or city</span><small>Raised buildings · streets · terrain · 3MF · STL · OBJ</small></button></div></form></dialog>
+
 <div class="modal-overlay" id="modal" role="dialog" aria-modal="true" aria-label="Preview and export" tabindex="-1">
   <div class="modal-card">
     <div class="preview-stage">
-      <div id="previewArea"></div>
-      <div class="preview-controls">
+      <div id="previewArea" class="mode-2d"></div>
+      <div id="preview3d" class="mode-3d"></div>
+      <div class="model-feedback mode-3d"><progress id="modelProgress" max="100" hidden aria-label="3D model progress"></progress><p id="modelStatus" class="status-text" role="status" aria-live="polite"></p><button id="cancelModel" class="btn-secondary" hidden>Cancel model generation</button></div>
+      <div class="model-preview-controls mode-3d"><span>Drag to orbit · scroll to zoom</span><button id="resetModelView" class="btn-secondary">Reset view</button></div>
+      <div class="preview-controls mode-2d">
         <button id="undoStep2" class="btn-secondary icon-button" type="button" aria-label="Undo last change" title="Undo">&#8630;</button>
         <button id="refreshPreview" class="btn-secondary preview-toggle" type="button">Auto Preview On</button>
         <button id="renderPreview" class="btn-secondary" type="button" hidden>Update preview</button>
@@ -127,17 +135,18 @@
     <div class="export-side">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <h2 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-1px;">Preview & Export</h2>
-          <div style="font-size:12px; color:var(--color-text-sec); margin-top:4px;">Step 2: Choose Design - Step 3: Export Design</div>
+          <h2 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-1px;">Map Studio</h2>
+          <div style="font-size:12px; color:var(--color-text-sec); margin-top:4px;">Style your layers. Export with confidence.</div>
         </div>
         <button id="closePreview" aria-label="Close preview" style="border:none;background:none;font-size:32px;cursor:pointer;color:var(--color-text-sec);">&times;</button>
       </div>
+      <button id="changeOutput" class="btn-secondary">Change output · 2D / 3D</button>
       <div id="terrainSource" class="status-text"></div>
-      <div class="status-text">Data: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Mapzen terrain source credits</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>. Keep source credits with published exports.</div>
+      <details class="source-details"><summary>Data sources & credits</summary><div class="status-text">Data: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Mapzen terrain source credits</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>. Keep source credits with published exports.</div></details>
 
         <div class="stepper">
-        <button class="active" data-step-target="2">Step 2 - Choose Design</button>
-        <button data-step-target="3">Step 3 - Export Design</button>
+        <button class="active" data-step-target="2">Design</button>
+        <button data-step-target="3">Export</button>
       </div>
 
       <div class="step-content active" data-step="2">
@@ -145,6 +154,7 @@
           <span id="mapDataNoticeText">Map data loading...</span>
           <button type="button" id="mapDataNoticeClose" aria-label="Dismiss notification">&times;</button>
         </div>
+        <div class="mode-2d">
         <div class="group">
           <div class="ui-label">Preview</div>
           <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
@@ -153,12 +163,32 @@
         </div>
         <button id="resetStep2" class="btn-secondary">Reset Design</button>
         <div class="group">
-          <label class="ui-label" for="presetSel">Design Preset</label>
-          <select id="presetSel" style="margin-top:6px;">
-            <option value="dark">Dark (Negative)</option>
-            <option value="bright">Bright (Positive)</option>
-            <option value="grayscale">Greyscale (Mono)</option>
+          <div class="section-heading"><span class="ui-label">Start with a style</span><span class="section-hint">Then make it yours</span></div>
+          <div class="preset-grid" aria-label="Map styles">
+            {#each Object.entries(DESIGN_PRESETS) as [key, preset]}
+              <button type="button" class="preset-card" data-preset={key} aria-pressed={key === 'topographic'}>
+                <span class="preset-art" style:background={preset.background}>
+                  <svg viewBox="0 0 140 45" aria-hidden="true">
+                    {#if preset.contours}
+                      <g fill="none" stroke={preset.line} stroke-width="0.8">
+                        <path d="M-5 40 Q20 20 35 33 T75 18 T145 5 M-5 33 Q20 13 35 26 T75 11 T145 -2 M-5 26 Q20 6 35 19 T75 4 T145 -9 M-5 47 Q20 27 35 40 T75 25 T145 12 M45 48 Q65 35 85 33 T145 19 M70 49 Q100 33 145 26"/>
+                      </g>
+                    {:else}
+                      <g fill={key === 'blueprint' ? 'none' : preset.buildings} stroke={preset.outline} stroke-width="0.8">
+                        <path d="M9 7h22v12H9z M9 25h14v13H9z M29 25h19v13H29z M39 5h14v13H39z M63 7h23v30H63z M97 5h14v15H97z M97 27h32v13H97z M118 5h13v14H118z"/>
+                      </g>
+                      <path d="M57 0v45 M0 22h140 M91 0v45" fill="none" stroke={preset.roads} stroke-width="0.6"/>
+                    {/if}
+                  </svg>
+                </span>
+                <span class="preset-kind">{preset.kind}</span><strong>{preset.name}</strong>
+              </button>
+            {/each}
+          </div>
+          <select id="presetSel" hidden aria-label="Design preset">
+            {#each Object.entries(DESIGN_PRESETS) as [key,preset]}<option value={key}>{preset.name}</option>{/each}
           </select>
+          <p id="presetDescription" class="control-help"></p>
           <div id="designColors" style="margin-top:12px;">
             <div class="cust-row">
               <span style="margin:0" class="ui-label">Background</span>
@@ -174,9 +204,9 @@
         </div>
 
         <div class="group">
-          <div class="ui-label">Layer Stack (Drag to Reorder)</div>
+          <div class="ui-label">Map layers</div>
           <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
-            Grab the handle or use the arrows to move layers. Items higher in the list render above the ones below.
+            Toggle layers, adjust their appearance, or reorder them. Top layers draw above lower ones.
           </p>
           <div id="layerStack" class="layer-list">
             <div class="layer-item" data-layer="labels" draggable="true">
@@ -219,6 +249,35 @@
                 <div class="cust-row"><span style="margin:0" class="ui-label">Italic</span><button type="button" role="switch" aria-checked="false" aria-label="Italic labels" class="ios-switch" id="labelItalicToggle"></button></div>
               </div>
             </div>
+            <div class="layer-item" data-layer="buildings" draggable="true" style="margin-top:10px;">
+              <div class="layer-head drag-ready">
+                <div class="layer-info">
+                  <span class="drag-handle" title="Drag to reorder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h8M8 12h8M8 18h8"/></svg>
+                  </span>
+                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+                  <span>Buildings</span>
+                </div>
+                <div class="layer-actions">
+                  <button class="layer-move" data-move="up" title="Move layer up" aria-label="Move layer up">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l-6 6h12z"/></svg>
+                  </button>
+                  <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
+                  </button>
+                  <button type="button" role="switch" aria-checked="false" aria-label="Buildings" class="ios-switch" id="buildingToggle"></button>
+                </div>
+              </div>
+              <div class="layer-body">
+                <p id="buildingCount" class="status-text">Generate a map to load building footprints.</p>
+                <div class="cust-row"><label class="ui-label" for="buildingColor">Fill color</label><input type="color" id="buildingColor" value="#ABB8AD"></div>
+                <div class="cust-row"><span class="ui-label">Solid footprints</span><button type="button" class="ios-switch on" id="buildingFillToggle" role="switch" aria-checked="true" aria-label="Fill building footprints"></button></div>
+                <div class="cust-row"><label class="ui-label" for="buildingOutline">Outline color</label><input type="color" id="buildingOutline" value="#65796C"></div>
+                <div class="cust-row"><label class="ui-label" for="buildingWidth">Outline width (mm)</label><input type="range" id="buildingWidth" min="0" max="1" step="0.01" value="0.1"><input type="number" id="buildingWidthInput" class="width-input" min="0" max="1" step="0.01" value="0.1" aria-label="Building outline width in millimetres"></div>
+                <div class="cust-row"><label class="ui-label" for="buildingOpacity">Opacity</label><input type="range" id="buildingOpacity" min="0" max="100" step="1" value="100"><span id="buildingOpacityVal" class="control-value">100%</span></div>
+                <p class="control-help">Footprints are shared by the preview, PNG, SVG and DXF. Raised buildings can be included in 3MF.</p>
+              </div>
+            </div>
             <div class="layer-item" data-layer="roads" draggable="true" style="margin-top:10px;">
               <div class="layer-head drag-ready">
                 <div class="layer-info">
@@ -240,7 +299,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><span style="margin:0" class="ui-label">Color</span><div class="color-dot" id="roadColorDot" style="background:#C9A75A"><input type="color" id="roadColor" value="#C9A75A"></div></div>
-                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (mm)</span><input type="range" id="roadWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="roadWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (mm)</span><input type="range" id="roadWidth" min="0.05" max="2" step="0.01" value="0.2"><input type="number" id="roadWidthInput" class="width-input" min="0.05" max="2" step="0.01" value="0.2"></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Opacity (%)</span><input type="range" id="roadOpacity" min="0" max="100" step="1" value="75"><span id="roadOpacityVal" style="font-size:11px;width:46px;text-align:right;">75%</span></div>
               </div>
             </div>
@@ -265,7 +324,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><span style="margin:0" class="ui-label">Line Color</span><div class="color-dot" id="riverColorDot" style="background:#7DB5D3"><input type="color" id="riverColor" value="#7DB5D3"></div></div>
-                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (mm)</span><input type="range" id="riverWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="riverWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (mm)</span><input type="range" id="riverWidth" min="0.05" max="2" step="0.01" value="0.2"><input type="number" id="riverWidthInput" class="width-input" min="0.05" max="2" step="0.01" value="0.2"></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Opacity (%)</span><input type="range" id="riverOpacity" min="0" max="100" step="1" value="85"><span id="riverOpacityVal" style="font-size:11px;width:46px;text-align:right;">85%</span></div>
               </div>
             </div>
@@ -338,7 +397,7 @@
               </div>
               <div class="layer-body">
                 <div class="cust-row"><span style="margin:0" class="ui-label">Color</span><div class="color-dot" style="background:#10141B"><input type="color" id="contourColor" value="#10141B"></div></div>
-                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (mm)</span><input type="range" id="contourWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="contourWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (mm)</span><input type="range" id="contourWidth" min="0.05" max="2" step="0.01" value="0.2"><input type="number" id="contourWidthInput" class="width-input" min="0.05" max="2" step="0.01" value="0.2"></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Bold Every Nth</span><input type="range" id="contourEmphasis" min="0" max="20" step="1" value="10"><span id="contourEmphasisVal" style="font-size:11px;width:60px;text-align:right;">10th line</span></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Density</span><input type="range" id="contourDensity" min="5" max="100" step="5" value="24"><span id="contourDensityVal" style="font-size:11px;width:40px;text-align:right;">24</span></div>
           <div class="cust-row"><span style="margin:0" class="ui-label">Opacity (%)</span><input type="range" id="contourOpacity" min="0" max="100" step="1" value="80"><span id="contourOpacityVal" style="font-size:11px;width:46px;text-align:right;">80%</span></div>
@@ -395,6 +454,24 @@
             </div>
           </div>
         </div>
+        </div>
+        <div class="mode-3d">
+          <div class="section-heading"><span class="ui-label">Choose a model preset</span><span class="section-hint">Then adjust the layers</span></div>
+          <div class="model-preset-grid">{#each Object.entries(MODEL_PRESETS) as [key,preset]}<button class="preset-card" data-model-preset={key} aria-pressed={key==='landscape'}><strong>{preset.name}</strong><small>{preset.description}</small></button>{/each}</div>
+          <div class="group input-grid">
+            <div><label class="ui-label" for="model-width">Print width (mm)</label><input id="model-width" type="number" min="50" max="400" value="200"></div>
+            <div><label class="ui-label" for="model-resolution">Mesh quality</label><select id="model-resolution"><option value="40">Draft · 40</option><option value="100">Balanced · 100</option><option value="160">Fine · 160</option><option value="240">Ultra · 240</option></select></div>
+          </div>
+          <div class="group"><span class="ui-label">Physical layers</span><div class="model-layer-grid">
+            {#each [['terrain','Terrain relief'],['buildings','Raised buildings'],['roads','Streets'],['water','Water areas'],['green','Green areas'],['rivers','Rivers']] as [key,label]}<label class="check-row"><input id={'model-'+key} type="checkbox">{label}</label>{/each}
+          </div><p class="control-help">Turning terrain off creates a flat base. Streets and area layers are raised, terrain-following geometry—not just preview colors.</p></div>
+          <details class="model-advanced"><summary>Advanced model settings</summary>
+            {#each [['base','Base thickness (mm)',1,10,.5,2],['relief','Terrain relief (mm)',1,80,1,12],['buildingScale','Building height multiplier',.1,10,.1,1],['roadWidth','Street width (mm)',.2,3,.1,.7],['roadRise','Street rise (mm)',.1,2,.1,.5],['areaRise','Area / river rise (mm)',.1,2,.1,.3]] as [key,label,min,max,step,value]}<div class="cust-row"><label class="ui-label" for={'model-'+key}>{label}</label><input id={'model-'+key} type="range" {min} {max} {step} {value}><output id={'model-'+key+'-value'}>{value}</output></div>{/each}
+            <label class="ui-label" for="model-fallbackHeight">Missing building height (metres)</label><input id="model-fallbackHeight" type="number" min="1" max="100" value="9">
+            <p class="control-help">Buildings use OSM height, then levels × 3 m, then this fallback. Roofs are flat, founded into the terrain; rise is at least 0.4 mm. Terrain relief is independently scaled. These are map models, not survey-accurate architectural replicas.</p>
+          </details>
+          <button id="updateModel" class="btn-main">Update 3D model</button>
+        </div>
         <button id="toExport" class="btn-main" style="margin-top:6px;">Continue to Export</button>
       </div>
 
@@ -411,22 +488,18 @@
             <div class="export-step" data-export-step="save"><span class="export-dot"></span><span>Save</span></div>
           </div>
         </div>
-        <div class="group" style="margin-top:20px;">
-        <div class="ui-label">3D Print (3MF Terrain)</div>
-        <p style="font-size:13px; color:var(--color-text-sec); margin-bottom:12px; line-height:1.5;">
-          Creates a watertight relief mesh based on elevation data. Contours remain 2D for vector exports.
-        </p>
-        <div class="input-grid">
-           <div><label class="ui-label" for="socketMm">Socket (mm)</label><input type="text" id="socketMm" value="2.0" disabled></div>
-           <div><label class="ui-label" for="targetH">Relief Hub</label><input type="number" id="targetH" value="10"></div>
-           <div><label class="ui-label" for="meshRes">Mesh Resolution</label><input type="number" id="meshRes" value="160" min="40" max="400"></div>
+        <div class="group mode-3d">
+          <span class="ui-label">Export the previewed model</span>
+          <p class="control-help">A fused solid in millimetres. All selected layers share the exact preview geometry. 3MF includes surface colors; STL and OBJ are geometry-only. Your slicer and printer determine color/material support.</p>
+          <label class="ui-label" for="model-format">File format</label><select id="model-format"><option value="3mf">3MF · geometry + colors</option><option value="stl">STL · universal print mesh</option><option value="obj">OBJ · general 3D mesh</option></select>
+          <button id="exportModel" class="btn-main" disabled>Download model</button><p class="control-help">Inspect the result in your slicer before printing. Ultra quality and dense cities can take longer; use a small area first.</p>
         </div>
-        <button id="btn3MF" class="btn-main" style="margin-top:10px;">Download 3MF</button>
-      </div>
-
+        <div class="mode-2d">
       <div class="group">
         <div class="ui-label">Laser / Vector (DXF)</div>
         <button id="btnDXF" class="btn-main">Download DXF</button>
+        <button id="btnSVG" class="btn-secondary">Download SVG · sharp vector</button>
+        <p class="control-help">SVG preserves fill colors and exact line widths in millimetres. DXF exports editable layer outlines, including courtyards.</p>
       </div>
 
       <div class="group">
@@ -437,6 +510,7 @@
           <span id="pngResVal" style="font-size:12px; font-weight:700; width:60px;">2000px</span>
         </div>
         <button id="btnPNG" class="btn-main" style="color:#F5F7FB;">Save PNG</button>
+      </div>
       </div>
       </div>
     </div>
