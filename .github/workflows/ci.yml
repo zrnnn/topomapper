@@ -1,4 +1,4 @@
-name: Verify release candidate
+name: Verify Topomapper
 on:
   pull_request:
   push:

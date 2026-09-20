@@ -3,6 +3,8 @@
   import { base } from '$app/paths';
   import { DESIGN_PRESETS } from '$lib/presets';
   import { MODEL_PRESETS } from '$lib/model';
+  import WorkflowChrome from '$lib/WorkflowChrome.svelte';
+  import {LAYER_CHOICES} from '$lib/layer-selection.js';
 
   onMount(() => {
     let cancelled = false;
@@ -19,19 +21,22 @@
 
 <svelte:head>
   <title>Topomapper</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
 </svelte:head>
 
 <div id="loader" class="loader"><div class="spinner"></div><span id="loaderText">Loading...</span><progress id="loaderProgress" max="100" aria-label="Operation progress"></progress></div>
 
 <header class="top-header">
-  <a class="top-brand" href={base + '/'}>
-    <img class="top-logo" src={base + '/assets/logo.png'} alt="Topomapper logo">
+  <a class="top-brand" href={base + '/'} aria-label="Topomapper home">
+    <img class="top-logo" src={base + '/assets/topomapper-mark.svg'} alt="" width="44" height="44">
+    <span class="brand-lockup"><span class="brand-wordmark">topomapper<span class="brand-period">.</span></span><span class="brand-descriptor">Landscape studio</span></span>
   </a>
+  <span class="brand-caption">A place. A perspective. Something to make.</span>
 </header>
 
 <div class="sidebar">
   <div class="scroll-content">
+    <div id="selectionInputs">
     <div class="hero">
       <div class="hero-eyebrow">Topo Studio</div>
       <h1 class="hero-title">Your place. On paper or in 3D.</h1>
@@ -87,9 +92,30 @@
             Fine-tune contours, colors, and map layers after the preview loads.
           </p>
         </div>
+        <div class="group">
+          <label class="ui-label" for="customOverpassEndpoint">Optional map-data endpoint</label>
+          <input id="customOverpassEndpoint" type="url" inputmode="url" placeholder="https://your-overpass.example/api/interpreter">
+          <p class="control-help">Advanced fallback for a self-hosted or API-key Overpass-compatible endpoint. HTTPS only; the three public worldwide providers remain automatic fallbacks.</p>
+        </div>
       </div>
     </details>
 
+    </div>
+    <section id="purposeDialog" class="area-setup" hidden aria-label="Choose output and layers">
+      <div class="section-heading"><span class="ui-label">Set up your map</span><button id="backToArea" type="button" class="btn-secondary">Back</button></div>
+      <h2>What would you like to make?</h2>
+      <div class="purpose-grid"><button id="choose2d" type="button" class="purpose-card" aria-pressed="true"><strong>2D map</strong><span>Paper · image · laser</span></button><button id="choose3d" type="button" class="purpose-card" aria-pressed="false"><strong>3D print</strong><span>3MF · STL · OBJ</span></button></div>
+      <p id="areaSummary" class="control-help"></p>
+      <h3>Layers to load</h3>
+      <p class="control-help">Load only what you need. Appearance and presets come next.</p>
+      <div class="load-layer-list">
+        {#each LAYER_CHOICES as [key,label,description]}
+          <label class="load-layer-row" for={'load-'+key}><span><strong>{label}</strong><small>{description}</small></span><input id={'load-'+key} data-load-layer={key} type="checkbox" role="switch" checked /></label>
+        {/each}
+      </div>
+      <p id="areaPolicyWarning" class="inline-notice" role="status" hidden></p>
+      <p class="control-help">Automatic detail · bounded downloads · cancel at any time.</p>
+    </section>
     <div class="sidebar-footer">
       <a href="https://github.com/zrnnn/topomapper" target="_blank" rel="noopener noreferrer">Topomapper</a>
       · Elevation: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Mapzen terrain sources</a>
@@ -102,7 +128,7 @@
       <div id="generationSteps" class="operation-steps" hidden aria-label="Generation phases"><span data-phase="terrain">Elevation</span><span data-phase="map">Map layers</span><span data-phase="render">Preview</span></div>
       <div id="generationError" class="error-report" hidden role="alert"><strong id="generationErrorTitle"></strong><span id="generationErrorMessage"></span><span id="generationErrorAction" class="error-action"></span><details><summary>Technical details</summary><code id="generationErrorTechnical"></code></details></div>
     </div>
-    <button id="btnGen" class="btn-main">Continue · choose output</button>
+    <button id="btnGen" class="btn-main" disabled>Starting map studio…</button>
     <button id="retryGeneration" class="btn-secondary" type="button" hidden>Retry loading this area</button>
     <button id="cancelGeneration" class="btn-secondary" type="button" hidden>Cancel generation</button>
     <button id="previousPreview" class="btn-secondary" type="button" hidden>Open previous preview</button>
@@ -110,6 +136,7 @@
 </div>
 
 <div class="viewport">
+  <WorkflowChrome />
   <div id="map"></div>
   <div class="viewfinder-wrapper">
     <svg id="vfSvg" width="100%" height="100%">
@@ -121,22 +148,14 @@
   </div>
 </div>
 
-<dialog id="purposeDialog" class="purpose-dialog"><form method="dialog"><div class="section-heading"><span class="ui-label">Step 2 · What are you making?</span><button class="btn-secondary" aria-label="Cancel output choice">×</button></div><p id="areaSummary" class="control-help"></p><div class="purpose-grid"><button id="choose2d" type="button" class="purpose-card"><strong>2D map</strong><span>Paper, posters & laser work</span><small>Shaded raster · PNG · SVG · DXF · contour lines</small></button><button id="choose3d" type="button" class="purpose-card"><strong>3D print</strong><span>A physical landscape or city</span><small>Raised buildings · streets · terrain · 3MF · STL · OBJ</small></button></div></form></dialog>
+
 
 <div class="modal-overlay" id="modal" role="dialog" aria-modal="true" aria-label="Preview and export" tabindex="-1">
   <div class="modal-card">
     <div class="preview-stage">
-      <div class="preview-zoom-controls" aria-label="Preview zoom"><button id="previewZoomOut" class="btn-secondary" type="button" aria-label="Zoom preview out">−</button><span id="previewZoomValue" aria-live="polite">100%</span><button id="previewZoomIn" class="btn-secondary" type="button" aria-label="Zoom preview in">+</button><button id="previewZoomFit" class="btn-secondary" type="button">Fit</button></div>
+      <WorkflowChrome preview={true} />
       <div id="previewArea" class="mode-2d"></div>
       <div id="preview3d" class="mode-3d"></div>
-      <div id="modelFeedback" class="model-feedback operation-panel mode-3d" data-state="idle"><div class="operation-head"><span class="operation-icon" aria-hidden="true">3D</span><div><strong id="modelTitle">3D model</strong><p id="modelStatus" role="status" aria-live="polite">Choose settings, then update the model.</p></div><span id="modelPercent" class="operation-percent"></span></div><progress id="modelProgress" max="100" hidden aria-label="3D model progress"></progress><div id="modelError" class="error-report" hidden role="alert"><span id="modelErrorAction" class="error-action"></span><details><summary>Technical details</summary><code id="modelErrorTechnical"></code></details></div><button id="retryModel" class="btn-secondary" hidden>Retry model</button><button id="cancelModel" class="btn-secondary" hidden>Cancel model generation</button></div>
-      <div class="model-preview-controls mode-3d"><span>Drag to orbit · scroll to zoom</span><button id="resetModelView" class="btn-secondary">Reset view</button></div>
-      <div class="preview-controls mode-2d">
-        <button id="undoStep2" class="btn-secondary icon-button" type="button" aria-label="Undo last change" title="Undo">&#8630;</button>
-        <button id="refreshPreview" class="btn-secondary preview-toggle" type="button">Auto Preview On</button>
-        <button id="renderPreview" class="btn-secondary" type="button" hidden>Update preview</button>
-        <button id="redoStep2" class="btn-secondary icon-button" type="button" aria-label="Redo last change" title="Redo">&#8631;</button>
-      </div>
     </div>
     <div class="export-side">
       <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -146,15 +165,14 @@
         </div>
         <button id="closePreview" aria-label="Close preview" style="border:none;background:none;font-size:32px;cursor:pointer;color:var(--color-text-sec);">&times;</button>
       </div>
-      <button id="changeOutput" class="btn-secondary">Change output · 2D / 3D</button>
+      <div id="modelFeedback" class="model-feedback operation-panel mode-3d" data-state="idle"><div class="operation-head"><span class="operation-icon" aria-hidden="true">3D</span><div><strong id="modelTitle">3D model</strong><p id="modelStatus" role="status" aria-live="polite">Choose settings, then update the model.</p></div><span id="modelPercent" class="operation-percent"></span></div><progress id="modelProgress" max="100" hidden aria-label="3D model progress"></progress><div id="modelError" class="error-report" hidden role="alert"><span id="modelErrorAction" class="error-action"></span><details><summary>Technical details</summary><code id="modelErrorTechnical"></code></details></div><button id="retryModel" class="btn-secondary" hidden>Retry model</button><button id="cancelModel" class="btn-secondary" hidden>Cancel model generation</button></div>
       <div id="terrainSource" class="status-text"></div>
+      <p id="previewLoadStatus" class="control-help" role="status" hidden></p>
+      <button id="cancelPreviewLoad" class="btn-secondary" hidden>Stop loading more detail</button>
+      <details class="source-details"><summary>Loading details</summary><p id="loadMetrics" class="status-text">Waiting for area data.</p><span class="status-text">City tiles: © OpenMapTiles · © OpenStreetMap contributors, served by OpenFreeMap.</span></details>
       <button id="retryMapLayers" class="btn-secondary" type="button" hidden>Retry map layers</button>
-      <details class="source-details"><summary>Data sources & credits</summary><div class="status-text">Data: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Mapzen terrain source credits</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>. Keep source credits with published exports.</div></details>
+      <details class="source-details"><summary>Data sources & credits</summary><div class="status-text">Data: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Mapzen terrain source credits</a> · <a href="https://mapterhorn.com/attribution/" target="_blank" rel="noopener noreferrer">Mapterhorn terrain credits</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>. Keep source credits with published exports.</div></details>
 
-        <div class="stepper">
-        <button class="active" data-step-target="2">Design</button>
-        <button data-step-target="3">Export</button>
-      </div>
 
       <div class="step-content active" data-step="2">
         <div id="mapDataNotice" class="notice">
@@ -162,13 +180,6 @@
           <button type="button" id="mapDataNoticeClose" aria-label="Dismiss notification">&times;</button>
         </div>
         <div class="mode-2d">
-        <div class="group">
-          <div class="ui-label">Preview</div>
-          <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
-            Auto preview can be switched off to avoid performance issues while customizing.
-          </p>
-        </div>
-        <button id="resetStep2" class="btn-secondary">Reset Design</button>
         <div class="group">
           <div class="section-heading"><span class="ui-label">Start with a style</span><span class="section-hint">Then make it yours</span></div>
           <div class="preset-grid" aria-label="Map styles">
@@ -475,18 +486,18 @@
             {#each [['terrain','Terrain relief'],['buildings','Raised buildings'],['roads','Streets'],['water','Water areas'],['green','Green areas'],['rivers','Rivers']] as [key,label]}<label class="check-row"><input id={'model-'+key} type="checkbox">{label}</label>{/each}
           </div><p class="control-help">Turning terrain off creates a flat base. Streets and area layers are raised, terrain-following geometry—not just preview colors.</p></div>
           <details class="model-advanced"><summary>Advanced model settings</summary>
-            {#each [['base','Base thickness (mm)',1,10,.5,2],['relief','Terrain relief (mm)',1,80,1,12],['buildingScale','Building height multiplier',.1,10,.1,1],['roadWidth','Street width (mm)',.2,3,.1,.7],['roadRise','Street rise (mm)',.1,2,.1,.5],['areaRise','Area / river rise (mm)',.1,2,.1,.3]] as [key,label,min,max,step,value]}<div class="cust-row"><label class="ui-label" for={'model-'+key}>{label}</label><input id={'model-'+key} type="range" {min} {max} {step} {value}><output id={'model-'+key+'-value'}>{value}</output></div>{/each}
+            {#each [['base','Base thickness (mm)',1,10,.5,2],['relief','Terrain vertical scale (%)',10,500,10,100],['buildingScale','Building height multiplier',.1,10,.1,1],['roadWidth','Street width (mm)',.2,3,.1,.7],['roadRise','Street rise (mm)',.1,2,.1,.5],['areaRise','Area / river rise (mm)',.1,2,.1,.3]] as [key,label,min,max,step,value]}<div class="cust-row"><label class="ui-label" for={'model-'+key}>{label}</label><input id={'model-'+key} type="range" {min} {max} {step} {value}><output id={'model-'+key+'-value'}>{key==='relief'?`${value}%`:value}</output></div>{/each}
             <label class="ui-label" for="model-fallbackHeight">Missing building height (metres)</label><input id="model-fallbackHeight" type="number" min="1" max="100" value="9">
             <label class="ui-label" for="model-minBuildingArea">Minimum building footprint (mm²)</label><input id="model-minBuildingArea" type="number" min="0" max="20" step="0.1" value="0.8">
-            <p class="control-help">Buildings use OSM height, then levels × 3 m, then this fallback. Roofs are flat, founded into the terrain; rise is at least 0.4 mm. Terrain relief is independently scaled. These are map models, not survey-accurate architectural replicas.</p>
+            <p class="control-help">At 100%, terrain height uses the same physical scale as map width. Use 10–90% to flatten relief or 110–500% to exaggerate it. Buildings use OSM height, then levels × 3 m, then this fallback. Roofs are flat and founded into the terrain; rise is at least 0.4 mm.</p>
           </details>
-          <button id="updateModel" class="btn-main">Update 3D model</button>
+          <button id="updateModel" class="btn-secondary">Update quick preview</button>
+          <button id="prepareModel" class="btn-main">Prepare printable model</button>
+          <p class="control-help">Quick preview uses separate surfaces and a lighter terrain mesh. Prepare the printable model to fuse and validate the selected layers before downloading.</p>
         </div>
-        <button id="toExport" class="btn-main" style="margin-top:6px;">Continue to Export</button>
       </div>
 
       <div class="step-content" data-step="3">
-        <button id="backToStyle" class="btn-main">Back to Design</button>
         <div class="export-status" id="exportStatus">
           <div class="export-status-head">
             <span class="export-status-title">Export Status</span>

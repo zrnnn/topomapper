@@ -4,7 +4,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 export function createModelPreview(container) {
   const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-  renderer.setClearColor(0x132d30,1);
+  renderer.setClearColor(0x202620,1);
   container.replaceChildren(renderer.domElement);
   renderer.domElement.setAttribute('aria-label','3D model. Drag to orbit, scroll to zoom.');
   const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(38,1,.1,10000);
@@ -23,8 +23,11 @@ export function createModelPreview(container) {
     set(next) {
       if(object){scene.remove(object);object.geometry.dispose();object.material.dispose();}
       model=next;
-      const positions=new Float32Array(next.mesh.t.length*9),colors=new Float32Array(positions.length),color=new THREE.Color();
-      next.mesh.t.forEach((tri,i)=>{color.set(next.mesh.colors[i]||'#D4D6C8');tri.forEach((id,j)=>{positions.set(next.mesh.v[id],i*9+j*3);colors.set([color.r,color.g,color.b],i*9+j*3);});});
+      let positions=next.display?.positions,colors=next.display?.colors;
+      if(!positions){
+        positions=new Float32Array(next.mesh.t.length*9);colors=new Float32Array(positions.length);const color=new THREE.Color();
+        next.mesh.t.forEach((tri,i)=>{color.set(next.mesh.colors[i]||'#D4D6C8');tri.forEach((id,j)=>{positions.set(next.mesh.v[id],i*9+j*3);colors.set([color.r,color.g,color.b],i*9+j*3);});});
+      }
       const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));geometry.computeVertexNormals();
       object=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85,metalness:0,flatShading:true}));scene.add(object);reset();
     },reset,zoom,

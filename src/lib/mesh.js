@@ -1,6 +1,6 @@
 import { createGeometry } from './geometry.js';
 export function buildTerrainMesh(state, {resolution = 160, targetHeight = 10} = {}) {
-if(!state.terrainData || !Number.isFinite(targetHeight) || targetHeight <= 0 || targetHeight > 200) throw new Error('Relief height must be between 0 and 200 mm.');
+if(!state.terrainData || !Number.isFinite(targetHeight) || targetHeight < 0 || targetHeight > 100000) throw new Error('Calculated relief height is outside the supported range.');
 const {getZInterpolated, smoothPass, getClipPolygon, polygonArea, clipPolygon} = createGeometry(state);
 const zScale = state.terrainData.delta > 0 ? targetHeight / state.terrainData.delta : 0;
         const baseThickness = 2.0;

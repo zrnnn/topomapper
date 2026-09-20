@@ -87,6 +87,11 @@ test('Building level-of-detail removes sub-millimetre footprints and keeps large
   const lod=prepareBuildingLod(buildings,{minArea:.5,maxBuildings:1});
   assert.deepEqual(lod.buildings.map(b=>b.id),['large']);assert.deepEqual([lod.stats.original,lod.stats.shown,lod.stats.omitted],[3,1,2]);
 });
+test('3D footprint filtering requires both printable dimensions',()=>{
+  const thin={id:'thin',polygons:[[[[0,0],[3,0],[3,.19],[0,.19],[0,0]]]]};
+  const printable={id:'printable',polygons:[[[[0,0],[3,0],[3,.2],[0,.2],[0,0]]]]};
+  assert.deepEqual(prepareBuildingLod([thin,printable],{minArea:0,minDimension:.2,tolerance:0}).buildings.map(b=>b.id),['printable']);
+});
 test('Directed coastline creates coastal water and closed islands cut holes',()=>{
   const frame=[[0,0],[10,0],[10,10],[0,10]];
   const coast=coastlineAreas([[[0,5],[10,5]]],frame);assert.equal(coast.length,1);assert.ok(coast[0].polygons[0][0].length>=4);

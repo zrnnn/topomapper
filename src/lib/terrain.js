@@ -1,4 +1,6 @@
 // Mapzen Terrarium: https://github.com/tilezen/joerd/blob/master/docs/formats.md
+import {cachedBytes,cacheBytes} from './data-cache.js';
+import {readBounded,downloadDetail} from './data-budget.js';
 export const latitudeY = lat => (1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2;
 export const yLatitude = y => Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180 / Math.PI;
 export function validateBounds({sw, ne}) {
@@ -18,47 +20,55 @@ export function normalizeTerrain(heights, rows, cols, source) {
   return { rows, cols, min, max, delta:max-min, h:Float32Array.from(heights,v=>v-min), source };
 }
 async function request(url, options={}) {
-  const response = await fetch(url, {...options, signal:AbortSignal.timeout(12000)});
-  if(!response.ok) throw new Error(`Elevation service returned HTTP ${response.status}.`);
+  const response = await fetch(url, {...options, signal:AbortSignal.timeout(25000)});
+  if(!response.ok) throw new Error(`${new URL(url).hostname}: elevation service returned HTTP ${response.status}${[429,406].includes(response.status)?' · API rate limit exceeded':''}.`);
   return response;
 }
-async function decodeImage(blob) {
+async function decodeImage(blob,tileSize=256) {
   const bitmap=await createImageBitmap(blob, {colorSpaceConversion:'none', premultiplyAlpha:'none'});
   try {
-    if(bitmap.width!==256 || bitmap.height!==256) throw new Error('Invalid terrain tile.');
-    const canvas=new OffscreenCanvas(256,256), ctx=canvas.getContext('2d',{willReadFrequently:true});
+    if(bitmap.width!==tileSize || bitmap.height!==tileSize) throw new Error('Invalid terrain tile.');
+    const canvas=new OffscreenCanvas(tileSize,tileSize), ctx=canvas.getContext('2d',{willReadFrequently:true});
     ctx.drawImage(bitmap,0,0);
-    return ctx.getImageData(0,0,256,256).data;
+    return ctx.getImageData(0,0,tileSize,tileSize).data;
   } finally { bitmap.close(); }
 }
-export async function loadTiles(bounds, {rows=160, cols=160, fetchTile, progress=()=>{}}={}) {
+export async function loadTiles(bounds, {rows=160, cols=160, fetchTile, progress=()=>{},tileSize=256,maxZoom=13,source='Mapzen terrain',tileUrl=(z,x,y)=>`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`}={}) {
   validateBounds(bounds);
   const {sw,ne}=bounds, north=latitudeY(ne.lat), south=latitudeY(sw.lat);
   const west=(sw.lng+180)/360, east=(ne.lng+180)/360;
-  const zoom=Math.max(0,Math.min(13,Math.ceil(Math.log2(Math.max(cols/(east-west),rows/(south-north))/256))));
-  const n=2**zoom, size=n*256;
+  const zoom=Math.max(0,Math.min(maxZoom,Math.ceil(Math.log2(Math.max(cols/(east-west),rows/(south-north))/tileSize))));
+  const n=2**zoom, size=n*tileSize;
   const x0=west*size, x1=Math.min(size-1,east*size), y0=north*size, y1=Math.min(size-1,south*size);
   const tiles=new Map(), jobs=[];
-  for(let y=Math.floor(y0/256);y<=Math.floor((y1+1)/256);y++) {
-    for(let x=Math.floor(x0/256);x<=Math.floor((x1+1)/256);x++) {
+  for(let y=Math.floor(y0/tileSize);y<=Math.floor((y1+1)/tileSize);y++) {
+    for(let x=Math.floor(x0/tileSize);x<=Math.floor((x1+1)/tileSize);x++) {
       if(x<n && y<n) jobs.push({x,y});
     }
   }
   if(jobs.length>64) throw new Error('Choose a less elongated frame for terrain generation.');
   let done=0, cursor=0;
-  const getTile=fetchTile || (async (z,x,y)=>decodeImage(await (await request(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`)).blob()));
+  const getTile=fetchTile || (async (z,x,y)=>{
+    const url=tileUrl(z,x,y);
+    let bytes=await cachedBytes(url);
+    const detail=text=>progress({phase:'terrain',percent:8+Math.round(done/jobs.length*47),detail:text});
+    if(!bytes){detail(`Connecting to ${new URL(url).hostname} · terrain tiles`);bytes=await readBounded(await request(url),{maxBytes:2*1024*1024,onProgress:p=>detail(downloadDetail(url,p)+` · ${done}/${jobs.length} terrain tiles ready`)});await cacheBytes(url,bytes);}
+    else detail(`Using cached terrain · ${done}/${jobs.length} tiles ready`);
+    detail(`Decoding terrain tile · ${done}/${jobs.length} tiles ready`);
+    return decodeImage(new Blob([bytes],{type:tileSize===512?'image/webp':'image/png'}),tileSize);
+  });
   await Promise.all(Array.from({length:Math.min(4,jobs.length)},async()=>{
     while(cursor<jobs.length) {
       const {x,y}=jobs[cursor++];
       const pixels=await getTile(zoom,x,y);
-      if(pixels.length!==256*256*4) throw new Error('Invalid terrain tile.');
+      if(pixels.length!==tileSize*tileSize*4) throw new Error('Invalid terrain tile.');
       tiles.set(`${x},${y}`,pixels);progress(`Loading terrain ${++done}/${jobs.length}`);
     }
   }));
   const sample=(x,y)=>{
     x=Math.max(0,Math.min(size-1,x)); y=Math.max(0,Math.min(size-1,y));
-    const pixels=tiles.get(`${Math.floor(x/256)},${Math.floor(y/256)}`);
-    const i=((y%256)*256+x%256)*4;
+    const pixels=tiles.get(`${Math.floor(x/tileSize)},${Math.floor(y/tileSize)}`);
+    const i=((y%tileSize)*tileSize+x%tileSize)*4;
     if(!pixels || pixels[i+3]!==255) throw new Error('Terrain coverage is incomplete in this area.');
     return decodeTerrarium(pixels[i],pixels[i+1],pixels[i+2]);
   };
@@ -68,14 +78,21 @@ export async function loadTiles(bounds, {rows=160, cols=160, fetchTile, progress
     const ix=Math.floor(x),iy=Math.floor(y),tx=x-ix,ty=y-iy;
     heights[r*cols+c]=(sample(ix,iy)*(1-tx)+sample(ix+1,iy)*tx)*(1-ty)+(sample(ix,iy+1)*(1-tx)+sample(ix+1,iy+1)*tx)*ty;
   }
-  return normalizeTerrain(heights,rows,cols,`Mapzen terrain · ${cols} × ${rows} samples`);
+  return normalizeTerrain(heights,rows,cols,`${source} · ${cols} × ${rows} samples`);
 }
+export const loadMapterhorn=(bounds,options={})=>loadTiles(bounds,{...options,tileSize:512,maxZoom:12,source:'Mapterhorn terrain',tileUrl:(z,x,y)=>`https://tiles.mapterhorn.com/${z}/${x}/${y}.webp`});
 export async function loadLookup(bounds, {progress=()=>{}, fetchBatch}={}) {
   validateBounds(bounds);
   const rows=64,cols=64,locations=[],heights=[];
   const north=latitudeY(bounds.ne.lat),south=latitudeY(bounds.sw.lat);
   for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) locations.push({latitude:yLatitude(north+(south-north)*r/(rows-1)),longitude:bounds.sw.lng+(bounds.ne.lng-bounds.sw.lng)*c/(cols-1)});
-  const lookup=fetchBatch || (async locations=>(await request('https://api.open-elevation.com/api/v1/lookup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locations})})).json());
+  const lookup=fetchBatch || (async locations=>{
+    const url='https://api.open-elevation.com/api/v1/lookup';
+    progress('Connecting to api.open-elevation.com · fallback elevation provider');
+    const response=await request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locations})});
+    const bytes=await readBounded(response,{maxBytes:1024*1024,onProgress:p=>progress({phase:'terrain',detail:downloadDetail(url,p)})});
+    return JSON.parse(new TextDecoder().decode(bytes));
+  });
   for(let i=0;i<locations.length;i+=512) {
     const batch=locations.slice(i,i+512), data=await lookup(batch);
     if(!Array.isArray(data.results) || data.results.length!==batch.length) throw new Error('Incomplete elevation response.');
@@ -87,10 +104,12 @@ export async function loadLookup(bounds, {progress=()=>{}, fetchBatch}={}) {
   }
   return normalizeTerrain(heights,rows,cols,'Open-Elevation fallback · 64 × 64 samples');
 }
-export async function loadTerrain(bounds, {primary=loadTiles,fallback=loadLookup,progress=()=>{}}={}) {
+export async function loadTerrain(bounds, {primary=loadTiles,secondary=primary===loadTiles?loadMapterhorn:null,fallback=loadLookup,progress=()=>{},rows=160,cols=160}={}) {
   validateBounds(bounds);
-  try { return await primary(bounds,{progress}); }
-  catch { progress('Primary terrain unavailable. Trying fallback…'); }
-  try { return await fallback(bounds,{progress}); }
-  catch { throw new Error('Elevation services could not be reached or returned invalid data. Your previous preview is preserved. Check your connection and retry.'); }
+  const errors=[];
+  for(const provider of [primary,secondary,fallback].filter(Boolean)){
+    try{return await provider(bounds,{progress,rows,cols});}
+    catch(error){errors.push(error.message);progress(`${error.message} · Looking for another elevation provider…`);}
+  }
+  throw new Error('Elevation services could not be reached or returned invalid data. Your previous preview is preserved. '+errors.join(' · '));
 }

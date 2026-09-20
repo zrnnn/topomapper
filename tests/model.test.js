@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import init from 'manifold-3d';
 import JSZip from 'jszip';
-import {buildModel,defaultModel,MODEL_PRESETS,validateModelSettings} from '../src/lib/model.js';
+import {buildModel,defaultModel,MODEL_PRESETS,terrainReliefHeight,validateModelSettings} from '../src/lib/model.js';
 import {exportModel} from '../src/lib/model-export.js';
 import {parseAreas,buildingHeight} from '../src/lib/buildings.js';
 const engine=await init();engine.setup();
@@ -22,6 +22,13 @@ test('All export formats use exactly the preview mesh',async()=>{
 test('Flat city preset preserves a base and raised buildings',async()=>{const city=await buildModel(engine,state,{...defaultModel(),...MODEL_PRESETS.city,resolution:40});closed(city.mesh);assert.ok(Math.max(...city.mesh.v.map(p=>p[2]))<20);});
 for(const shape of ['circle','hex'])test(`${shape}: clipped terrain and overlays fuse with no open edges`,async()=>{const result=await buildModel(engine,{...state,shape,hMm:100},{...defaultModel(),resolution:40,green:true,rivers:true});closed(result.mesh);assert.ok(result.volume>0);});
 test('Invalid settings fail and dense building sets are reduced automatically',async()=>{assert.throws(()=>validateModelSettings({...defaultModel(),width:NaN}),/width/);const tiny={...state.osmData.buildings[0],polygons:[[[[20,20],[20.1,20],[20.1,20.1],[20,20.1],[20,20]]]]};const dense=await buildModel(engine,{...state,osmData:{...state.osmData,buildings:Array.from({length:2600},(_,i)=>({...tiny,id:String(i)}))}},{...defaultModel(),resolution:40});assert.equal(dense.buildingStats.shown,0);assert.equal(dense.buildingStats.omitted,2600);});
+test('Terrain relief percentage preserves real proportions at 100 percent',()=>{
+  const widthMetres=.01*Math.PI/180*6371008.8*Math.cos(.005*Math.PI/180);
+  assert.ok(Math.abs(terrainReliefHeight(state,100)-10*100/widthMetres)<1e-9);
+  assert.ok(Math.abs(terrainReliefHeight(state,500)-terrainReliefHeight(state,100)*5)<1e-9);
+  assert.throws(()=>validateModelSettings({...defaultModel(),relief:9}),/relief/);
+  assert.throws(()=>validateModelSettings({...defaultModel(),relief:501}),/relief/);
+});
 test('Landcover parsing preserves islands and incomplete relations are not fabricated',()=>{
   const geom=ring=>ring.map(([lon,lat])=>({lon,lat}));
   const relation={type:'relation',id:1,tags:{natural:'water'},members:[{type:'way',ref:1,role:'outer',geometry:geom(ring)},{type:'way',ref:2,role:'inner',geometry:geom(hole)}]};

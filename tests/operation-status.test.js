@@ -8,9 +8,15 @@ test('Errors are classified into actionable, bounded reports',()=>{
   assert.match(describeError(new Error('HTTP 503'),'area').action,/retry/i);
   assert.equal(describeError(new Error('Check width: use a value between 50 and 400.'),'model').kind,'settings');
   assert.equal(describeError(new Error('Solid fusion failed'),'model').kind,'geometry');
+  assert.match(describeError(new Error('Map overlays are unavailable.'),'model').action,/Retry map layers/);
   assert.ok(describeError(new Error('x'.repeat(500))).technical.length<=240);
 });
 test('Terrain progress maps provider counters into stable UI progress',()=>{
   assert.deepEqual(terrainProgress('Loading terrain 2/4'),{phase:'terrain',detail:'Loading terrain 2/4',percent:32});
   assert.equal(terrainProgress('Fallback terrain 256/512').percent,48);
+});
+test('Provider quota responses are reported as limits with a fallback action',()=>{
+  const report=describeError(new Error('Map service HTTP 429: rate limit exceeded'),'area');
+  assert.equal(report.kind,'limit');
+  assert.match(report.action,/another Overpass endpoint/i);
 });

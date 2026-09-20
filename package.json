@@ -1,9 +1,11 @@
 {
 	"name": "topomapper",
 	"private": true,
-	"version": "0.1.0-rc.1",
+	"version": "0.2.0",
 	"type": "module",
-	"engines": { "node": ">=22.12.0" },
+	"engines": {
+		"node": ">=22.12.0"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -19,11 +21,13 @@
 		"vite": "^7.3.6"
 	},
 	"dependencies": {
+		"@mapbox/vector-tile": "^3.0.0",
 		"earcut": "^3.2.3",
-		"polygon-clipping": "^0.15.7",
-		"manifold-3d": "^3.5.3",
-		"three": "^0.186.0",
 		"jszip": "^3.10.1",
-		"maplibre-gl": "^6.10.0"
+		"manifold-3d": "^3.5.3",
+		"maplibre-gl": "^6.10.0",
+		"pbf": "^5.1.2",
+		"polygon-clipping": "^0.15.7",
+		"three": "^0.186.0"
 	}
 }

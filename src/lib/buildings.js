@@ -21,10 +21,13 @@ const same = (a,b) => Math.hypot(a[0]-b[0],a[1]-b[1]) < 1e-6;
 const area = ring => ring.reduce((sum,p,i)=>{const q=ring[(i+1)%ring.length];return sum+p[0]*q[1]-q[0]*p[1];},0)/2;
 const polygonArea = polygon => Math.max(0,Math.abs(area(polygon[0]||[]))-polygon.slice(1).reduce((sum,ring)=>sum+Math.abs(area(ring)),0));
 
-export function prepareBuildingLod(buildings,{minArea=.5,tolerance=.06,maxBuildings=2500}={}) {
+export function prepareBuildingLod(buildings,{minArea=.5,minDimension=0,tolerance=.06,maxBuildings=2500}={}) {
   const original=(buildings||[]).length, originalPoints=(buildings||[]).reduce((sum,b)=>sum+b.polygons.flat(2).length,0);
   const candidates=(buildings||[]).flatMap(building=>{
-    const polygons=building.polygons.filter(polygon=>polygonArea(polygon)>=minArea);
+    const polygons=building.polygons.filter(polygon=>{
+      const ring=polygon[0]||[],xs=ring.map(p=>p[0]),ys=ring.map(p=>p[1]);
+      return ring.length>=4&&polygonArea(polygon)>=minArea&&(!minDimension||Math.max(...xs)-Math.min(...xs)>=minDimension&&Math.max(...ys)-Math.min(...ys)>=minDimension);
+    });
     const footprint=polygons.reduce((sum,polygon)=>sum+polygonArea(polygon),0);
     return polygons.length?[{...building,polygons,footprint}]:[];
   }).sort((a,b)=>b.footprint-a.footprint);

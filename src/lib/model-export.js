@@ -1,6 +1,7 @@
 import {create3mf} from './three-mf.js';
 
 export async function exportModel(model,format) {
+  if(model.previewOnly)throw new Error('Prepare the printable model before exporting. Quick previews are not printable solids.');
   const mesh=model.mesh;
   if(!mesh?.t.length)throw new Error('Build the 3D preview before exporting.');
   if(format==='3mf')return {blob:await create3mf([{name:'Fused map',mesh}]),name:'Topomapper.3mf'};

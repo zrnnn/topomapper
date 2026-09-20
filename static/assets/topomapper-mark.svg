@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Topomapper — contours of a landscape</title>
+  <rect x="1" y="1" width="62" height="62" rx="17" fill="#252c25" stroke="#4d5848"/>
+  <g stroke="#adb99f" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 37c0-7 7-9 10-14s4-12 12-12 11 7 15 12 9 8 8 15-11 9-19 13-15 2-20-2-6-7-6-12Z"/>
+    <path d="M17 36c0-5 6-7 9-11s2-7 7-7 7 6 10 10 7 5 6 10-8 7-14 9-11 2-14-2-4-5-4-9Z"/>
+    <path d="M24 35c0-4 5-5 7-9s5 0 7 3 6 5 4 9-7 5-11 4-7-3-7-7Z"/>
+  </g>
+  <circle cx="33.5" cy="34" r="2.4" fill="#c8b595"/>
+</svg>
