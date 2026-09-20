@@ -98,7 +98,7 @@
       transition: transform 0.25s ease, box-shadow 0.25s ease;
       animation: dockIn 0.6s ease both;
     }
-    .sidebar:hover { transform: translateY(-2px); box-shadow: 0 30px 70px rgba(0,0,0,0.52); }
+    .sidebar:hover { box-shadow: 0 30px 70px rgba(0,0,0,0.52); }
 
     .scroll-content { flex: 1; overflow-y: auto; padding: 22px 22px 30px; scrollbar-width: thin; scrollbar-color: rgba(242,180,91,0.6) transparent; }
     .scroll-content::-webkit-scrollbar { width: 6px; }
@@ -829,6 +829,42 @@
       .hero-card-map { height: 96px; }
       .export-timeline { grid-template-columns: 1fr; }
       .export-step { justify-content: flex-start; }
+    }
+
+    /* Stable workspace: keep the primary action and preview visible. */
+    [hidden] { display: none !important; }
+    .hero { padding: 16px; margin-bottom: 18px; }
+    .hero-title { font-size: 24px; margin: 6px 0; }
+    .hero-copy { margin: 6px 0; }
+    .hero-card, .hero-flow { display: none; }
+    .scroll-content { min-height: 0; }
+    .generation-actions { flex: 0 0 auto; padding: 14px 20px; border-top: 1px solid var(--color-border); background: #10191c; display: grid; gap: 8px; }
+    .generation-actions .btn-main { margin: 0; }
+    .status-text { font-size: 12px; line-height: 1.5; color: #c0ced4; overflow-wrap: anywhere; }
+    .status-text.error { color: #ffbcac; }
+    .search-container { display: flex; gap: 8px; }
+    .search-container input { min-width: 0; }
+    .search-container .btn-secondary { width: auto; margin: 0; }
+    button.suggestion-item { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: inherit; font: inherit; }
+    button.suggestion-item:hover, button.suggestion-item:focus-visible { background: #27413e; }
+    :focus-visible { outline: 2px solid #f6c16b; outline-offset: 3px; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .maplibregl-ctrl button .maplibregl-ctrl-icon { filter: invert(1); }
+    .preview-stage { min-width: 0; min-height: 0; }
+    button.ios-switch { padding: 0; flex-shrink: 0; }
+    .export-side { min-height: 0; }
+    @media (max-width: 980px) {
+      .sidebar { max-height: 48dvh; }
+      .maplibregl-ctrl-bottom-right { top: 65px; bottom: auto; }
+      .hero { display: none; }
+      .scroll-content { padding: 14px 18px; }
+      .sidebar-footer { display: none; }
+      .generation-actions { padding: 10px 18px; }
+      .modal-card { height: 96dvh; width: 97vw; border-radius: 18px; }
+      .preview-stage { flex: 0 0 40%; padding: 14px; gap: 8px; }
+      .export-side { flex: 1 1 0; width: 100%; overflow-y: auto; padding: 18px; }
+      .preview-controls { flex-wrap: wrap; gap: 6px; margin: 0; }
+      .stepper { flex-direction: row; }
     }
 
     @media (prefers-reduced-motion: reduce) {

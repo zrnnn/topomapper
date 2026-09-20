@@ -2,9 +2,16 @@
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
 
-  onMount(async () => {
-    const { initTopomapper } = await import('$lib/topomapper');
-    initTopomapper();
+  onMount(() => {
+    let cancelled = false;
+    let cleanup;
+    import('$lib/topomapper').then(({ initTopomapper }) => {
+      if(!cancelled) cleanup = initTopomapper();
+    }).catch(() => {
+      const status = document.getElementById('generationStatus');
+      if(status) status.textContent = 'The app could not start. Please reload this page.';
+    });
+    return () => { cancelled = true; cleanup?.(); };
   });
 </script>
 
@@ -45,8 +52,10 @@
       <label class="ui-label" for="searchInp">Location Search</label>
       <div class="search-container">
         <input type="text" id="searchInp" placeholder="City, Region..." autocomplete="off">
+        <button id="searchButton" class="btn-secondary" type="button">Search</button>
         <div id="suggestionBox" class="suggestions"></div>
       </div>
+      <div id="searchStatus" class="status-text" role="status"></div>
     </div>
 
     <details class="accordion" id="advancedControls">
@@ -79,10 +88,16 @@
       </div>
     </details>
 
-    <button id="btnGen" class="btn-main">Generate Preview</button>
     <div class="sidebar-footer">
-      (c) <a href="https://github.com/topomapper" target="_blank" rel="noopener noreferrer">Topomapper</a>
+      <a href="https://github.com/zrnnn/topomapper" target="_blank" rel="noopener noreferrer">Topomapper</a>
+      · Elevation: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Mapzen terrain sources</a>
     </div>
+  </div>
+  <div class="generation-actions">
+    <div id="generationStatus" class="status-text" role="status" aria-live="polite">Move the map to frame your area, then generate.</div>
+    <button id="btnGen" class="btn-main">Generate Preview</button>
+    <button id="cancelGeneration" class="btn-secondary" type="button" hidden>Cancel generation</button>
+    <button id="previousPreview" class="btn-secondary" type="button" hidden>Open previous preview</button>
   </div>
 </div>
 
@@ -98,13 +113,14 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="modal">
+<div class="modal-overlay" id="modal" role="dialog" aria-modal="true" aria-label="Preview and export" tabindex="-1">
   <div class="modal-card">
     <div class="preview-stage">
       <div id="previewArea"></div>
       <div class="preview-controls">
         <button id="undoStep2" class="btn-secondary icon-button" type="button" aria-label="Undo last change" title="Undo">&#8630;</button>
         <button id="refreshPreview" class="btn-secondary preview-toggle" type="button">Auto Preview On</button>
+        <button id="renderPreview" class="btn-secondary" type="button" hidden>Update preview</button>
         <button id="redoStep2" class="btn-secondary icon-button" type="button" aria-label="Redo last change" title="Redo">&#8631;</button>
       </div>
     </div>
@@ -114,8 +130,10 @@
           <h2 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-1px;">Preview & Export</h2>
           <div style="font-size:12px; color:var(--color-text-sec); margin-top:4px;">Step 2: Choose Design - Step 3: Export Design</div>
         </div>
-        <button on:click={() => window.closeModal?.()} style="border:none;background:none;font-size:32px;cursor:pointer;color:var(--color-text-sec);">&times;</button>
+        <button id="closePreview" aria-label="Close preview" style="border:none;background:none;font-size:32px;cursor:pointer;color:var(--color-text-sec);">&times;</button>
       </div>
+      <div id="terrainSource" class="status-text"></div>
+      <div class="status-text">Data: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Mapzen terrain source credits</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>. Keep source credits with published exports.</div>
 
         <div class="stepper">
         <button class="active" data-step-target="2">Step 2 - Choose Design</button>
@@ -177,16 +195,16 @@
                   <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
                   </button>
-                  <div class="ios-switch" id="labelToggle"></div>
+                  <button type="button" role="switch" aria-checked="false" aria-label="Place names" class="ios-switch" id="labelToggle"></button>
                 </div>
               </div>
               <div class="layer-body">
                 <div class="cust-row"><span style="margin:0" class="ui-label">Label Color</span><div class="color-dot" id="labelColorDot" style="background:#1E232B"><input type="color" id="labelColor" value="#1E232B"></div></div>
-                <div class="cust-row"><span style="margin:0" class="ui-label">Text Background</span><div class="ios-switch" id="labelBgToggle"></div></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Text Background</span><button type="button" role="switch" aria-checked="false" aria-label="Label background" class="ios-switch" id="labelBgToggle"></button></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Background Color</span><div class="color-dot" id="labelBgColorDot" style="background:#F5F2EB"><input type="color" id="labelBgColor" value="#F5F2EB"></div></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Opacity (%)</span><input type="range" id="labelOpacity" min="0" max="100" step="1" value="85"><span id="labelOpacityVal" style="font-size:11px;width:46px;text-align:right;">85%</span></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Font Size (mm)</span><input type="range" id="labelSize" min="0.2" max="3" step="0.05" value="0.4"><span id="labelSizeVal" style="font-size:11px;width:56px;text-align:right;">0.40 mm</span></div>
-                <div class="cust-row"><span style="margin:0" class="ui-label">Scale by Place Rank</span><div class="ios-switch" id="labelScaleToggle"></div></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Scale by Place Rank</span><button type="button" role="switch" aria-checked="false" aria-label="Scale labels by rank" class="ios-switch" id="labelScaleToggle"></button></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Typeface</span>
                   <select id="labelFont">
                     <option value="system" selected>System Sans</option>
@@ -197,8 +215,8 @@
                     <option value="display">Display</option>
                   </select>
                 </div>
-                <div class="cust-row"><span style="margin:0" class="ui-label">Bold</span><div class="ios-switch" id="labelBoldToggle"></div></div>
-                <div class="cust-row"><span style="margin:0" class="ui-label">Italic</span><div class="ios-switch" id="labelItalicToggle"></div></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Bold</span><button type="button" role="switch" aria-checked="false" aria-label="Bold labels" class="ios-switch" id="labelBoldToggle"></button></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Italic</span><button type="button" role="switch" aria-checked="false" aria-label="Italic labels" class="ios-switch" id="labelItalicToggle"></button></div>
               </div>
             </div>
             <div class="layer-item" data-layer="roads" draggable="true" style="margin-top:10px;">
@@ -217,12 +235,12 @@
                   <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
                   </button>
-                  <div class="ios-switch" id="roadToggle"></div>
+                  <button type="button" role="switch" aria-checked="false" aria-label="Roads" class="ios-switch" id="roadToggle"></button>
                 </div>
               </div>
               <div class="layer-body">
                 <div class="cust-row"><span style="margin:0" class="ui-label">Color</span><div class="color-dot" id="roadColorDot" style="background:#C9A75A"><input type="color" id="roadColor" value="#C9A75A"></div></div>
-                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (px)</span><input type="range" id="roadWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="roadWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (mm)</span><input type="range" id="roadWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="roadWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Opacity (%)</span><input type="range" id="roadOpacity" min="0" max="100" step="1" value="75"><span id="roadOpacityVal" style="font-size:11px;width:46px;text-align:right;">75%</span></div>
               </div>
             </div>
@@ -242,12 +260,12 @@
                   <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
                   </button>
-                  <div class="ios-switch" id="riverToggle"></div>
+                  <button type="button" role="switch" aria-checked="false" aria-label="Rivers" class="ios-switch" id="riverToggle"></button>
                 </div>
               </div>
               <div class="layer-body">
                 <div class="cust-row"><span style="margin:0" class="ui-label">Line Color</span><div class="color-dot" id="riverColorDot" style="background:#7DB5D3"><input type="color" id="riverColor" value="#7DB5D3"></div></div>
-                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (px)</span><input type="range" id="riverWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="riverWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (mm)</span><input type="range" id="riverWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="riverWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Opacity (%)</span><input type="range" id="riverOpacity" min="0" max="100" step="1" value="85"><span id="riverOpacityVal" style="font-size:11px;width:46px;text-align:right;">85%</span></div>
               </div>
             </div>
@@ -267,7 +285,7 @@
                   <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
                   </button>
-                  <div class="ios-switch" id="waterAreaToggle"></div>
+                  <button type="button" role="switch" aria-checked="false" aria-label="water Area" class="ios-switch" id="waterAreaToggle"></button>
                 </div>
               </div>
               <div class="layer-body">
@@ -291,7 +309,7 @@
                   <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
                   </button>
-                  <div class="ios-switch" id="greenAreaToggle"></div>
+                  <button type="button" role="switch" aria-checked="false" aria-label="green Area" class="ios-switch" id="greenAreaToggle"></button>
                 </div>
               </div>
               <div class="layer-body">
@@ -315,14 +333,14 @@
                   <button class="layer-move" data-move="down" title="Move layer down" aria-label="Move layer down">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18l6-6H6z"/></svg>
                   </button>
-                  <div class="ios-switch on" id="contourToggle"></div>
+                  <button type="button" role="switch" aria-checked="true" aria-label="Contours" class="ios-switch on" id="contourToggle"></button>
                 </div>
               </div>
               <div class="layer-body">
                 <div class="cust-row"><span style="margin:0" class="ui-label">Color</span><div class="color-dot" style="background:#10141B"><input type="color" id="contourColor" value="#10141B"></div></div>
-                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (px)</span><input type="range" id="contourWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="contourWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Line Width (mm)</span><input type="range" id="contourWidth" min="0.1" max="2" step="0.05" value="0.2"><input type="number" id="contourWidthInput" class="width-input" min="0.1" max="2" step="0.05" value="0.2"></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Bold Every Nth</span><input type="range" id="contourEmphasis" min="0" max="20" step="1" value="10"><span id="contourEmphasisVal" style="font-size:11px;width:60px;text-align:right;">10th line</span></div>
-                <div class="cust-row"><span style="margin:0" class="ui-label">Density</span><input type="range" id="contourDensity" min="5" max="250" step="5" value="24"><span id="contourDensityVal" style="font-size:11px;width:40px;text-align:right;">24</span></div>
+                <div class="cust-row"><span style="margin:0" class="ui-label">Density</span><input type="range" id="contourDensity" min="5" max="100" step="5" value="24"><span id="contourDensityVal" style="font-size:11px;width:40px;text-align:right;">24</span></div>
           <div class="cust-row"><span style="margin:0" class="ui-label">Opacity (%)</span><input type="range" id="contourOpacity" min="0" max="100" step="1" value="80"><span id="contourOpacityVal" style="font-size:11px;width:46px;text-align:right;">80%</span></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Smoothing</span><input type="range" id="contourSmooth" min="0" max="5" step="1" value="4"><span id="contourSmoothVal" style="font-size:11px;width:40px;text-align:right;">4</span></div>
               </div>
@@ -334,7 +352,7 @@
           <div class="layer-item" style="padding: 12px 14px; display:flex; flex-direction:column; gap:10px;">
             <div class="toggle-row">
               <span style="font-weight:600; font-size:14px;">Layered Height Bands</span>
-              <div class="ios-switch" id="pngLayerToggle"></div>
+              <button type="button" role="switch" aria-checked="false" aria-label="Layered height bands" class="ios-switch" id="pngLayerToggle"></button>
             </div>
             <p style="font-size:11px; color:var(--color-text-sec); margin:0; line-height:1.4;">
               Fills each contour band with stepped colors and hillshade based on the lowest/highest points in the frame.
@@ -401,7 +419,7 @@
         <div class="input-grid">
            <div><label class="ui-label" for="socketMm">Socket (mm)</label><input type="text" id="socketMm" value="2.0" disabled></div>
            <div><label class="ui-label" for="targetH">Relief Hub</label><input type="number" id="targetH" value="10"></div>
-           <div><label class="ui-label" for="meshRes">Mesh Resolution</label><input type="number" id="meshRes" value="220" min="80" max="600"></div>
+           <div><label class="ui-label" for="meshRes">Mesh Resolution</label><input type="number" id="meshRes" value="160" min="40" max="400"></div>
         </div>
         <button id="btn3MF" class="btn-main" style="margin-top:10px;">Download 3MF</button>
       </div>

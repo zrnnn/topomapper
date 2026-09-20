@@ -1,5 +1,8 @@
-import maplibregl from 'maplibre-gl';
-import JSZip from 'jszip';
+import * as maplibregl from 'maplibre-gl';
+import { createGeometry } from './geometry.js';
+import { latitudeY, validateBounds } from './terrain.js';
+import { runWorker } from './worker-client.js';
+import { escapeXml } from './xml.js';
 
 export function initTopomapper() {
   // --- STATE ---
@@ -60,6 +63,7 @@ export function initTopomapper() {
       pngPreviewCache: { key: null, dataUrl: null }
     };
 
+    const { getZInterpolated, isInShape, getContourLineCount, getContourLevels, getShapeHeightRange, getContourSegments, buildPolylines, smoothPolyline, getShapePathD, polygonArea, getClipPolygon, clipCanvasToShape, clipPolygon, clipSegmentToConvex, clipPolylineToPolygon, ensureClosed, smoothPass } = createGeometry(state);
     const defaultDesign = {
       contour: {
         enabled: true,
@@ -106,12 +110,20 @@ export function initTopomapper() {
       layerOrder: ['labels', 'roads', 'rivers', 'water', 'green', 'contours']
     };
 
+    let disposed = false;
+    let activeJob = null;
+    let exportBusy = false;
+    const lifetime = new AbortController();
+    const cachePut = (cache, key, value) => {
+      if(cache.size >= 8 && !cache.has(key)) cache.delete(cache.keys().next().value);
+      cache.set(key, value);
+    };
     const FETCH_TIMEOUT = 12000;
     const terrainCache = new Map();
     const osmCache = new Map();
     const bboxKey = (sw, ne) => {
       if(!sw || !ne) return '';
-      return `${sw.lat.toFixed(4)},${sw.lng.toFixed(4)}:${ne.lat.toFixed(4)},${ne.lng.toFixed(4)}`;
+      return `${sw.lat.toFixed(6)},${sw.lng.toFixed(6)}:${ne.lat.toFixed(6)},${ne.lng.toFixed(6)}`;
     };
 
     const linkAbort = (source, target) => {
@@ -187,84 +199,37 @@ export function initTopomapper() {
       exportStatusSteps.forEach(step => step.classList.remove('is-active', 'is-done'));
     };
     const runExportFlow = async (label, task) => {
-      if(!task) return;
+      if(!task || exportBusy || activeJob) return;
       if(exportStatusTimer) {
         clearTimeout(exportStatusTimer);
         exportStatusTimer = null;
       }
+      exportBusy = true;
       setExportStatus('prepare', label);
-      await nextFrame();
-      setExportStatus('render', label);
       const onSave = async () => {
         setExportStatus('save', label);
         await nextFrame();
       };
-      await task(onSave);
-      setExportStatus('done', label);
-      exportStatusTimer = setTimeout(clearExportStatus, 2200);
+      const controls = Array.from(document.querySelectorAll('#modal input, #modal select, #modal button'));
+      const disabled = controls.map(el => el.disabled);
+      controls.forEach(el => el.disabled = true);
+      try {
+        await nextFrame();
+        setExportStatus('render', label);
+        await task(onSave);
+        setExportStatus('done', label);
+        exportStatusTimer = setTimeout(clearExportStatus, 2200);
+      } catch(error) {
+        exportStatus.classList.remove('done');
+        exportStatusLabel.textContent = label + ' failed: ' + error.message;
+      } finally {
+        idle();
+        exportBusy = false;
+        controls.forEach((el,i) => el.disabled = disabled[i]);
+      }
     };
 
     // --- HELPERS: SCALING & INTERPOLATION ---
-    function getZInterpolated(nx, ny) {
-      if(!state.terrainData) return 0;
-      const T = state.terrainData;
-      const rFloat = ny * (T.rows-1);
-      const cFloat = nx * (T.cols-1);
-      const r0 = Math.floor(rFloat), r1 = Math.min(T.rows-1, r0+1);
-      const c0 = Math.floor(cFloat), c1 = Math.min(T.cols-1, c0+1);
-      const dr = rFloat - r0, dc = cFloat - c0;
-      const h00 = T.h[r0*T.cols+c0], h01 = T.h[r0*T.cols+c1], h10 = T.h[r1*T.cols+c0], h11 = T.h[r1*T.cols+c1];
-      return (h00*(1-dr)*(1-dc) + h01*(1-dr)*dc + h10*dr*(1-dc) + h11*dr*dc);
-    }
-
-    function isInShape(x, y) {
-      if(['rect','din_l','din_p','sq'].includes(state.shape)) return true;
-      const dx = x - state.wMm / 2;
-      const dy = y - state.hMm / 2;
-      if(state.shape === 'circle') return (dx*dx + dy*dy) <= (state.wMm/2) ** 2;
-      if(state.shape !== 'hex') return true;
-      const qx = Math.abs(dx) / (state.wMm / 2);
-      const qy = Math.abs(dy) / (state.hMm / 2);
-      return qx + qy * 0.577 <= 1;
-    }
-
-    function getContourLineCount() {
-      const desired = Math.max(4, Math.round(state.contour.density));
-      const minSpacing = Math.max(1.2, pxToMm(state.contour.width) * 8);
-      const maxLines = Math.max(4, Math.floor(Math.min(state.wMm, state.hMm) / minSpacing));
-      const hardMax = 100;
-      return Math.max(4, Math.min(desired, Math.min(maxLines, hardMax)));
-    }
-
-    function getContourLevels(minNorm = 0, maxNorm = state.terrainData?.delta ?? 0) {
-      if(!state.terrainData || maxNorm <= minNorm) return [];
-      const lineCount = getContourLineCount();
-      const interval = (maxNorm - minNorm) / lineCount;
-      return Array.from({length: lineCount - 1}, (_, i) => minNorm + interval * (i + 1));
-    }
-
-    function getShapeHeightRange() {
-      if(!state.terrainData) return null;
-      const { rows, cols, h, min, delta } = state.terrainData;
-      let minZ = Infinity;
-      let maxZ = -Infinity;
-      for(let r=0; r<rows; r++) {
-        const y = (r / (rows - 1)) * state.hMm;
-        for(let c=0; c<cols; c++) {
-          const x = (c / (cols - 1)) * state.wMm;
-          if(!isInShape(x, y)) continue;
-          const z = min + h[r * cols + c];
-          if(z < minZ) minZ = z;
-          if(z > maxZ) maxZ = z;
-        }
-      }
-      if(!Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
-        minZ = min;
-        maxZ = min + delta;
-      }
-      return { minZ, maxZ, minNorm: minZ - min, maxNorm: maxZ - min };
-    }
-
     function parseHexColor(hex) {
       const v = hex.replace('#', '').trim();
       if(v.length === 3) {
@@ -284,7 +249,8 @@ export function initTopomapper() {
       return { r: 0, g: 0, b: 0 };
     }
 
-    function colorToRgb(color) {
+    const colorCache = new Map();
+    function parseCssColor(color) {
       const tester = new Option().style;
       tester.color = color;
       const parsed = tester.color || '#000000';
@@ -296,6 +262,11 @@ export function initTopomapper() {
         return { r: parseInt(match[1], 10), g: parseInt(match[2], 10), b: parseInt(match[3], 10) };
       }
       return { r: 0, g: 0, b: 0 };
+    }
+
+    function colorToRgb(color) {
+      if(!colorCache.has(color)) cachePut(colorCache, color, parseCssColor(color));
+      return colorCache.get(color);
     }
 
     function lerp(a, b, t) { return a + (b - a) * t; }
@@ -543,184 +514,12 @@ export function initTopomapper() {
       return dataUrl;
     }
 
-    function getContourSegments(level, widthMm, heightMm) {
-      if(!state.terrainData) return [];
-      const T = state.terrainData;
-      const rows = T.rows;
-      const cols = T.cols;
-      const segments = [];
-      const xScale = widthMm / (cols - 1);
-      const yScale = heightMm / (rows - 1);
-      const safeRatio = (num, den) => {
-        if(den === 0) return 0.5;
-        const t = num / den;
-        if(!Number.isFinite(t)) return 0.5;
-        return Math.max(0, Math.min(1, t));
-      };
-
-      const edgePoint = (edge, r, c, h00, h10, h11, h01) => {
-        const x = c * xScale;
-        const y = r * yScale;
-        if(edge === 0) {
-          const t = safeRatio(level - h00, h10 - h00);
-          return [x + xScale * t, y];
-        }
-        if(edge === 1) {
-          const t = safeRatio(level - h10, h11 - h10);
-          return [x + xScale, y + yScale * t];
-        }
-        if(edge === 2) {
-          const t = safeRatio(level - h11, h01 - h11);
-          return [x + xScale * (1 - t), y + yScale];
-        }
-        const t = safeRatio(level - h01, h00 - h01);
-        return [x, y + yScale * (1 - t)];
-      };
-
-      const table = {
-        0: [],
-        1: [[3,2]],
-        2: [[2,1]],
-        3: [[3,1]],
-        4: [[0,1]],
-        5: 'amb',
-        6: [[0,2]],
-        7: [[0,3]],
-        8: [[0,3]],
-        9: [[0,2]],
-        10: 'amb',
-        11: [[0,1]],
-        12: [[3,1]],
-        13: [[2,1]],
-        14: [[3,2]],
-        15: []
-      };
-
-      for(let r=0; r<rows-1; r++) {
-        for(let c=0; c<cols-1; c++) {
-          const h00 = T.h[r*cols + c];
-          const h10 = T.h[r*cols + c + 1];
-          const h01 = T.h[(r+1)*cols + c];
-          const h11 = T.h[(r+1)*cols + c + 1];
-          const tl = h00 >= level;
-          const tr = h10 >= level;
-          const br = h11 >= level;
-          const bl = h01 >= level;
-          const idx = (tl<<3) | (tr<<2) | (br<<1) | bl;
-          if(idx === 0 || idx === 15) continue;
-          const cellCenter = (h00 + h10 + h11 + h01) / 4;
-          let pairs = table[idx];
-          if(pairs === 'amb') {
-            if(cellCenter >= level) {
-              pairs = idx === 5 ? [[0,1],[2,3]] : [[0,3],[1,2]];
-            } else {
-              pairs = idx === 5 ? [[0,3],[1,2]] : [[0,1],[2,3]];
-            }
-          }
-          pairs.forEach(pair => {
-            const p1 = edgePoint(pair[0], r, c, h00, h10, h11, h01);
-            const p2 = edgePoint(pair[1], r, c, h00, h10, h11, h01);
-            if(isInShape(p1[0], p1[1]) && isInShape(p2[0], p2[1])) {
-              segments.push([p1, p2]);
-            }
-          });
-        }
-      }
-      return segments;
-    }
-
-    function buildPolylines(segments, precision = 2) {
-      const keyFor = (p) => `${p[0].toFixed(precision)},${p[1].toFixed(precision)}`;
-      const endpointMap = new Map();
-      const used = new Array(segments.length).fill(false);
-      segments.forEach((seg, i) => {
-        [0,1].forEach(end => {
-          const key = keyFor(seg[end]);
-          if(!endpointMap.has(key)) endpointMap.set(key, []);
-          endpointMap.get(key).push({ index: i, end });
-        });
-      });
-
-      const takeNext = (key) => {
-        const list = endpointMap.get(key);
-        if(!list) return null;
-        for(const item of list) {
-          if(!used[item.index]) return item;
-        }
-        return null;
-      };
-
-      const lines = [];
-      for(let i = 0; i < segments.length; i++) {
-        if(used[i]) continue;
-        used[i] = true;
-        const base = segments[i];
-        const line = [base[0], base[1]];
-
-        let advanced = true;
-        while(advanced) {
-          advanced = false;
-          const tailKey = keyFor(line[line.length - 1]);
-          const next = takeNext(tailKey);
-          if(next && next.index !== i) {
-            used[next.index] = true;
-            const seg = segments[next.index];
-            const nextPoint = next.end === 0 ? seg[1] : seg[0];
-            line.push(nextPoint);
-            advanced = true;
-          }
-        }
-
-        advanced = true;
-        while(advanced) {
-          advanced = false;
-          const headKey = keyFor(line[0]);
-          const next = takeNext(headKey);
-          if(next && next.index !== i) {
-            used[next.index] = true;
-            const seg = segments[next.index];
-            const nextPoint = next.end === 0 ? seg[1] : seg[0];
-            line.unshift(nextPoint);
-            advanced = true;
-          }
-        }
-        lines.push(line);
-      }
-      return lines;
-    }
-
-    function smoothPolyline(points, iterations) {
-      if(points.length < 3 || iterations <= 0) return points;
-      const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-      const isClosed = dist(points[0], points[points.length - 1]) < 0.01;
-      let pts = isClosed ? points.slice(0, -1) : points.slice();
-
-      for(let i = 0; i < iterations; i++) {
-        const nextPts = [];
-        for(let p = 0; p < pts.length - 1; p++) {
-          const a = pts[p];
-          const b = pts[p + 1];
-          nextPts.push([0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]]);
-          nextPts.push([0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]]);
-        }
-        if(isClosed) {
-          const a = pts[pts.length - 1];
-          const b = pts[0];
-          nextPts.push([0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]]);
-          nextPts.push([0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]]);
-        }
-        pts = nextPts;
-      }
-      if(isClosed) pts.push(pts[0]);
-      return pts;
-    }
-
     function projectToSvg(lat, lon) {
       const bbox = state.renderBbox || state.bbox;
       if(!bbox) return [0, 0];
       const { sw, ne } = bbox;
       const x = ((lon - sw.lng) / (ne.lng - sw.lng)) * state.wMm;
-      const y = ((ne.lat - lat) / (ne.lat - sw.lat)) * state.hMm;
+      const y = ((latitudeY(lat) - latitudeY(ne.lat)) / (latitudeY(sw.lat) - latitudeY(ne.lat))) * state.hMm;
       return [x, y];
     }
 
@@ -785,30 +584,6 @@ export function initTopomapper() {
         }
       }
       return rings;
-    }
-
-    function getShapePathD() {
-      const w = state.wMm;
-      const h = state.hMm;
-      if(['rect','din_l','din_p','sq'].includes(state.shape)) {
-        return `M 0,0 H ${w} V ${h} H 0 Z`;
-      }
-      if(state.shape === 'circle') {
-        const r = w / 2;
-        return `M ${w / 2},${h / 2} m -${r},0 a ${r},${r} 0 1,0 ${w},0 a ${r},${r} 0 1,0 -${w},0`;
-      }
-      if(state.shape === 'hex') {
-        const r = w / 2;
-        const cx = w / 2;
-        const cy = h / 2;
-        const pts = [];
-        for(let i=0; i<6; i++) {
-          const a = i * Math.PI / 3 - Math.PI / 6;
-          pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
-        }
-        return `M ${pts[0][0]},${pts[0][1]} ` + pts.slice(1).map(p=>`L ${p[0]},${p[1]}`).join(' ') + ' Z';
-      }
-      return `M 0,0 H ${w} V ${h} H 0 Z`;
     }
 
     const overpassServers = [
@@ -925,6 +700,7 @@ export function initTopomapper() {
     const fetchOverpass = async (query, signal) => {
       let lastError = null;
       for(const server of overpassServers) {
+        if(signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
         try {
           return await fetchJsonWithTimeout(
             server,
@@ -954,9 +730,9 @@ export function initTopomapper() {
       ];
     };
 
-    async function fetchMapFeatures(sw, ne) {
+    async function fetchMapFeatures(sw, ne, signal) {
       state.osmStatus = { loaded: false, error: null, tiles: 1, ignored: false };
-      const cacheId = bboxKey(sw, ne);
+      const cacheId = `${bboxKey(sw, ne)}:${state.wMm}:${state.hMm}:mercator`;
       const cached = cacheId ? osmCache.get(cacheId) : null;
       if(cached?.data) {
         state.osmData = typeof structuredClone === 'function' ? structuredClone(cached.data) : JSON.parse(JSON.stringify(cached.data));
@@ -967,6 +743,7 @@ export function initTopomapper() {
       }
       updateMapDataStatus({ announce: true, loading: true });
       const controller = new AbortController();
+      linkAbort(signal, controller);
       const timeoutId = setTimeout(() => controller.abort(), OSM_TOTAL_TIMEOUT_MS);
       const attemptFetch = async (bboxes) => {
         const osmData = buildEmptyOsmData();
@@ -1000,7 +777,7 @@ export function initTopomapper() {
         state.osmStatus.loaded = true;
         state.osmStatus.tiles = 1;
         updateMapDataStatus({ announce: true });
-        if(cacheId) osmCache.set(cacheId, { data: state.osmData, tiles: state.osmStatus.tiles });
+        if(cacheId) cachePut(osmCache, cacheId, { data: state.osmData, tiles: state.osmStatus.tiles });
         return true;
       } catch (err) {
         if(controller.signal.aborted) {
@@ -1015,7 +792,7 @@ export function initTopomapper() {
           state.osmStatus.loaded = true;
           state.osmStatus.tiles = tiledBboxes.length;
           updateMapDataStatus({ announce: true });
-          if(cacheId) osmCache.set(cacheId, { data: state.osmData, tiles: state.osmStatus.tiles });
+          if(cacheId) cachePut(osmCache, cacheId, { data: state.osmData, tiles: state.osmStatus.tiles });
           return true;
         } catch (tileErr) {
           if(controller.signal.aborted) {
@@ -1070,42 +847,51 @@ export function initTopomapper() {
       updateVf();
     });
 
-    const SEARCH_DEBOUNCE_MS = 350;
-    const SEARCH_TIMEOUT_MS = 8000;
     let timer;
     let activeSearch = null;
-    $('searchInp').addEventListener('input', (e) => {
-      clearTimeout(timer);
-      const val = e.target.value;
-      if(val.length<3) { $('suggestionBox').style.display='none'; return; }
-      timer = setTimeout(async () => {
-        try {
-          if(activeSearch) {
-            activeSearch.abort();
-          }
-          activeSearch = new AbortController();
-          const d = await fetchJsonWithTimeout(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&limit=5`,
-            { signal: activeSearch.signal },
-            SEARCH_TIMEOUT_MS
-          );
-          const box = $('suggestionBox'); box.innerHTML='';
-          if(d.length) {
-            d.forEach(i => {
-              const div = document.createElement('div'); div.className = 'suggestion-item';
-              div.innerText = i.display_name.split(',').slice(0,3).join(',');
-              div.onclick = () => { map.flyTo({ center: [Number(i.lon), Number(i.lat)], zoom: 14, essential: true }); box.style.display='none'; $('searchInp').value=div.innerText; };
-              box.appendChild(div);
-            });
-            box.style.display='block';
-          }
-        } catch(e) {
-          if (e.name !== 'AbortError') {
-            $('suggestionBox').style.display='none';
-          }
-        }
-      }, SEARCH_DEBOUNCE_MS);
-    });
+    let lastSearchAt = 0;
+    const searchCache = new Map();
+    const search = async () => {
+      const val = searchInput.value.trim();
+      const box = $('suggestionBox');
+      if(val.length < 3 || activeSearch || activeJob) return;
+      const cached = searchCache.get(val.toLowerCase());
+      if(!cached && Date.now() - lastSearchAt < 1100) return;
+      activeSearch = new AbortController();
+      $('searchButton').disabled = true;
+      $('searchStatus').textContent = 'Searching…';
+      try {
+        lastSearchAt = Date.now();
+        const results = cached || await fetchJsonWithTimeout(
+          'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(val) + '&limit=5',
+          {signal:activeSearch.signal}, 8000
+        );
+        if(disposed) return;
+        cachePut(searchCache, val.toLowerCase(), results);
+        box.replaceChildren();
+        results.forEach(item => {
+          const button = document.createElement('button');
+          button.type = 'button'; button.className = 'suggestion-item';
+          button.textContent = item.display_name.split(',').slice(0,3).join(',');
+          button.onclick = () => {
+            map.flyTo({center:[Number(item.lon),Number(item.lat)],zoom:14,essential:true});
+            box.style.display='none'; searchInput.value=button.textContent;
+            $('searchStatus').textContent = '';
+          };
+          box.appendChild(button);
+        });
+        box.style.display = results.length ? 'block' : 'none';
+        $('searchStatus').textContent = results.length ? 'Choose a location below.' : 'No matches. Try a nearby city or move the map.';
+      } catch(error) {
+        if(!disposed) $('searchStatus').textContent = 'Search unavailable. You can still move and zoom the map.';
+      } finally {
+        activeSearch = null;
+        if(!disposed) $('searchButton').disabled = false;
+      }
+    };
+    $('searchButton').onclick = search;
+    searchInput.addEventListener('keydown', event => { if(event.key === 'Enter') { event.preventDefault(); search(); } });
+    searchInput.addEventListener('input', () => { $('suggestionBox').style.display='none'; });
 
     // --- UI CONSTRUCTION ---
     document.querySelectorAll('.layer-head').forEach((head) => {
@@ -1248,6 +1034,7 @@ export function initTopomapper() {
     if(toExport) toExport.addEventListener('click', () => setStep('3'));
     const backToStyle = $('backToStyle');
     if(backToStyle) backToStyle.addEventListener('click', () => setStep('2'));
+    $('renderPreview').onclick = () => { if(state.terrainData) renderSVG(); };
     if(refreshPreviewBtn) {
       refreshPreviewBtn.addEventListener('click', () => {
         if(!state.terrainData) return;
@@ -1383,7 +1170,7 @@ export function initTopomapper() {
 
     let previewTimer = null;
     const historyState = { past: [], future: [] };
-    const historyLimit = 5;
+    const historyLimit = 30;
     let isRestoringHistory = false;
 
     const getDesignSnapshot = () => JSON.stringify({
@@ -1430,6 +1217,7 @@ export function initTopomapper() {
       const dirtyHint = !state.autoPreview && state.previewDirty ? ' - Needs Refresh' : '';
       refreshPreviewBtn.textContent = `${label}${dirtyHint}`;
       refreshPreviewBtn.classList.toggle('is-on', state.autoPreview);
+      $('renderPreview').hidden = state.autoPreview || !state.previewDirty;
       refreshPreviewBtn.disabled = !state.terrainData;
     };
 
@@ -1520,36 +1308,8 @@ export function initTopomapper() {
       return base * (scaleMap[key] || 1);
     };
 
-    const getOverlayAlignmentStatus = () => {
-      const bbox = state.renderBbox || state.bbox;
-      if(!bbox || !state.terrainData) return null;
-      const alignmentPoints = [
-        { lat: bbox.ne.lat, lon: bbox.sw.lng, expected: [0, 0] },
-        { lat: bbox.ne.lat, lon: bbox.ne.lng, expected: [state.wMm, 0] },
-        { lat: bbox.sw.lat, lon: bbox.sw.lng, expected: [0, state.hMm] },
-        { lat: (bbox.sw.lat + bbox.ne.lat) / 2, lon: (bbox.sw.lng + bbox.ne.lng) / 2, expected: [state.wMm / 2, state.hMm / 2] }
-      ];
-      let maxDelta = 0;
-      alignmentPoints.forEach((pt) => {
-        const [x, y] = projectToSvg(pt.lat, pt.lon);
-        const dx = x - pt.expected[0];
-        const dy = y - pt.expected[1];
-        maxDelta = Math.max(maxDelta, Math.hypot(dx, dy));
-      });
-      return { ok: maxDelta <= 0.5, delta: maxDelta };
-    };
-
-    const ensureOverlayAlignment = async () => {
-      if(!state.renderBbox) return;
-      const alignmentStatus = getOverlayAlignmentStatus();
-      if(alignmentStatus?.ok) return;
-      const { sw, ne } = state.renderBbox;
-      await fetchMapFeatures(sw, ne);
-    };
-
     const updateMapDataStatus = ({ announce = false, loading = false } = {}) => {
-      const alignmentStatus = getOverlayAlignmentStatus();
-      const alignmentLabel = alignmentStatus ? ` | Alignment ${alignmentStatus.ok ? 'OK' : 'Check'}` : '';
+      if(disposed) return;
       if(!announce) return;
       if(loading) {
         showMapNotice('Map data loading...', { sticky: true });
@@ -1557,12 +1317,12 @@ export function initTopomapper() {
       }
       if(state.osmStatus?.loaded && state.osmData) {
         const tilesLabel = state.osmStatus.tiles > 1 ? ` | ${state.osmStatus.tiles} tiles` : '';
-        showMapNotice(`Map data loaded: Water ${state.osmData.waterPolygons.length}, Rivers ${state.osmData.waterLines.length}, Roads ${state.osmData.roadLines.length}, Green ${state.osmData.greenPolygons.length}, Labels ${state.osmData.labels.length}${tilesLabel}${alignmentLabel}`);
+        showMapNotice(`Map data loaded: Water ${state.osmData.waterPolygons.length}, Rivers ${state.osmData.waterLines.length}, Roads ${state.osmData.roadLines.length}, Green ${state.osmData.greenPolygons.length}, Labels ${state.osmData.labels.length}${tilesLabel}`);
         return;
       }
       if(state.osmStatus?.error) {
         const suffix = state.osmStatus.ignored ? ' (ignored)' : '';
-        showMapNotice(`Map data missing${suffix}: ${state.osmStatus.error}${alignmentLabel}`);
+        showMapNotice(`Map data missing${suffix}: ${state.osmStatus.error}`);
       }
     };
 
@@ -1637,7 +1397,7 @@ export function initTopomapper() {
       markPreviewDirty();
     };
     $('contourWidth').oninput = (e) => setContourWidth(e.target.value);
-    $('contourWidthInput').oninput = (e) => setContourWidth(e.target.value);
+    $('contourWidthInput').onchange = (e) => setContourWidth(e.target.value);
     $('contourEmphasis').oninput = (e) => {
       const raw = parseInt(e.target.value, 10);
       const val = Math.min(20, Math.max(0, Number.isNaN(raw) ? 0 : raw));
@@ -1648,7 +1408,7 @@ export function initTopomapper() {
 
     $('contourDensity').oninput = (e) => {
       state.contour.density = parseInt(e.target.value, 10);
-      $('contourDensityVal').innerText = state.contour.density;
+      $('contourDensityVal').innerText = getContourLineCount();
       markPreviewDirty();
     };
 
@@ -1702,7 +1462,7 @@ export function initTopomapper() {
       markPreviewDirty();
     };
     $('riverWidth').oninput = (e) => setRiverWidth(e.target.value);
-    $('riverWidthInput').oninput = (e) => setRiverWidth(e.target.value);
+    $('riverWidthInput').onchange = (e) => setRiverWidth(e.target.value);
     $('riverOpacity').oninput = (e) => {
       state.mapFeatures.rivers.opacity = toPercent(e.target.value);
       $('riverOpacityVal').innerText = formatPercent(state.mapFeatures.rivers.opacity);
@@ -1742,7 +1502,7 @@ export function initTopomapper() {
       markPreviewDirty();
     };
     $('roadWidth').oninput = (e) => setRoadWidth(e.target.value);
-    $('roadWidthInput').oninput = (e) => setRoadWidth(e.target.value);
+    $('roadWidthInput').onchange = (e) => setRoadWidth(e.target.value);
     $('roadOpacity').oninput = (e) => {
       state.mapFeatures.roads.opacity = toPercent(e.target.value);
       $('roadOpacityVal').innerText = formatPercent(state.mapFeatures.roads.opacity);
@@ -1862,7 +1622,11 @@ export function initTopomapper() {
       $('dimH').disabled = ['sq','circle','hex','din_l','din_p'].includes(state.shape);
       updateVf();
     };
-    ['dimW','dimH'].forEach(id => $(id).oninput = updateVf);
+    ['dimW','dimH'].forEach(id => $(id).onchange = () => {
+      state[id === 'dimW' ? 'wMm' : 'hMm'] = clampDimensionMm($(id).value);
+      $(id).value = state[id === 'dimW' ? 'wMm' : 'hMm'];
+      updateVf();
+    });
 
     const syncUiFromState = () => {
       $('presetSel').value = state.theme.preset;
@@ -1880,7 +1644,7 @@ export function initTopomapper() {
       $('contourEmphasis').value = state.contour.emphasisEvery ?? 0;
       $('contourEmphasisVal').innerText = formatNthLineLabel(state.contour.emphasisEvery);
       $('contourDensity').value = state.contour.density;
-      $('contourDensityVal').innerText = state.contour.density;
+      $('contourDensityVal').innerText = getContourLineCount();
       $('contourOpacity').value = state.contour.opacity;
       $('contourOpacityVal').innerText = formatPercent(state.contour.opacity);
       $('contourSmooth').value = state.contour.smooth;
@@ -1962,21 +1726,24 @@ export function initTopomapper() {
     }
 
     function updateVf() {
-      state.wMm = clampDimensionMm($('dimW').value); state.hMm = clampDimensionMm($('dimH').value);
-      $('dimW').value = state.wMm;
-      $('dimH').value = state.hMm;
+      if(disposed) return;
       if(['sq','circle','hex'].includes(state.shape)) { state.hMm = state.wMm; $('dimH').value = state.wMm; }
       if(state.shape === 'din_l') { state.hMm = Math.round(state.wMm / 1.414); $('dimH').value = state.hMm; }
       if(state.shape === 'din_p') { state.hMm = Math.round(state.wMm * 1.414); $('dimH').value = state.hMm; }
 
       const winW = window.innerWidth, winH = window.innerHeight;
-      const sideW = document.querySelector('.sidebar')?.offsetWidth || 400;
+      const sidebar = document.querySelector('.sidebar').getBoundingClientRect();
       const headerH = document.querySelector('.top-header')?.offsetHeight || 0;
-      const pad = 24;
-      const availW = Math.max(0, winW - sideW - pad * 2);
-      const availH = Math.max(0, winH - headerH - pad * 2);
-      const cx = sideW + pad + availW / 2;
-      const cy = headerH + pad + availH / 2;
+      const pad = 16;
+      const mobile = winW <= 980;
+      const left = mobile ? pad : sidebar.right + pad;
+      const top = headerH + pad;
+      const right = winW - pad;
+      const bottom = mobile ? sidebar.top - pad : winH - pad;
+      const availW = Math.max(1, right - left);
+      const availH = Math.max(1, bottom - top);
+      const cx = left + availW / 2;
+      const cy = top + availH / 2;
       const ratio = state.hMm / state.wMm;
       const targetW = availW * 0.78, targetH = availH * 0.78;
       let pxW, pxH;
@@ -2003,102 +1770,94 @@ export function initTopomapper() {
       }
       updateMapDataStatus();
     }
-    window.addEventListener('resize', () => { map.resize(); updateVf(); });
+    window.addEventListener('resize', () => { map.resize(); updateVf(); }, {signal:lifetime.signal});
+    const frameObserver = new ResizeObserver(updateVf);
+    frameObserver.observe(document.querySelector('.sidebar'));
     map.on('move', updateVf);
     map.on('zoom', updateVf);
     map.on('resize', updateVf);
-    setTimeout(updateVf,500);
+    const frameTimer = setTimeout(updateVf,500);
 
     // --- GENERATION PIPELINE ---
-    $('btnGen').onclick = async () => {
-      msg('Fetching Elevation Data...');
-      if(state.bbox) {
-        state.renderBbox = {
-          sw: { ...state.bbox.sw },
-          ne: { ...state.bbox.ne }
-        };
-      }
-      const {sw, ne} = state.bbox;
-      await fetchTerrain(sw, ne);
-      msg('Fetching Map Features...');
-      const mapOk = await fetchMapFeatures(sw, ne);
-      if(!state.terrainData) {
+    const showGenerationStatus = (text, error = false) => {
+      $('generationStatus').textContent = text;
+      $('generationStatus').classList.toggle('error', error);
+    };
+    const openPreview = () => {
+      if(lastFrame) {
+        Object.assign(state,lastFrame);
+        $('dimW').value=state.wMm; $('dimH').value=state.hMm; $('shapeSel').value=state.shape;
+        $('dimH').disabled=['sq','circle','hex','din_l','din_p'].includes(state.shape);
         renderSVG();
-        idle();
-        $('modal').classList.add('open');
-        alert('Elevation data unavailable. Try a smaller area or try again.');
-        return;
       }
-      if(!mapOk) {
-        idle();
-        const proceed = confirm('Map data (roads, rivers, water/green areas) could not be loaded.\n\nProceed without map data?\nCancel to pick another area.');
-        if(!proceed) {
-          return;
-        }
-        state.osmStatus.ignored = true;
-        updateMapDataStatus();
-      }
-      await ensureOverlayAlignment();
-      renderSVG();
-      idle();
-      setStep('2');
       $('modal').classList.add('open');
+      document.querySelector('.sidebar').inert = true;
+      document.querySelector('.viewport').inert = true;
+      $('closePreview').focus();
+    };
+    $('previousPreview').onclick = () => { if(state.terrainData) openPreview(); };
+    $('cancelGeneration').onclick = () => activeJob?.abort();
+    $('btnGen').onclick = async () => {
+      if(activeJob || exportBusy || disposed) return;
+      const controller = new AbortController();
+      activeJob = controller;
+      const previous = { terrainData: state.terrainData, osmData: state.osmData, osmStatus: state.osmStatus, renderBbox: state.renderBbox };
+      const controls = Array.from(document.querySelectorAll('.sidebar input, .sidebar select, #btnGen, #previousPreview, #searchButton'));
+      const disabled = controls.map(el => el.disabled);
+      controls.forEach(el => el.disabled = true);
+      const interactions = [map.dragPan, map.scrollZoom, map.boxZoom, map.doubleClickZoom, map.touchZoomRotate, map.keyboard];
+      const enabled = interactions.map(control => control.isEnabled());
+      interactions.forEach(control => control.disable());
+      $('cancelGeneration').hidden = false;
+      showGenerationStatus('Loading elevation…');
+      try {
+        updateVf();
+        const bounds = structuredClone(state.bbox);
+        validateBounds(bounds);
+        const key = bboxKey(bounds.sw, bounds.ne);
+        const terrain = terrainCache.get(key) || await runWorker('terrain', bounds, {
+          signal: controller.signal, progress: text => { if(!disposed) showGenerationStatus(text); }
+        });
+        if(controller.signal.aborted || disposed) throw new DOMException('Cancelled', 'AbortError');
+        cachePut(terrainCache, key, terrain);
+        state.renderBbox = bounds;
+        state.terrainData = terrain;
+        state.terrainVersion++;
+        state.pngPreviewCache = {key:null,dataUrl:null};
+        showGenerationStatus('Terrain ready. Loading roads and water…');
+        const mapOk = await fetchMapFeatures(bounds.sw, bounds.ne, controller.signal);
+        if(controller.signal.aborted || disposed) throw new DOMException('Cancelled', 'AbortError');
+        state.osmStatus.ignored = !mapOk;
+        renderSVG();
+        setStep('2');
+        showGenerationStatus(terrain.source + (mapOk ? '' : ' · Map overlays unavailable; terrain is ready.'));
+        lastFrame={wMm:state.wMm,hMm:state.hMm,shape:state.shape};
+        $('terrainSource').textContent = terrain.source;
+        openPreview();
+      } catch(error) {
+        Object.assign(state, previous);
+        state.terrainVersion++;
+        state.pngPreviewCache = {key:null,dataUrl:null};
+        if(!disposed) {
+          if(state.terrainData) renderSVG();
+          showGenerationStatus(error.name === 'AbortError' ? 'Cancelled. Your previous preview is preserved.' : error.message, error.name !== 'AbortError');
+        }
+      } finally {
+        activeJob = null;
+        if(!disposed) {
+          controls.forEach((el,i) => el.disabled = disabled[i]);
+          interactions.forEach((control,i) => { if(enabled[i]) control.enable(); });
+          $('cancelGeneration').hidden = true;
+          $('previousPreview').hidden = !state.terrainData;
+          $('btnGen').textContent = state.terrainData ? 'Generate New Preview' : 'Generate Preview';
+          updateMapDataStatus();
+          idle();
+        }
+      }
     };
 
-    async function fetchTerrain(sw, ne) {
-      try {
-        const cacheId = bboxKey(sw, ne);
-        const cached = cacheId ? terrainCache.get(cacheId) : null;
-        if(cached) {
-          state.terrainData = cached;
-          state.terrainVersion += 1;
-          state.pngPreviewCache = { key: null, dataUrl: null };
-          return;
-        }
-        const rows = 120;
-        const cols = rows;
-        const locs=[];
-        const dLat = (ne.lat - sw.lat) / (rows - 1);
-        const dLon = (ne.lng - sw.lng) / (cols - 1);
-        for(let r=0;r<rows;r++) {
-          const lat = ne.lat - r * dLat;
-          for(let c=0;c<cols;c++) {
-            locs.push({ latitude: lat, longitude: sw.lng + c * dLon });
-          }
-        }
-        const j = await fetchJsonWithTimeout(
-          'https://api.open-elevation.com/api/v1/lookup',
-          {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locations:locs})}
-        );
-        let h = j.results.map(x=>x.elevation);
-        // Smooth based on detail: higher detail keeps more variation.
-        const smoothPasses = 4;
-        for(let i=0; i<smoothPasses; i++) h = smoothPass(h, rows, cols);
-        let min=Infinity, max=-Infinity; h.forEach(v => { if(v<min) min=v; if(v>max) max=v; });
-        state.terrainData = { rows, cols, h: h.map(z=>z-min), min, max, delta: max-min };
-        state.terrainVersion += 1;
-        state.pngPreviewCache = { key: null, dataUrl: null };
-        if(cacheId) terrainCache.set(cacheId, state.terrainData);
-      } catch(e) {
-        state.terrainData = null;
-        state.pngPreviewCache = { key: null, dataUrl: null };
-      }
-    }
-
-    function smoothPass(data, rows, cols) {
-      const out = new Float32Array(data.length);
-      for(let r=0; r<rows; r++) for(let c=0; c<cols; c++) {
-        let sum=0, wSum=0;
-        for(let rr=r-1; rr<=r+1; rr++) for(let cc=c-1; cc<=c+1; cc++) {
-          if(rr>=0 && rr<rows && cc>=0 && cc<cols) {
-            const w = (rr===r && cc===c) ? 8 : 1; sum+=data[rr*cols+cc]*w; wSum+=w;
-          }
-        }
-        out[r*cols+c] = sum/wSum;
-      }
-      return out;
-    }
-
+    let lastFrame = null;
+    let contourCache = {key:null, groups:[]};
     function buildSvgMarkup({ includeBackground = true, includeGradient = true, includeFrame = true } = {}) {
       const {wMm, hMm} = state;
       let svg = `<svg id="prevSvg" width="${wMm}mm" height="${hMm}mm" viewBox="0 0 ${wMm} ${hMm}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
@@ -2138,7 +1897,7 @@ export function initTopomapper() {
         },
         rivers: () => {
           if(!state.osmData || !state.mapFeatures.rivers.enabled || !state.osmData.waterLines.length) return '';
-          let out = `<g id="rivers" stroke="${state.mapFeatures.rivers.color}" stroke-width="${state.mapFeatures.rivers.width}px" stroke-opacity="${toUnitOpacity(state.mapFeatures.rivers.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+          let out = `<g id="rivers" stroke="${state.mapFeatures.rivers.color}" stroke-width="${state.mapFeatures.rivers.width}" stroke-opacity="${toUnitOpacity(state.mapFeatures.rivers.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
           state.osmData.waterLines.forEach((line) => {
             const d = pathFromCoords(line, false);
             if(d) out += `<path d="${d}"/>`;
@@ -2147,7 +1906,7 @@ export function initTopomapper() {
         },
         roads: () => {
           if(!state.osmData || !state.mapFeatures.roads.enabled || !state.osmData.roadLines.length) return '';
-          let out = `<g id="roads" stroke="${state.mapFeatures.roads.color}" stroke-width="${state.mapFeatures.roads.width}px" stroke-opacity="${toUnitOpacity(state.mapFeatures.roads.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+          let out = `<g id="roads" stroke="${state.mapFeatures.roads.color}" stroke-width="${state.mapFeatures.roads.width}" stroke-opacity="${toUnitOpacity(state.mapFeatures.roads.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
           state.osmData.roadLines.forEach((line) => {
             const d = pathFromCoords(line, false);
             if(d) out += `<path d="${d}"/>`;
@@ -2157,26 +1916,30 @@ export function initTopomapper() {
         contours: () => {
           state.contourPaths = [];
           if(!state.contour.enabled) return '';
-          if(!state.terrainData || state.terrainData.delta <= 0) {
+          if(state.terrainData?.delta === 0) return '';
+          if(!state.terrainData) {
             const cx = wMm / 2;
             const cy = hMm / 2;
             return `<text x="${cx}" y="${cy}" text-anchor="middle" font-family="SF Pro Text, Segoe UI, Roboto, sans-serif" font-size="6" fill="#9AA3B2">Elevation data missing. Try generating again.</text>`;
           }
-          const levels = getContourLevels();
-          const emphasisEvery = Math.max(0, Math.round(state.contour.emphasisEvery || 0));
+          const key = [state.terrainVersion,wMm,hMm,state.shape,state.contour.density,state.contour.smooth].join(':');
+          if(contourCache.key !== key) {
+            const clip = getClipPolygon();
+            const groups = getContourLevels().map(level =>
+              buildPolylines(getContourSegments(level,wMm,hMm)).flatMap(line =>
+                clipPolylineToPolygon(smoothPolyline(line,state.contour.smooth),clip)
+              )
+            );
+            contourCache = {key,groups};
+          }
+          const emphasisEvery = Math.max(0,Math.round(state.contour.emphasisEvery || 0));
           let out = `<g id="contours" stroke="${state.contour.color}" stroke-opacity="${toUnitOpacity(state.contour.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
-          levels.forEach((level, idx) => {
-            const segments = getContourSegments(level, wMm, hMm);
-            if(!segments.length) return;
-            const polylines = buildPolylines(segments);
-            const isBold = emphasisEvery > 0 && ((idx + 1) % emphasisEvery === 0);
-            const lineWidth = state.contour.width * (isBold ? 2 : 1);
-            polylines.forEach(line => {
-              const smoothed = state.contour.smooth ? smoothPolyline(line, state.contour.smooth) : line;
-              if(smoothed.length < 2) return;
-              state.contourPaths.push(smoothed);
-              const path = smoothed.map((pt, idx) => `${idx ? 'L' : 'M'} ${pt[0].toFixed(2)} ${pt[1].toFixed(2)}`).join(' ');
-              out += `<path d="${path}" stroke-width="${lineWidth}px" />`;
+          contourCache.groups.forEach((paths,index) => {
+            const lineWidth = state.contour.width * (emphasisEvery > 0 && (index+1)%emphasisEvery === 0 ? 2 : 1);
+            paths.forEach(path => {
+              state.contourPaths.push(path);
+              const d=path.map((pt,i)=>`${i?'L':'M'} ${pt[0].toFixed(2)} ${pt[1].toFixed(2)}`).join(' ');
+              out += `<path d="${d}" stroke-width="${lineWidth}" />`;
             });
           });
           return out + `</g>`;
@@ -2196,12 +1959,12 @@ export function initTopomapper() {
           const haloColor = state.mapFeatures.labels.background.color || state.theme.background;
           const fontWeight = state.mapFeatures.labels.weight || 'normal';
           const fontStyle = state.mapFeatures.labels.style || 'normal';
-          let out = `<g id="placeLabels" font-family="${fontFamily}" text-anchor="middle" fill="${state.mapFeatures.labels.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.labels.opacity)}" paint-order="stroke" font-weight="${fontWeight}" font-style="${fontStyle}">`;
+          let out = `<g id="placeLabels" font-family="${escapeXml(fontFamily)}" text-anchor="middle" fill="${state.mapFeatures.labels.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.labels.opacity)}" paint-order="stroke" font-weight="${fontWeight}" font-style="${fontStyle}">`;
           state.osmData.labels.forEach((place) => {
             const [x, y] = projectToSvg(place.lat, place.lon);
             const size = getLabelSize(place);
             const stroke = haloEnabled ? ` stroke="${haloColor}" stroke-width="0.6"` : ' stroke="none" stroke-width="0"';
-            out += `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${size.toFixed(2)}mm"${stroke}>${place.name}</text>`;
+            out += `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${size.toFixed(2)}"${stroke}>${escapeXml(place.name)}</text>`;
           });
           return out + `</g>`;
         }
@@ -2215,13 +1978,14 @@ export function initTopomapper() {
 
       svg += `</g>`;
       if(includeFrame) {
-        svg += `<rect x="0.5" y="0.5" width="${wMm - 1}" height="${hMm - 1}" fill="none" stroke="rgba(36,48,65,0.6)" stroke-width="0.5" />`;
+        svg += `<path d="${clipPathD}" fill="none" stroke="#6b7280" stroke-width="0.2" />`;
       }
       svg += `</svg>`;
       return svg;
     }
 
     function renderSVG() {
+      if(disposed) return;
       const svg = buildSvgMarkup({ includeBackground: true, includeGradient: true, includeFrame: true });
       $('previewArea').innerHTML = svg;
       updatePngRangeInfo();
@@ -2229,173 +1993,11 @@ export function initTopomapper() {
       updateAutoPreviewButton();
     }
 
-    const polygonArea = (poly) => {
-      let sum = 0;
-      for(let i = 0; i < poly.length - 1; i++) {
-        sum += poly[i][0] * poly[i + 1][1] - poly[i + 1][0] * poly[i][1];
-      }
-      return sum / 2;
-    };
-
-    const getClipPolygon = () => {
-      const w = state.wMm;
-      const h = state.hMm;
-      if(['rect','din_l','din_p','sq'].includes(state.shape)) {
-        return [[0,0],[w,0],[w,h],[0,h]];
-      }
-      if(state.shape === 'hex') {
-        const r = w / 2;
-        const cx = w / 2;
-        const cy = h / 2;
-        const pts = [];
-        for(let i=0; i<6; i++) {
-          const a = i * Math.PI / 3 - Math.PI / 6;
-          pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
-        }
-        return pts;
-      }
-      if(state.shape === 'circle') {
-        const r = w / 2;
-        const cx = w / 2;
-        const cy = h / 2;
-        const pts = [];
-        const steps = 48;
-        for(let i=0; i<steps; i++) {
-          const a = (i / steps) * Math.PI * 2;
-          pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
-        }
-        return pts;
-      }
-      return [[0,0],[w,0],[w,h],[0,h]];
-    };
-
-    const clipCanvasToShape = (ctx, widthPx, heightPx) => {
-      const poly = getClipPolygon();
-      if(!poly?.length) return;
-      ctx.beginPath();
-      poly.forEach((pt, idx) => {
-        const x = (pt[0] / state.wMm) * widthPx;
-        const y = (pt[1] / state.hMm) * heightPx;
-        if(idx === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
-      ctx.closePath();
-      ctx.clip();
-    };
-
-    const clipPolygon = (subject, clip) => {
-      let output = subject.slice();
-      const isInside = (pt, edgeStart, edgeEnd) => {
-        return (edgeEnd[0] - edgeStart[0]) * (pt[1] - edgeStart[1]) - (edgeEnd[1] - edgeStart[1]) * (pt[0] - edgeStart[0]) >= 0;
-      };
-      const lineIntersection = (s, e, cp1, cp2) => {
-        const dc = [cp1[0] - cp2[0], cp1[1] - cp2[1]];
-        const dp = [s[0] - e[0], s[1] - e[1]];
-        const n1 = cp1[0] * cp2[1] - cp1[1] * cp2[0];
-        const n2 = s[0] * e[1] - s[1] * e[0];
-        const denom = dc[0] * dp[1] - dc[1] * dp[0];
-        if(Math.abs(denom) < 1e-9) return e;
-        return [
-          (n1 * dp[0] - n2 * dc[0]) / denom,
-          (n1 * dp[1] - n2 * dc[1]) / denom
-        ];
-      };
-      for(let i=0; i<clip.length; i++) {
-        const cp1 = clip[i];
-        const cp2 = clip[(i + 1) % clip.length];
-        const input = output.slice();
-        output = [];
-        if(!input.length) break;
-        let s = input[input.length - 1];
-        input.forEach((e) => {
-          if(isInside(e, cp1, cp2)) {
-            if(!isInside(s, cp1, cp2)) {
-              output.push(lineIntersection(s, e, cp1, cp2));
-            }
-            output.push(e);
-          } else if(isInside(s, cp1, cp2)) {
-            output.push(lineIntersection(s, e, cp1, cp2));
-          }
-          s = e;
-        });
-      }
-      return output;
-    };
-
-    const clipSegmentToConvex = (p0, p1, clip) => {
-      let t0 = 0;
-      let t1 = 1;
-      for(let i=0; i<clip.length; i++) {
-        const a = clip[i];
-        const b = clip[(i + 1) % clip.length];
-        const edge = [b[0] - a[0], b[1] - a[1]];
-        const normal = [edge[1], -edge[0]];
-        const w = [p0[0] - a[0], p0[1] - a[1]];
-        const denom = normal[0] * (p1[0] - p0[0]) + normal[1] * (p1[1] - p0[1]);
-        const numer = -(normal[0] * w[0] + normal[1] * w[1]);
-        if(Math.abs(denom) < 1e-9) {
-          if(numer < 0) return null;
-          continue;
-        }
-        const t = numer / denom;
-        if(denom < 0) {
-          t0 = Math.max(t0, t);
-        } else {
-          t1 = Math.min(t1, t);
-        }
-        if(t0 > t1) return null;
-      }
-      const c0 = [p0[0] + (p1[0] - p0[0]) * t0, p0[1] + (p1[1] - p0[1]) * t0];
-      const c1 = [p0[0] + (p1[0] - p0[0]) * t1, p0[1] + (p1[1] - p0[1]) * t1];
-      return [c0, c1];
-    };
-
-    const clipPolylineToPolygon = (line, clip) => {
-      if(line.length < 2) return [];
-      const out = [];
-      let current = [];
-      for(let i=0; i<line.length - 1; i++) {
-        const clipped = clipSegmentToConvex(line[i], line[i + 1], clip);
-        if(clipped) {
-          const [c0, c1] = clipped;
-          if(!current.length) {
-            current.push(c0, c1);
-          } else {
-            const last = current[current.length - 1];
-            if(Math.hypot(last[0] - c0[0], last[1] - c0[1]) > 1e-4) {
-              out.push(current);
-              current = [c0, c1];
-            } else {
-              current.push(c1);
-            }
-          }
-        } else if(current.length) {
-          out.push(current);
-          current = [];
-        }
-      }
-      if(current.length) out.push(current);
-      return out;
-    };
-
-    const ensureClosed = (poly) => {
-      if(poly.length < 3) return poly;
-      const first = poly[0];
-      const last = poly[poly.length - 1];
-      if(Math.hypot(first[0] - last[0], first[1] - last[1]) > 1e-4) {
-        return poly.concat([first]);
-      }
-      return poly;
-    };
-
     $('btnDXF').onclick = async () => {
-      if(!state.contourPaths.length) {
-        alert('Generate contours first.');
-        return;
-      }
+      if(!state.terrainData && !state.osmData) return;
       await runExportFlow('DXF', async (onSave) => {
         buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: true });
-        let dxf = "0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
+        let dxf = "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
         const rgbToAci = ({ r, g, b }) => {
           const max = Math.max(r, g, b);
           const min = Math.min(r, g, b);
@@ -2423,7 +2025,7 @@ export function initTopomapper() {
           const aci = rgbToAci(rgb);
           const trueColor = (rgb.r << 16) + (rgb.g << 8) + rgb.b;
           dxf += `0\nLWPOLYLINE\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n90\n${outPts.length}\n70\n${closed ? 1 : 0}\n`;
-          outPts.forEach(p => dxf += `10\n${p[0].toFixed(4)}\n20\n${(state.hMm - p[1]).toFixed(4)}\n`);
+          outPts.forEach(p => dxf += `10\n${p[0].toFixed(6)}\n20\n${(state.hMm - p[1]).toFixed(6)}\n`);
         };
         const writeText = (layer, text, x, y, height, color) => {
           if(!text) return;
@@ -2432,7 +2034,7 @@ export function initTopomapper() {
           const trueColor = (rgb.r << 16) + (rgb.g << 8) + rgb.b;
           const safeText = String(text).replace(/[\r\n\t]+/g, ' ').trim();
           if(!safeText) return;
-          dxf += `0\nTEXT\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n10\n${x.toFixed(4)}\n20\n${(state.hMm - y).toFixed(4)}\n40\n${height.toFixed(4)}\n1\n${safeText}\n50\n0\n`;
+          dxf += `0\nTEXT\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n10\n${x.toFixed(6)}\n20\n${(state.hMm - y).toFixed(6)}\n40\n${height.toFixed(6)}\n1\n${safeText}\n50\n0\n`;
         };
         const clipPoly = getClipPolygon();
         if(polygonArea(clipPoly) < 0) clipPoly.reverse();
@@ -2505,7 +2107,7 @@ export function initTopomapper() {
           ctx.drawImage(img, 0, 0, w, h);
           resolve();
         };
-        img.onerror = reject;
+        img.onerror = () => reject(new Error('SVG could not be rendered. Check the design and retry.'));
         img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgMarkup)));
       });
     }
@@ -2624,8 +2226,7 @@ export function initTopomapper() {
 
     async function exportLayeredPng(onSave) {
       if(!state.terrainData) {
-        alert('Generate contours first.');
-        return;
+        throw new Error('Generate terrain before exporting.');
       }
       const e = +$('pngResRange').value;
       const r = state.hMm / state.wMm;
@@ -2646,12 +2247,10 @@ export function initTopomapper() {
       const alpha = Math.round(255 * clamp(toUnitOpacity(state.png.gradientOpacity), 0, 1));
       const gradientResult = buildLayeredGradientCanvas(gradW, gradH, alpha);
       if(gradientResult.error === 'data') {
-        alert('Elevation data missing.');
-        return;
+        throw new Error('Elevation data missing.');
       }
       if(gradientResult.error === 'range') {
-        alert('Contour range too small for height band export.');
-        return;
+        throw new Error('Contour range too small for height band export.');
       }
       if(gradientResult.canvas) {
         ctx.save();
@@ -2667,11 +2266,12 @@ export function initTopomapper() {
       try {
         await drawSvgOnCanvas(ctx, overlaySvg, w, h);
       } catch (e) {
-        // best effort, proceed without overlay on failure
+        throw new Error('Could not render map overlays. No partial PNG was saved.');
       }
       if(onSave) await onSave();
-      await new Promise((resolve) => {
+      await new Promise((resolve, reject) => {
         cv.toBlob((b) => {
+          if(!b) { reject(new Error('PNG encoding failed. Try a lower resolution.')); return; }
           save(b, 'Topomapper_Layered.png');
           resolve();
         });
@@ -2701,8 +2301,9 @@ export function initTopomapper() {
         img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
       });
       if(onSave) await onSave();
-      await new Promise((resolve) => {
+      await new Promise((resolve, reject) => {
         cv.toBlob((b) => {
+          if(!b) { reject(new Error('PNG encoding failed. Try a lower resolution.')); return; }
           save(b, 'Topomapper.png');
           resolve();
         });
@@ -2722,186 +2323,55 @@ export function initTopomapper() {
     };
 
     $('btn3MF').onclick = async () => {
-      if(!state.terrainData) {
-        alert('Generate contours first.');
-        return;
-      }
-      await runExportFlow('3MF', async (onSave) => {
-        msg('Generating Assembly...');
-        await new Promise(r => setTimeout(r, 100));
-        const zip = new JSZip();
-        const targetH = +$('targetH').value;
-        let zScale = state.terrainData && state.terrainData.delta > 0 ? targetH / state.terrainData.delta : 1;
-        const objs = [];
-        let objId = 1;
-
-        // 1. Terrain Mesh (Watertight)
-        const baseThickness = 2.0;
-        const resInput = $('meshRes');
-        const res = Math.max(80, Math.min(600, Math.round(parseFloat(resInput?.value) || 220)));
-        const tm = { v:[], t:[] };
-        const vertexCache = new Map();
-        const gridSize = res + 1;
-        let heightGrid = new Float32Array(gridSize * gridSize);
-        for(let r=0; r<=res; r++) {
-          for(let c=0; c<=res; c++) {
-            heightGrid[r * gridSize + c] = getZInterpolated(c / res, r / res);
-          }
-        }
-        const meshSmoothPasses = 2;
-        for(let i=0; i<meshSmoothPasses; i++) {
-          heightGrid = smoothPass(heightGrid, gridSize, gridSize);
-        }
-        const polygonAreaClosed = (poly) => {
-          let sum = 0;
-          for(let i=0; i<poly.length; i++) {
-            const a = poly[i];
-            const b = poly[(i + 1) % poly.length];
-            sum += a[0] * b[1] - b[0] * a[1];
-          }
-          return sum / 2;
-        };
-        const sampleHeight = (xMm, yMm) => {
-          const nx = Math.max(0, Math.min(1, xMm / state.wMm));
-          const ny = Math.max(0, Math.min(1, yMm / state.hMm));
-          const gx = nx * res;
-          const gy = ny * res;
-          const c0 = Math.max(0, Math.min(res, Math.floor(gx)));
-          const r0 = Math.max(0, Math.min(res, Math.floor(gy)));
-          const c1 = Math.min(res, c0 + 1);
-          const r1 = Math.min(res, r0 + 1);
-          const tx = gx - c0;
-          const ty = gy - r0;
-          const h00 = heightGrid[r0 * gridSize + c0];
-          const h01 = heightGrid[r0 * gridSize + c1];
-          const h10 = heightGrid[r1 * gridSize + c0];
-          const h11 = heightGrid[r1 * gridSize + c1];
-          const top = h00 * (1 - tx) + h01 * tx;
-          const bottom = h10 * (1 - tx) + h11 * tx;
-          return top * (1 - ty) + bottom * ty;
-        };
-        const vertexKey = (v) => `${v[0].toFixed(4)},${v[1].toFixed(4)},${v[2].toFixed(4)}`;
-        const getVertexIndex = (v) => {
-          const key = vertexKey(v);
-          const existing = vertexCache.get(key);
-          if(existing !== undefined) return existing;
-          const idx = tm.v.push(v) - 1;
-          vertexCache.set(key, idx);
-          return idx;
-        };
-        const addTri = (a, b, c) => {
-          const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-          const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-          const cx = ab[1] * ac[2] - ab[2] * ac[1];
-          const cy = ab[2] * ac[0] - ab[0] * ac[2];
-          const cz = ab[0] * ac[1] - ab[1] * ac[0];
-          const area2 = Math.hypot(cx, cy, cz);
-          if(area2 < 1e-6) return;
-          const ia = getVertexIndex(a);
-          const ib = getVertexIndex(b);
-          const ic = getVertexIndex(c);
-          if(ia === ib || ib === ic || ia === ic) return;
-          tm.t.push([ia, ib, ic]);
-        };
-        const addTopTri = (p0, p1, p2) => {
-          const v0 = [p0[0], p0[1], baseThickness + sampleHeight(p0[0], p0[1]) * zScale];
-          const v1 = [p1[0], p1[1], baseThickness + sampleHeight(p1[0], p1[1]) * zScale];
-          const v2 = [p2[0], p2[1], baseThickness + sampleHeight(p2[0], p2[1]) * zScale];
-          addTri(v0, v1, v2);
-        };
-        const addBottomTri = (p0, p1, p2) => {
-          addTri([p0[0], p0[1], 0], [p1[0], p1[1], 0], [p2[0], p2[1], 0]);
-        };
-
-        const clipPoly = getClipPolygon();
-        if(polygonArea(clipPoly) < 0) clipPoly.reverse();
-        const clipCcw = polygonAreaClosed(clipPoly) < 0 ? clipPoly.slice().reverse() : clipPoly.slice();
-        const triangulateTop = (poly) => {
-          if(!poly || poly.length < 3) return;
-          const ordered = polygonAreaClosed(poly) < 0 ? poly.slice().reverse() : poly;
-          for(let i=1; i<ordered.length-1; i++) {
-            addTopTri(ordered[0], ordered[i], ordered[i + 1]);
-          }
-        };
-        const triangulateBottom = (poly) => {
-          if(!poly || poly.length < 3) return;
-          const ordered = polygonAreaClosed(poly) < 0 ? poly.slice().reverse() : poly;
-          for(let i=1; i<ordered.length-1; i++) {
-            addBottomTri(ordered[0], ordered[i], ordered[i + 1]);
-          }
-        };
-
-        for(let r=0; r<res; r++) {
-          const y0 = (r / res) * state.hMm;
-          const y1 = ((r + 1) / res) * state.hMm;
-          for(let c=0; c<res; c++) {
-            const x0 = (c / res) * state.wMm;
-            const x1 = ((c + 1) / res) * state.wMm;
-            const triA = [[x0, y0], [x1, y0], [x0, y1]];
-            const triB = [[x1, y0], [x1, y1], [x0, y1]];
-            triangulateTop(clipPolygon(triA, clipCcw));
-            triangulateTop(clipPolygon(triB, clipCcw));
-          }
-        }
-
-        const edgeKey = (a, b) => (a < b ? `${a},${b}` : `${b},${a}`);
-        const edgeCount = new Map();
-        tm.t.forEach((tri) => {
-          const [a, b, c] = tri;
-          [ [a, b], [b, c], [c, a] ].forEach(([u, v]) => {
-            const key = edgeKey(u, v);
-            edgeCount.set(key, (edgeCount.get(key) || 0) + 1);
-          });
-        });
-        const boundaryEdges = [];
-        edgeCount.forEach((count, key) => {
-          if(count !== 1) return;
-          const [a, b] = key.split(',').map(Number);
-          boundaryEdges.push([a, b]);
-        });
-
-        for(let r=0; r<res; r++) {
-          const y0 = (r / res) * state.hMm;
-          const y1 = ((r + 1) / res) * state.hMm;
-          for(let c=0; c<res; c++) {
-            const x0 = (c / res) * state.wMm;
-            const x1 = ((c + 1) / res) * state.wMm;
-            const triA = [[x0, y0], [x1, y0], [x0, y1]];
-            const triB = [[x1, y0], [x1, y1], [x0, y1]];
-            triangulateBottom(clipPolygon(triA, clipCcw));
-            triangulateBottom(clipPolygon(triB, clipCcw));
-          }
-        }
-
-        boundaryEdges.forEach(([a, b]) => {
-          const top0 = tm.v[a];
-          const top1 = tm.v[b];
-          const bottom0 = [top0[0], top0[1], 0];
-          const bottom1 = [top1[0], top1[1], 0];
-          addTri(top0, bottom0, bottom1);
-          addTri(top0, bottom1, top1);
-        });
-
-        objs.push({id:objId++, name:'Terrain', mesh:tm});
-
-        let resXml='', buildXml='';
-        objs.forEach(o => {
-          let vS='', tS=''; o.mesh.v.forEach(v=> vS+=`<vertex x="${v[0].toFixed(3)}" y="${v[1].toFixed(3)}" z="${v[2].toFixed(3)}" />`);
-          o.mesh.t.forEach(t=> tS+=`<triangle v1="${t[0]}" v2="${t[1]}" v3="${t[2]}" />`);
-          resXml += `<object id="${o.id}" name="${o.name}" type="model"><mesh><vertices>${vS}</vertices><triangles>${tS}</triangles></mesh></object>`;
-          buildXml += `<item objectid="${o.id}" />`;
-        });
-        const xml = `<?xml version="1.0" encoding="UTF-8"?><model unit="millimeter" xml:lang="en" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><resources>${resXml}</resources><build>${buildXml}</build></model>`;
-        zip.file("3D/3dmodel.model", xml);
-        zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>`);
-        zip.folder("_rels").file(".rels", `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rel1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" Target="3D/3dmodel.model"/></Relationships>`);
-        const blob = await zip.generateAsync({type:"blob"});
-        if(onSave) await onSave();
+      if(!state.terrainData) return;
+      await runExportFlow('3MF', async onSave => {
+        const blob = await runWorker('mesh', {
+          state: {wMm:state.wMm, hMm:state.hMm, shape:state.shape, terrainData:state.terrainData},
+          options: {resolution:Number($('meshRes').value), targetHeight:Number($('targetH').value)}
+        }, {signal:lifetime.signal, progress:msg});
+        await onSave();
         save(blob, 'Topomapper_Terrain.3mf');
-        idle();
       });
     };
 
-    window.closeModal = () => $('modal').classList.remove('open');
-    function save(b, n) { const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=n; a.click(); }
+    const closePreview = () => {
+      if(exportBusy) return;
+      $('modal').classList.remove('open');
+      document.querySelector('.sidebar').inert = false;
+      document.querySelector('.viewport').inert = false;
+      $('previousPreview').focus();
+    };
+    $('closePreview').onclick = closePreview;
+    document.addEventListener('keydown', event => {
+      if(!$('modal').classList.contains('open')) return;
+      if(event.key === 'Escape') closePreview();
+      if(event.key === 'Tab') {
+        const focusable = Array.from($('modal').querySelectorAll('button, input, select, a[href], [tabindex="0"]')).filter(el => !el.disabled && el.getClientRects().length);
+        const first=focusable[0],last=focusable.at(-1);
+        if(event.shiftKey && document.activeElement===first) { event.preventDefault(); last?.focus(); }
+        else if(!event.shiftKey && document.activeElement===last) { event.preventDefault(); first?.focus(); }
+      }
+    }, {signal:lifetime.signal});
+    function save(b, n) {
+      if(!b || b.size === 0) throw new Error('The export was empty. Please retry.');
+      const a=document.createElement('a'), url=URL.createObjectURL(b);
+      a.href=url; a.download=n; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }
+    const syncSwitchAccessibility = () => document.querySelectorAll('.ios-switch').forEach(el => el.setAttribute('aria-checked',String(el.classList.contains('on'))));
+    const switchObserver = new MutationObserver(syncSwitchAccessibility);
+    document.querySelectorAll('.ios-switch').forEach(el => {
+      switchObserver.observe(el,{attributes:true,attributeFilter:['class']});
+      el.addEventListener('click',()=>queueMicrotask(()=>{if(!disposed) pushHistoryState();}));
+    });
+    syncSwitchAccessibility();
+    document.querySelectorAll('.layer-head .layer-info').forEach(el => {
+      el.tabIndex=0; el.setAttribute('role','button');
+      el.setAttribute('aria-label','Expand '+el.textContent.trim()+' options');
+      el.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();el.click();}});
+    });
+    return () => {
+      disposed = true; activeJob?.abort(); activeSearch?.abort(); lifetime.abort();
+      clearTimeout(timer); clearTimeout(frameTimer); clearTimeout(exportStatusTimer); clearTimeout(previewTimer); clearTimeout(mapNoticeTimer);
+      frameObserver.disconnect(); switchObserver.disconnect(); map.remove();
+    };
 }
