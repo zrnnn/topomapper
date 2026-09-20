@@ -1,23 +1,29 @@
 {
 	"name": "topomapper",
 	"private": true,
-	"version": "0.0.1",
+	"version": "0.1.0-rc.1",
 	"type": "module",
+	"engines": { "node": ">=22.12.0" },
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
+		"test": "node --test tests/*.test.js",
 		"prepare": "svelte-kit sync || echo ''"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",
-		"@sveltejs/kit": "^2.49.1",
-		"@sveltejs/vite-plugin-svelte": "^6.2.1",
-		"svelte": "^5.45.6",
-		"vite": "^7.2.6"
+		"@sveltejs/kit": "^2.70.3",
+		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"svelte": "^5.57.1",
+		"vite": "^7.3.6"
 	},
 	"dependencies": {
+		"earcut": "^3.2.3",
+		"polygon-clipping": "^0.15.7",
+		"manifold-3d": "^3.5.3",
+		"three": "^0.186.0",
 		"jszip": "^3.10.1",
-		"maplibre-gl": "^5.16.0"
+		"maplibre-gl": "^6.10.0"
 	}
 }
