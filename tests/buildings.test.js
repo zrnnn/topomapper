@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import JSZip from 'jszip';
-import {buildingHeight,parseBuildings,clipBuildings,buildingPath} from '../src/lib/buildings.js';
+import {buildingHeight,parseBuildings,clipBuildings,buildingPath,prepareBuildingLod,coastlineAreas} from '../src/lib/buildings.js';
 import {extrudeBuilding,buildBuildingMeshes} from '../src/lib/building-mesh.js';
 import {create3mf} from '../src/lib/three-mf.js';
 import {DESIGN_PRESETS,applyDesignPreset} from '../src/lib/presets.js';
@@ -81,4 +81,14 @@ test('Purpose-based presets reset layer visibility and disable bold contours',()
   }
   applyDesignPreset(state,'buildings');assert.equal(state.mapFeatures.buildings.enabled,true);assert.equal(state.contour.enabled,false);
   applyDesignPreset(state,'topographic');assert.equal(state.contour.enabled,true);assert.equal(state.contour.width,.12);
+});
+test('Building level-of-detail removes sub-millimetre footprints and keeps largest first',()=>{
+  const buildings=[{id:'large',polygons:[[square]]},{id:'tiny',polygons:[[[0,0],[.2,0],[.2,.2],[0,.2],[0,0]]]},{id:'middle',polygons:[[[0,0],[2,0],[2,2],[0,2],[0,0]]]}];
+  const lod=prepareBuildingLod(buildings,{minArea:.5,maxBuildings:1});
+  assert.deepEqual(lod.buildings.map(b=>b.id),['large']);assert.deepEqual([lod.stats.original,lod.stats.shown,lod.stats.omitted],[3,1,2]);
+});
+test('Directed coastline creates coastal water and closed islands cut holes',()=>{
+  const frame=[[0,0],[10,0],[10,10],[0,10]];
+  const coast=coastlineAreas([[[0,5],[10,5]]],frame);assert.equal(coast.length,1);assert.ok(coast[0].polygons[0][0].length>=4);
+  const island=coastlineAreas([[[3,3],[3,7],[7,7],[7,3],[3,3]]],frame);assert.equal(island[0].polygons[0].length,2);
 });

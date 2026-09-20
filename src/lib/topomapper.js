@@ -3,10 +3,11 @@ import { createGeometry } from './geometry.js';
 import { latitudeY, validateBounds } from './terrain.js';
 import { runWorker } from './worker-client.js';
 import { escapeXml } from './xml.js';
-import { parseBuildings, parseAreas, clipBuildings, buildingPath } from './buildings.js';
+import { parseBuildings, parseAreas, clipBuildings, buildingPath, prepareBuildingLod, coastlineAreas } from './buildings.js';
 import { DESIGN_PRESETS, applyDesignPreset } from './presets.js';
 
 import {initModelWorkflow} from './model-workflow.js';
+import {describeError,terrainProgress} from './operation-status.js';
 
 export function initTopomapper() {
   // --- STATE ---
@@ -38,7 +39,7 @@ export function initTopomapper() {
         line: '#000000'
       },
       mapFeatures: {
-        buildings: {enabled:true,color:'#ABB8AD',outline:'#65796C',width:0.1,opacity:100,filled:true},
+        buildings: {enabled:true,color:'#ABB8AD',outline:'#65796C',width:0.1,opacity:100,filled:true,minArea:0.5,maxCount:2500},
         waterAreas: { enabled: true, color: '#7A7A7A', opacity: 100 },
         rivers: { enabled: true, color: '#7A7A7A', width: 0.2, opacity: 100 },
         greenAreas: { enabled: false, color: '#7FAE8A', opacity: 15 },
@@ -122,6 +123,8 @@ export function initTopomapper() {
     const mapDataNoticeClose = $('mapDataNoticeClose');
     const exportStatus = $('exportStatus');
     const exportStatusLabel = $('exportStatusLabel');
+    const exportProgress = $('exportProgress');
+    const exportError = $('exportError');
     const exportStatusSteps = exportStatus ? Array.from(exportStatus.querySelectorAll('[data-export-step]')) : [];
     const exportPhaseOrder = ['prepare', 'render', 'save'];
     const exportPhaseLabels = {
@@ -136,9 +139,12 @@ export function initTopomapper() {
       if(!exportStatus) return;
       exportStatus.classList.add('active');
       exportStatus.classList.toggle('done', phase === 'done');
+      exportStatus.classList.remove('error');
+      exportError.hidden = true;
       const labelText = exportPhaseLabels[phase] ?? 'Working';
       exportStatusLabel.innerText = label ? `${label} · ${labelText}` : labelText;
       const currentIndex = exportPhaseOrder.indexOf(phase);
+      exportProgress.value = phase==='prepare'?12:phase==='render'?55:phase==='save'?88:phase==='done'?100:0;
       exportStatusSteps.forEach((step) => {
         const stepIndex = exportPhaseOrder.indexOf(step.dataset.exportStep);
         if(phase === 'done') {
@@ -156,7 +162,8 @@ export function initTopomapper() {
         clearTimeout(exportStatusTimer);
         exportStatusTimer = null;
       }
-      exportStatus.classList.remove('active', 'done');
+      exportStatus.classList.remove('active', 'done', 'error');
+      exportError.hidden = true;
       exportStatusLabel.innerText = 'Idle';
       exportStatusSteps.forEach(step => step.classList.remove('is-active', 'is-done'));
     };
@@ -182,8 +189,15 @@ export function initTopomapper() {
         setExportStatus('done', label);
         exportStatusTimer = setTimeout(clearExportStatus, 2200);
       } catch(error) {
-        exportStatus.classList.remove('done');
-        exportStatusLabel.textContent = label + ' failed: ' + error.message;
+        const report=describeError(error,'export');
+        exportStatus.classList.remove('done'); exportStatus.classList.add('error');
+        exportStatusLabel.textContent = `${label} · ${report.title}`;
+        exportProgress.value=0; exportError.hidden=false;
+        $('exportErrorTitle').textContent=report.title;
+        $('exportErrorMessage').textContent=report.message;
+        $('exportErrorAction').textContent=report.action;
+        $('exportErrorTechnical').textContent=report.technical;
+        $('retryExport').onclick=()=>runExportFlow(label,task);
       } finally {
         idle();
         exportBusy = false;
@@ -499,7 +513,7 @@ export function initTopomapper() {
       return closed ? coords : [...coords, first];
     }
 
-    function joinLineSegments(segments, tolerance = 0.4) {
+    function joinLineSegments(segments, tolerance = 0.4, close = true) {
       if(!segments.length) return [];
       const remaining = segments.map(seg => seg.slice());
       const rings = [];
@@ -541,8 +555,8 @@ export function initTopomapper() {
             }
           }
         }
-        if(ring.length >= 3) {
-          rings.push(normalizeRing(ring));
+        if(ring.length >= (close ? 3 : 2)) {
+          rings.push(close ? normalizeRing(ring) : ring);
         }
       }
       return rings;
@@ -561,10 +575,14 @@ export function initTopomapper() {
         way["building"]["building"!="no"](${bbox});
         relation["building"]["building"!="no"](${bbox});
         way["natural"="water"](${bbox});
-        way["water"~"sea|ocean"](${bbox});
+        way["natural"~"bay|coastline"](${bbox});
+        way["water"~"lake|reservoir|pond|basin|lagoon|sea|ocean"](${bbox});
+        way["landuse"~"reservoir|basin"](${bbox});
         way["waterway"="riverbank"](${bbox});
         relation["natural"="water"](${bbox});
-        relation["water"~"sea|ocean"](${bbox});
+        relation["natural"="bay"](${bbox});
+        relation["water"~"lake|reservoir|pond|basin|lagoon|sea|ocean"](${bbox});
+        relation["landuse"~"reservoir|basin"](${bbox});
         relation["waterway"="riverbank"](${bbox});
         way["waterway"~"river|stream|canal"](${bbox});
         way["landuse"~"forest|grass|meadow|recreation_ground"](${bbox});
@@ -581,7 +599,7 @@ export function initTopomapper() {
       out geom;`;
 
     const buildEmptyOsmData = () => ({
-      buildings: [], waterAreas: [], greenAreas: [],
+      buildings: [], waterAreas: [], greenAreas: [], coastlineLines: [],
       waterPolygons: [],
       greenPolygons: [],
       waterLines: [],
@@ -597,8 +615,9 @@ export function initTopomapper() {
       const greenLeisure = new Set(['park', 'garden']);
       const greenNatural = new Set(['wood', 'grassland']);
       const waterLinesSet = new Set(['river', 'stream', 'canal']);
-      const waterAreaSet = new Set(['sea', 'ocean']);
-      for(const [key,predicate] of [['waterAreas',t=>t.natural==='water'||t.waterway==='riverbank'||waterAreaSet.has(t.water)],['greenAreas',t=>greenLanduse.has(t.landuse)||greenLeisure.has(t.leisure)||greenNatural.has(t.natural)]]) {
+      const waterAreaSet = new Set(['sea','ocean','lake','reservoir','pond','basin','lagoon']);
+      const isWaterArea=t=>t.natural==='water'||t.natural==='bay'||t.waterway==='riverbank'||waterAreaSet.has(t.water)||['reservoir','basin'].includes(t.landuse);
+      for(const [key,predicate] of [['waterAreas',isWaterArea],['greenAreas',t=>greenLanduse.has(t.landuse)||greenLeisure.has(t.leisure)||greenNatural.has(t.natural)]]) {
         const seen=new Set(target[key].map(f=>f.id));
         for(const area of parseAreas(elements,projectToSvg,predicate))if(!seen.has(area.id)){target[key].push(area);seen.add(area.id);}
       }
@@ -621,6 +640,7 @@ export function initTopomapper() {
         }
         if(el.type === 'way' && Array.isArray(el.geometry)) {
           const coords = toSvgCoords(el.geometry);
+          if(tags.natural==='coastline'){target.coastlineLines.push(coords);return;}
           if(tags.waterway && waterLinesSet.has(tags.waterway)) {
             target.waterLines.push(coords);
             if(tags.name) {
@@ -635,7 +655,7 @@ export function initTopomapper() {
             target.roadLines.push(coords);
             return;
           }
-          const isWater = tags.natural === 'water' || tags.waterway === 'riverbank' || waterAreaSet.has(tags.water);
+          const isWater = isWaterArea(tags);
           const isGreen = greenLanduse.has(tags.landuse) || greenLeisure.has(tags.leisure) || greenNatural.has(tags.natural);
           if(isWater) {
             target.waterPolygons.push(normalizeRing(coords));
@@ -651,7 +671,7 @@ export function initTopomapper() {
             .filter(m => m.role === 'outer' && Array.isArray(m.geometry))
             .map(m => toSvgCoords(m.geometry));
           const relationPolys = joinLineSegments(relationSegments);
-          const isWater = tags.natural === 'water' || tags.waterway === 'riverbank' || waterAreaSet.has(tags.water);
+          const isWater = isWaterArea(tags);
           const isGreen = greenLanduse.has(tags.landuse) || greenLeisure.has(tags.leisure) || greenNatural.has(tags.natural);
           if(isWater) {
             target.waterPolygons.push(...(relationPolys.length ? relationPolys : relationSegments.map(normalizeRing)));
@@ -726,9 +746,17 @@ export function initTopomapper() {
             throw new DOMException('Aborted', 'AbortError');
           }
           const bboxStr = `${bbox.sw.lat},${bbox.sw.lng},${bbox.ne.lat},${bbox.ne.lng}`;
-          showGenerationStatus(`Loading map features · section ${bboxes.indexOf(bbox)+1} of ${bboxes.length}`);
+          const section=bboxes.indexOf(bbox)+1;
+          showGenerationStatus({phase:'map',percent:62+Math.round(section/bboxes.length*27),title:'Loading map layers',detail:`Requesting buildings, roads and water · section ${section} of ${bboxes.length}`});
           const data = await fetchOverpass(buildOverpassQuery(bboxStr), controller.signal);
           parseOverpassElements(data.elements || [], osmData);
+        }
+        if(osmData.coastlineLines.length) {
+          // Coastlines are commonly split into many OSM ways. Join them before clipping,
+          // otherwise internal way endpoints cannot be closed against the output frame.
+          const joined=joinLineSegments(osmData.coastlineLines,.02,false);
+          const clipped=joined.flatMap(line=>clipPolylineToPolygon(line,getClipPolygon()));
+          osmData.waterAreas.push(...coastlineAreas(clipped,getClipPolygon()));
         }
         const placeRank = { city: 1, town: 2, village: 3, suburb: 4, neighbourhood: 5, hamlet: 6 };
         const labelRank = { peak: 2, river: 6 };
@@ -849,7 +877,9 @@ export function initTopomapper() {
           button.type = 'button'; button.className = 'suggestion-item';
           button.textContent = item.display_name.split(',').slice(0,3).join(',');
           button.onclick = () => {
-            map.flyTo({center:[Number(item.lon),Number(item.lat)],zoom:14,essential:true});
+            // Apply the result immediately so Continue can never capture a half-finished fly animation.
+            map.jumpTo({center:[Number(item.lon),Number(item.lat)],zoom:14});
+            updateVf();
             box.style.display='none'; searchInput.value=button.textContent;
             $('searchStatus').textContent = '';
           };
@@ -1243,12 +1273,12 @@ export function initTopomapper() {
       }
       if(state.osmStatus?.loaded && state.osmData) {
         const tilesLabel = state.osmStatus.tiles > 1 ? ` | ${state.osmStatus.tiles} tiles` : '';
-        showMapNotice(`Map data loaded: Buildings ${state.osmData.buildings.length}, Water ${state.osmData.waterPolygons.length}, Rivers ${state.osmData.waterLines.length}, Roads ${state.osmData.roadLines.length}, Green ${state.osmData.greenPolygons.length}, Labels ${state.osmData.labels.length}${tilesLabel}`);
+        showMapNotice(`Map data loaded: Buildings ${state.osmData.buildings.length}, Water areas ${state.osmData.waterAreas.length}, Rivers ${state.osmData.waterLines.length}, Roads ${state.osmData.roadLines.length}, Green areas ${state.osmData.greenAreas.length}, Labels ${state.osmData.labels.length}${tilesLabel}`);
         return;
       }
       if(state.osmStatus?.error) {
         const suffix = state.osmStatus.ignored ? ' (ignored)' : '';
-        showMapNotice(`Map data missing${suffix}: ${state.osmStatus.error}`);
+        showMapNotice(`Map data missing${suffix}: ${state.osmStatus.error}`, { sticky: true });
       }
     };
 
@@ -1368,6 +1398,10 @@ export function initTopomapper() {
     $('buildingOpacity').oninput=event=>{
       state.mapFeatures.buildings.opacity=toPercent(event.target.value);
       $('buildingOpacityVal').textContent=state.mapFeatures.buildings.opacity+'%';markPreviewDirty();
+    };
+    $('buildingMinArea').oninput=event=>{
+      state.mapFeatures.buildings.minArea=Math.max(0,Math.min(5,Number(event.target.value)||0));
+      $('buildingMinAreaVal').textContent=state.mapFeatures.buildings.minArea.toFixed(1);buildingCache.data=null;markPreviewDirty();
     };
 
     $('waterAreaToggle').onclick = function() {
@@ -1580,6 +1614,8 @@ export function initTopomapper() {
       $('buildingWidthInput').value=buildings.width;
       $('buildingOpacity').value=buildings.opacity;
       $('buildingOpacityVal').textContent=buildings.opacity+'%';
+      $('buildingMinArea').value=buildings.minArea;
+      $('buildingMinAreaVal').textContent=buildings.minArea.toFixed(1);
 
       $('presetSel').value = state.theme.preset;
       $('bgColorText').value = state.theme.background;
@@ -1745,10 +1781,29 @@ export function initTopomapper() {
     const frameTimer = setTimeout(updateVf,500);
 
     // --- GENERATION PIPELINE ---
-    const showGenerationStatus = (text, error = false) => {
-      $('generationStatus').textContent = typeof text==='string'?text:text.detail;
-      if(typeof text==='object')$('generationProgress').value=text.percent;else $('generationProgress').removeAttribute('value');
-      $('generationStatus').classList.toggle('error', error);
+    const generationPhases=['terrain','map','render'];
+    const showGenerationStatus = value => {
+      const update=typeof value==='string'?{detail:value}:value;
+      const phase=update.phase||(/map|building|road|water/i.test(update.detail)?'map':'terrain');
+      $('generationPanel').dataset.state=update.state||'loading';
+      $('generationTitle').textContent=update.title||(phase==='terrain'?'Loading elevation':phase==='map'?'Loading map layers':'Preparing preview');
+      $('generationStatus').textContent=update.detail;
+      $('generationError').hidden=true; $('retryGeneration').hidden=true; $('generationSteps').hidden=false;
+      const current=generationPhases.indexOf(phase);
+      $('generationSteps').querySelectorAll('[data-phase]').forEach((el,index)=>{
+        el.classList.toggle('active',index===current&&update.state!=='success');
+        el.classList.toggle('done',index<current||update.state==='success');
+      });
+      if(Number.isFinite(update.percent)){$('generationProgress').value=update.percent;$('generationPercent').textContent=`${Math.round(update.percent)}%`;}
+      else {$('generationProgress').removeAttribute('value');$('generationPercent').textContent='';}
+    };
+    const showGenerationError = error => {
+      const report=describeError(error,'area'), cancelled=report.kind==='cancelled';
+      showGenerationStatus({phase:'terrain',state:cancelled?'idle':'error',title:report.title,detail:report.message});
+      $('generationSteps').hidden=true; $('generationError').hidden=cancelled;
+      $('generationErrorTitle').textContent=report.title; $('generationErrorMessage').textContent=report.message;
+      $('generationErrorAction').textContent=report.action; $('generationErrorTechnical').textContent=report.technical;
+      $('retryGeneration').hidden=cancelled;
     };
     const openPreview = () => {
       if(lastFrame) {
@@ -1762,12 +1817,30 @@ export function initTopomapper() {
       document.querySelector('.viewport').inert = true;
       $('modal').dataset.mode=outputMode;
       if(outputMode==='3d')modelWorkflow.open();
+      syncPreviewZoom();
       $('closePreview').focus();
     };
     $('previousPreview').onclick = () => { if(state.terrainData) openPreview(); };
     $('cancelGeneration').onclick = () => activeJob?.abort();
-    let outputMode='2d',reuseArea=false;
+    let outputMode='2d',reuseArea=false,lastRequestedMode='2d';
     const modelWorkflow=initModelWorkflow(state,{save,runExportFlow,signal:lifetime.signal});
+    let previewScale=1, cameraZoom=1;
+    const syncPreviewZoom=()=>{
+      if(outputMode==='2d') {
+        const artwork=$('previewArea').firstElementChild;
+        if(artwork) artwork.style.transform=`scale(${previewScale})`;
+        $('previewZoomValue').textContent=`${Math.round(previewScale*100)}%`;
+      } else $('previewZoomValue').textContent=`${Math.round(cameraZoom*100)}%`;
+    };
+    const zoomPreview=direction=>{
+      if(outputMode==='3d'){cameraZoom=Math.max(.35,Math.min(4,cameraZoom*(direction>0?1.2:1/1.2)));modelWorkflow.zoom(direction);}
+      else previewScale=Math.max(.5,Math.min(5,previewScale*(direction>0?1.2:1/1.2)));
+      syncPreviewZoom();
+    };
+    $('previewZoomIn').onclick=()=>zoomPreview(1);
+    $('previewZoomOut').onclick=()=>zoomPreview(-1);
+    $('previewZoomFit').onclick=()=>{previewScale=1;cameraZoom=1;modelWorkflow.resetView();syncPreviewZoom();};
+    $('previewArea').addEventListener('wheel',event=>{if(outputMode!=='2d')return;event.preventDefault();zoomPreview(event.deltaY<0?1:-1);},{passive:false,signal:lifetime.signal});
     function chooseOutput(reuse=false) {
       reuseArea=reuse;
       if(!reuse){map.stop();updateVf();}
@@ -1780,11 +1853,14 @@ export function initTopomapper() {
     $('changeOutput').onclick=()=>chooseOutput(true);
     for(const mode of ['2d','3d'])$('choose'+mode).onclick=()=>{
       $('purposeDialog').close();
-      if(reuseArea){outputMode=mode;$('modal').dataset.mode=mode;setStep('2');if(mode==='3d')modelWorkflow.open();else renderSVG();}
+      if(reuseArea){outputMode=mode;previewScale=1;cameraZoom=1;$('modal').dataset.mode=mode;setStep('2');if(mode==='3d')modelWorkflow.open();else renderSVG();syncPreviewZoom();}
       else void generateArea(mode);
     };
+    $('retryGeneration').onclick=()=>void generateArea(lastRequestedMode);
     async function generateArea(mode) {
       if(activeJob || exportBusy || disposed) return;
+      lastRequestedMode=mode;
+      previewScale=1; cameraZoom=1;
       const controller = new AbortController();
       activeJob = controller;
       const previous = { terrainData: state.terrainData, osmData: state.osmData, osmStatus: state.osmStatus, renderBbox: state.renderBbox };
@@ -1796,7 +1872,7 @@ export function initTopomapper() {
       interactions.forEach(control => control.disable());
       $('cancelGeneration').hidden = false;
       $('generationProgress').hidden=false;
-      showGenerationStatus('Loading elevation…');
+      showGenerationStatus({phase:'terrain',percent:3,title:'Loading elevation',detail:'Connecting to the primary terrain source…'});
       $('suggestionBox').style.display='none';
       try {
         updateVf();
@@ -1804,7 +1880,7 @@ export function initTopomapper() {
         validateBounds(bounds);
         const key = bboxKey(bounds.sw, bounds.ne);
         const terrain = terrainCache.get(key) || await runWorker('terrain', bounds, {
-          signal: controller.signal, progress: text => { if(!disposed) showGenerationStatus(text); }
+          signal: controller.signal, progress: value => { if(!disposed) showGenerationStatus(terrainProgress(value)); }
         });
         if(controller.signal.aborted || disposed) throw new DOMException('Cancelled', 'AbortError');
         cachePut(terrainCache, key, terrain);
@@ -1812,16 +1888,19 @@ export function initTopomapper() {
         state.terrainData = terrain;
         state.terrainVersion++;
         state.pngPreviewCache = {key:null,dataUrl:null};
-        showGenerationStatus('Terrain ready. Loading buildings, roads and water…');
+        showGenerationStatus({phase:'map',percent:62,title:'Loading map layers',detail:'Terrain is ready. Loading buildings, roads, water and green areas…'});
         const mapOk = await fetchMapFeatures(bounds.sw, bounds.ne, controller.signal);
         if(controller.signal.aborted || disposed) throw new DOMException('Cancelled', 'AbortError');
         state.osmStatus.ignored = !mapOk;
         outputMode=mode;modelWorkflow.invalidate();
+        showGenerationStatus({phase:'render',percent:94,title:'Preparing preview',detail:outputMode==='3d'?'Opening the 3D workspace…':'Rendering the 2D artwork…'});
         if(outputMode==='2d')renderSVG();
         setStep('2');
-        showGenerationStatus(terrain.source + (mapOk ? '' : ' · Map overlays unavailable; terrain is ready.'));
+        showGenerationStatus({phase:'render',percent:100,state:mapOk?'success':'warning',title:mapOk?'Area ready':'Terrain ready with missing layers',detail:terrain.source+(mapOk?' · Map layers loaded.':' · Map overlays unavailable; terrain-only work remains available.')});
+        $('retryGeneration').hidden=mapOk;
         lastFrame={wMm:state.wMm,hMm:state.hMm,shape:state.shape};
-        $('terrainSource').textContent = terrain.source;
+        $('terrainSource').textContent = mapOk ? terrain.source : `${terrain.source} · Map overlays unavailable. Close the preview and retry to load buildings, roads and water.`;
+        $('terrainSource').classList.toggle('error',!mapOk);
         openPreview();
       } catch(error) {
         Object.assign(state, previous);
@@ -1829,7 +1908,7 @@ export function initTopomapper() {
         state.pngPreviewCache = {key:null,dataUrl:null};
         if(!disposed) {
           if(state.terrainData) renderSVG();
-          showGenerationStatus(error.name === 'AbortError' ? 'Cancelled. Your previous preview is preserved.' : error.message, error.name !== 'AbortError');
+          showGenerationError(error);
         }
       } finally {
         activeJob = null;
@@ -1837,7 +1916,7 @@ export function initTopomapper() {
           controls.forEach((el,i) => el.disabled = disabled[i]);
           interactions.forEach((control,i) => { if(enabled[i]) control.enable(); });
           $('cancelGeneration').hidden = true;
-          $('generationProgress').hidden=true;
+          $('generationProgress').hidden=['idle','error'].includes($('generationPanel').dataset.state);
           $('previousPreview').hidden = !state.terrainData;
           $('btnGen').textContent = 'Continue · choose output';
           updateMapDataStatus();
@@ -1848,10 +1927,13 @@ export function initTopomapper() {
 
     let lastFrame = null;
     let contourCache = {key:null, groups:[]};
-    let buildingCache={data:null,key:null,buildings:[]};
+    let buildingCache={data:null,key:null,buildings:[],stats:{original:0,shown:0,omitted:0,simplified:0}};
     function visibleBuildings() {
-      const key=[state.wMm,state.hMm,state.shape].join(':');
-      if(buildingCache.data!==state.osmData||buildingCache.key!==key) buildingCache={data:state.osmData,key,buildings:clipBuildings(state.osmData?.buildings||[],getClipPolygon())};
+      const style=state.mapFeatures.buildings,key=[state.wMm,state.hMm,state.shape,style.minArea,style.maxCount].join(':');
+      if(buildingCache.data!==state.osmData||buildingCache.key!==key) {
+        const prepared=prepareBuildingLod(clipBuildings(state.osmData?.buildings||[],getClipPolygon()),{minArea:style.minArea,tolerance:.06,maxBuildings:style.maxCount});
+        buildingCache={data:state.osmData,key,...prepared};
+      }
       return buildingCache.buildings;
     }
     function buildSvgMarkup({ includeBackground = true, includeGradient = true, includeFrame = true } = {}) {
@@ -1990,8 +2072,10 @@ export function initTopomapper() {
       if(disposed) return;
       const svg = buildSvgMarkup({ includeBackground: true, includeGradient: true, includeFrame: true });
       $('previewArea').innerHTML = svg;
+      syncPreviewZoom();
       const buildings=visibleBuildings();
-      $('buildingCount').textContent=state.osmStatus.loaded ? `${buildings.length.toLocaleString()} footprints · ${buildings.filter(b=>b.height.estimated).length.toLocaleString()} estimated heights` : 'Building data unavailable. Regenerate to retry.';
+      const stats=buildingCache.stats;
+      $('buildingCount').textContent=state.osmStatus.loaded ? `${buildings.length.toLocaleString()} shown${stats.omitted?` · ${stats.omitted.toLocaleString()} tiny/dense footprints omitted`:''}${stats.simplified?` · ${stats.simplified.toLocaleString()} vertices simplified`:''} · ${buildings.filter(b=>b.height.estimated).length.toLocaleString()} estimated heights` : 'Building data unavailable. Regenerate to retry.';
       updatePngRangeInfo();
       state.previewDirty = false;
       updateAutoPreviewButton();

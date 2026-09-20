@@ -1,4 +1,5 @@
 import polygonClipping from 'polygon-clipping';
+import {simplifyPolyline} from './geometry.js';
 
 // Reuse the relation assembler for landcover, retaining inner rings (islands).
 export function parseAreas(elements, project, predicate) {
@@ -18,6 +19,52 @@ export function buildingHeight(tags = {}, fallback = 9) {
 
 const same = (a,b) => Math.hypot(a[0]-b[0],a[1]-b[1]) < 1e-6;
 const area = ring => ring.reduce((sum,p,i)=>{const q=ring[(i+1)%ring.length];return sum+p[0]*q[1]-q[0]*p[1];},0)/2;
+const polygonArea = polygon => Math.max(0,Math.abs(area(polygon[0]||[]))-polygon.slice(1).reduce((sum,ring)=>sum+Math.abs(area(ring)),0));
+
+export function prepareBuildingLod(buildings,{minArea=.5,tolerance=.06,maxBuildings=2500}={}) {
+  const original=(buildings||[]).length, originalPoints=(buildings||[]).reduce((sum,b)=>sum+b.polygons.flat(2).length,0);
+  const candidates=(buildings||[]).flatMap(building=>{
+    const polygons=building.polygons.filter(polygon=>polygonArea(polygon)>=minArea);
+    const footprint=polygons.reduce((sum,polygon)=>sum+polygonArea(polygon),0);
+    return polygons.length?[{...building,polygons,footprint}]:[];
+  }).sort((a,b)=>b.footprint-a.footprint);
+  const limited=candidates.slice(0,maxBuildings).map(building=>({...building,polygons:building.polygons.map(polygon=>polygon.map(ring=>{
+    if(ring.length<=5||tolerance<=0)return ring;
+    const open=ring.slice(0,-1), simplified=simplifyPolyline(open,tolerance);
+    return simplified.length>=3?simplified.concat([simplified[0]]):ring;
+  }))}));
+  const points=limited.reduce((sum,b)=>sum+b.polygons.flat(2).length,0);
+  return {buildings:limited,stats:{original,shown:limited.length,omitted:original-limited.length,originalPoints,points,simplified:Math.max(0,originalPoints-points)}};
+}
+
+export function coastlineAreas(lines,clipPolygon) {
+  const clip=clipPolygon.concat([clipPolygon[0]]), closed=[], open=[];
+  const onSegment=(p,a,b)=>Math.abs((b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]))<1e-4&&p[0]>=Math.min(a[0],b[0])-1e-4&&p[0]<=Math.max(a[0],b[0])+1e-4&&p[1]>=Math.min(a[1],b[1])-1e-4&&p[1]<=Math.max(a[1],b[1])+1e-4;
+  const edgeOf=p=>clipPolygon.findIndex((a,i)=>onSegment(p,a,clipPolygon[(i+1)%clipPolygon.length]));
+  for(const line of lines||[]) {
+    if(line.length<2)continue;
+    if(same(line[0],line.at(-1))){closed.push([line]);continue;}
+    const start=edgeOf(line[0]),end=edgeOf(line.at(-1));if(start<0||end<0)continue;
+    const boundary=[line.at(-1)];let edge=end,guard=0;
+    while(edge!==start&&guard++<clipPolygon.length+1){boundary.push(clipPolygon[(edge+1)%clipPolygon.length]);edge=(edge+1)%clipPolygon.length;}
+    boundary.push(line[0]);
+    const candidate=line.concat(boundary.slice(1));
+    // OSM coastline direction keeps land on the left in geographic coordinates.
+    // Projected screen Y is inverted, so water is the positive-area side here.
+    if(area(candidate)>0)open.push([candidate]);
+    else {
+      const reverseBoundary=[line.at(-1)];edge=end;guard=0;
+      while(edge!==start&&guard++<clipPolygon.length+1){reverseBoundary.push(clipPolygon[edge]);edge=(edge-1+clipPolygon.length)%clipPolygon.length;}
+      reverseBoundary.push(line[0]);const other=line.concat(reverseBoundary.slice(1));
+      if(area(other)>0)open.push([other]);
+    }
+  }
+  try {
+    let water=open.length?polygonClipping.union(...open):closed.length?[clip]:[];
+    if(closed.length&&water.length)water=polygonClipping.difference(water,...closed);
+    return water.map((polygons,index)=>({id:`coastline/${index}`,name:'Coastal water',polygons:[polygons]}));
+  } catch { return []; }
+}
 function joinRings(segments) {
   const pending = segments.filter(s=>s.length>=2).map(s=>s.slice()), rings=[];
   while(pending.length) {

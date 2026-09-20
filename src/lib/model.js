@@ -1,6 +1,6 @@
 import {buildTerrainMesh} from './mesh.js';
 import {buildBuildingMeshes} from './building-mesh.js';
-import {clipBuildings} from './buildings.js';
+import {clipBuildings,prepareBuildingLod} from './buildings.js';
 import {createGeometry} from './geometry.js';
 
 export const MODEL_PRESETS = {
@@ -8,7 +8,7 @@ export const MODEL_PRESETS = {
   city:{name:'City block',description:'A flat architectural base with buildings and street context.',terrain:false,buildings:true,roads:true,water:true,green:true,rivers:false,relief:10,buildingScale:2},
   relief:{name:'Terrain study',description:'A clean terrain relief with no architectural overlays.',terrain:true,buildings:false,roads:false,water:false,green:false,rivers:false,relief:18,buildingScale:1}
 };
-export const defaultModel = () => ({...MODEL_PRESETS.landscape,preset:'landscape',width:200,resolution:100,base:2,roadWidth:0.7,roadRise:0.5,areaRise:0.3,fallbackHeight:9,format:'3mf'});
+export const defaultModel = () => ({...MODEL_PRESETS.landscape,preset:'landscape',width:200,resolution:100,base:2,roadWidth:0.7,roadRise:0.5,areaRise:0.3,fallbackHeight:9,minBuildingArea:.8,format:'3mf'});
 
 function scaleRecords(records,scale) {
   return (records||[]).map(record=>({...record,polygons:record.polygons.map(polygon=>polygon.map(ring=>ring.map(([x,y])=>[x*scale,y*scale])))}));
@@ -19,12 +19,13 @@ export function modelInput(state, settings) {
   const scaled={...state,wMm:settings.width,hMm:state.hMm*scale,terrainData};
   const geometry=createGeometry(scaled),shape=geometry.getClipPolygon();
   const lines=records=>(records||[]).flatMap(line=>geometry.clipPolylineToPolygon(line.map(([x,y])=>[x*scale,y*scale]),shape));
-  return {state:scaled,buildings:clipBuildings(scaleRecords(state.osmData?.buildings,scale),shape),
+  const buildingLod=prepareBuildingLod(clipBuildings(scaleRecords(state.osmData?.buildings,scale),shape),{minArea:settings.minBuildingArea,tolerance:.08,maxBuildings:2500});
+  return {state:scaled,buildings:buildingLod.buildings,buildingStats:buildingLod.stats,
     water:clipBuildings(scaleRecords(state.osmData?.waterAreas,scale),shape),green:clipBuildings(scaleRecords(state.osmData?.greenAreas,scale),shape),
     roads:lines(state.osmData?.roadLines),rivers:lines(state.osmData?.waterLines)};
 }
 export function validateModelSettings(s) {
-  for(const [key,min,max] of [['width',50,400],['resolution',40,240],['base',1,10],['relief',1,80],['roadWidth',.2,3],['roadRise',.1,3],['areaRise',.1,2],['buildingScale',.1,10],['fallbackHeight',1,100]]) {
+  for(const [key,min,max] of [['width',50,400],['resolution',40,240],['base',1,10],['relief',1,80],['roadWidth',.2,3],['roadRise',.1,3],['areaRise',.1,2],['buildingScale',.1,10],['fallbackHeight',1,100],['minBuildingArea',0,20]]) {
     if(!Number.isFinite(s[key])||s[key]<min||s[key]>max) throw new Error(`Check ${key}: use a value between ${min} and ${max}.`);
   }
 }
@@ -46,10 +47,9 @@ const rgb = hex => [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);
 export async function buildModel(engine, state, settings, progress=()=>{}) {
   validateModelSettings(settings);
   if(!state.terrainData) throw new Error('Load an area before building a model.');
-  const areaRecords=[...(settings.buildings?state.osmData?.buildings||[]:[]),...(settings.water?state.osmData?.waterAreas||[]:[]),...(settings.green?state.osmData?.greenAreas||[]:[])];
-  let points=0;for(const record of areaRecords)for(const polygon of record.polygons)for(const ring of polygon){points+=ring.length;if(points>150000)throw new Error('Area geometry exceeds 150,000 points. Select a smaller area or disable buildings / area layers.');}
   const input=modelInput(state,settings), s=input.state;
-  if(settings.buildings && input.buildings.length>3000) throw new Error('This area has over 3,000 buildings. Select a smaller area or turn buildings off.');
+  const areaRecords=[...(settings.buildings?input.buildings:[]),...(settings.water?input.water:[]),...(settings.green?input.green:[])];
+  let points=0;for(const record of areaRecords)for(const polygon of record.polygons)for(const ring of polygon){points+=ring.length;if(points>150000)throw new Error('Area geometry exceeds 150,000 points. Select a smaller area or disable buildings / area layers.');}
   if((settings.roads?input.roads:[]).flat().length+(settings.rivers?input.rivers:[]).flat().length>40000) throw new Error('Street/river geometry is too large for browser modeling. Select a smaller area or disable those layers.');
   const {Manifold,Mesh,CrossSection}=engine, owned=[];
   const keep=object=>{owned.push(object);return object;};
@@ -108,7 +108,7 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
       const j=ids[0]*stride;
       colors.push('#'+[3,4,5].map(k=>Math.round(Math.max(0,Math.min(1,raw.vertProperties[j+k]??.7))*255).toString(16).padStart(2,'0')).join(''));
     }
-    const result={mesh:{v,t,colors},counts,width:s.wMm,height:s.hMm,triangles:t.length,volume:fused.volume(),settings:{...settings}};
+    const result={mesh:{v,t,colors},counts,buildingStats:input.buildingStats,width:s.wMm,height:s.hMm,triangles:t.length,volume:fused.volume(),settings:{...settings}};
     progress({percent:100,detail:`Ready · ${t.length.toLocaleString()} triangles`});
     return result;
   } finally { owned.reverse().forEach(object=>object.delete()); }

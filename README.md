@@ -11,9 +11,9 @@ Interactive 2D map and 3D print-model generator built with SvelteKit and MapLibr
 ### Printable model behavior
 
 - Manifold WebAssembly fuses all selected solids in a worker. Streets, rivers, water and green areas are actual terrain-following raised geometry. Internal overlapping surfaces are removed. 3MF stores face colors; STL and OBJ are geometry-only.
-- Building footprints and area multipolygons retain courtyard/island holes. Buildings use OSM height, levels × 3 m, then the adjustable fallback height. Roofs are flat; buildings extend into the terrain and have a minimum 0.4 mm visible rise. Relief height and building height exaggeration are independently controlled. These are cartographic models, not detailed architectural or survey replicas.
+- Building footprints and area multipolygons retain courtyard/island holes. Buildings use OSM height, levels × 3 m, then the adjustable fallback height. Roofs are flat; buildings extend into the terrain and have a minimum 0.4 mm visible rise. Tiny footprints can be omitted by their final printed area; dense results are capped at the 2,500 largest buildings and complex outlines are simplified at output scale, with the omissions reported in the UI. Relief height and building height exaggeration are independently controlled. These are cartographic models, not detailed architectural or survey replicas.
 - Changing settings invalidates export until the new preview succeeds. Failed jobs never export a partial model. Unavailable OSM data blocks selected overlay layers; disable them for terrain-only output or reload the area. Empty mapped layers are reported.
-- Mesh quality is bounded to 40–240 samples per side, print width to 50–400 mm, buildings to 3,000 and street/river input to 40,000 points. Workers have a 90-second limit and can be cancelled. Progress reports the modeling phase; network operations remain indeterminate where total work is unknown.
+- Mesh quality is bounded to 40–240 samples per side, print width to 50–400 mm, retained buildings to 2,500 and street/river input to 40,000 points. Workers have a 90-second limit and can be cancelled. Loading, modeling and export panels report their current phase, progress and actionable failure details while preserving the last successful result.
 - 3D geometry, rendering and compression are lazy-loaded. Models are north-up, Z-up and sized in millimetres. Verify scale, minimum feature sizes, materials and support requirements in your slicer before printing. Surface colors are not a guarantee of multi-material slicing support.
 
 ## Requirements
@@ -53,6 +53,8 @@ Pull requests and development branches run both checks. Deployment from `main` a
 - Contours preserve boundary endpoints, are clipped to the selected shape, simplified to limit point growth, and cached independently of colors and line widths.
 - 3MF creation and compression run in a worker. Meshes use outward-facing triangles and a 2 mm base; tests check closed edges and winding for rectangle, circle and hexagon terrain.
 - SVG label text/font attributes are escaped; label size and line widths use millimetres. DXF declares millimetres and permits map-only exports. PNG failures no longer silently omit overlays.
+- Water areas recognize lakes, ponds, reservoirs, basins, lagoons and bays. Directed OpenStreetMap coastlines are closed against the selected frame to render coastal sea/ocean, while island coastlines remain holes. A fully offshore frame containing no coastline cannot be inferred from Overpass alone.
+- The 2D preview supports mouse-wheel zoom plus explicit −, + and Fit controls; the same controls drive the 3D camera. Selecting a search result applies its center and zoom immediately, preventing a quick Continue click from capturing an in-between animated frame.
 
 ### Services and attribution
 

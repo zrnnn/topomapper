@@ -96,9 +96,14 @@
     </div>
   </div>
   <div class="generation-actions">
-    <div id="generationStatus" class="status-text" role="status" aria-live="polite">Move the map to frame your area, then continue.</div>
-    <progress id="generationProgress" max="100" hidden aria-label="Area data progress"></progress>
+    <div id="generationPanel" class="operation-panel" data-state="idle">
+      <div class="operation-head"><span id="generationIcon" class="operation-icon" aria-hidden="true">1</span><div><strong id="generationTitle">Area ready</strong><span id="generationStatus" role="status" aria-live="polite">Move the map to frame your area, then continue.</span></div><span id="generationPercent" class="operation-percent"></span></div>
+      <progress id="generationProgress" max="100" hidden aria-label="Area data progress"></progress>
+      <div id="generationSteps" class="operation-steps" hidden aria-label="Generation phases"><span data-phase="terrain">Elevation</span><span data-phase="map">Map layers</span><span data-phase="render">Preview</span></div>
+      <div id="generationError" class="error-report" hidden role="alert"><strong id="generationErrorTitle"></strong><span id="generationErrorMessage"></span><span id="generationErrorAction" class="error-action"></span><details><summary>Technical details</summary><code id="generationErrorTechnical"></code></details></div>
+    </div>
     <button id="btnGen" class="btn-main">Continue · choose output</button>
+    <button id="retryGeneration" class="btn-secondary" type="button" hidden>Retry loading this area</button>
     <button id="cancelGeneration" class="btn-secondary" type="button" hidden>Cancel generation</button>
     <button id="previousPreview" class="btn-secondary" type="button" hidden>Open previous preview</button>
   </div>
@@ -121,9 +126,10 @@
 <div class="modal-overlay" id="modal" role="dialog" aria-modal="true" aria-label="Preview and export" tabindex="-1">
   <div class="modal-card">
     <div class="preview-stage">
+      <div class="preview-zoom-controls" aria-label="Preview zoom"><button id="previewZoomOut" class="btn-secondary" type="button" aria-label="Zoom preview out">−</button><span id="previewZoomValue" aria-live="polite">100%</span><button id="previewZoomIn" class="btn-secondary" type="button" aria-label="Zoom preview in">+</button><button id="previewZoomFit" class="btn-secondary" type="button">Fit</button></div>
       <div id="previewArea" class="mode-2d"></div>
       <div id="preview3d" class="mode-3d"></div>
-      <div class="model-feedback mode-3d"><progress id="modelProgress" max="100" hidden aria-label="3D model progress"></progress><p id="modelStatus" class="status-text" role="status" aria-live="polite"></p><button id="cancelModel" class="btn-secondary" hidden>Cancel model generation</button></div>
+      <div id="modelFeedback" class="model-feedback operation-panel mode-3d" data-state="idle"><div class="operation-head"><span class="operation-icon" aria-hidden="true">3D</span><div><strong id="modelTitle">3D model</strong><p id="modelStatus" role="status" aria-live="polite">Choose settings, then update the model.</p></div><span id="modelPercent" class="operation-percent"></span></div><progress id="modelProgress" max="100" hidden aria-label="3D model progress"></progress><div id="modelError" class="error-report" hidden role="alert"><span id="modelErrorAction" class="error-action"></span><details><summary>Technical details</summary><code id="modelErrorTechnical"></code></details></div><button id="retryModel" class="btn-secondary" hidden>Retry model</button><button id="cancelModel" class="btn-secondary" hidden>Cancel model generation</button></div>
       <div class="model-preview-controls mode-3d"><span>Drag to orbit · scroll to zoom</span><button id="resetModelView" class="btn-secondary">Reset view</button></div>
       <div class="preview-controls mode-2d">
         <button id="undoStep2" class="btn-secondary icon-button" type="button" aria-label="Undo last change" title="Undo">&#8630;</button>
@@ -275,7 +281,8 @@
                 <div class="cust-row"><label class="ui-label" for="buildingOutline">Outline color</label><input type="color" id="buildingOutline" value="#65796C"></div>
                 <div class="cust-row"><label class="ui-label" for="buildingWidth">Outline width (mm)</label><input type="range" id="buildingWidth" min="0" max="1" step="0.01" value="0.1"><input type="number" id="buildingWidthInput" class="width-input" min="0" max="1" step="0.01" value="0.1" aria-label="Building outline width in millimetres"></div>
                 <div class="cust-row"><label class="ui-label" for="buildingOpacity">Opacity</label><input type="range" id="buildingOpacity" min="0" max="100" step="1" value="100"><span id="buildingOpacityVal" class="control-value">100%</span></div>
-                <p class="control-help">Footprints are shared by the preview, PNG, SVG and DXF. Raised buildings can be included in 3MF.</p>
+                <div class="cust-row"><label class="ui-label" for="buildingMinArea">Minimum footprint (mm²)</label><input type="range" id="buildingMinArea" min="0" max="5" step="0.1" value="0.5"><span id="buildingMinAreaVal" class="control-value">0.5</span></div>
+                <p class="control-help">Tiny footprints are omitted and complex outlines simplified at output scale. This keeps large city maps responsive. Set 0 mm² to retain all small buildings.</p>
               </div>
             </div>
             <div class="layer-item" data-layer="roads" draggable="true" style="margin-top:10px;">
@@ -348,6 +355,7 @@
                 </div>
               </div>
               <div class="layer-body">
+                <p class="control-help">Includes lakes, reservoirs, ponds, bays, and coastal sea where a coastline crosses the selected frame.</p>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Fill</span><div class="color-dot" id="waterAreaColorDot" style="background:#7DB5D3"><input type="color" id="waterAreaColor" value="#7DB5D3"></div></div>
                 <div class="cust-row"><span style="margin:0" class="ui-label">Opacity (%)</span><input type="range" id="waterAreaOpacity" min="0" max="100" step="1" value="45"><span id="waterAreaOpacityVal" style="font-size:11px;width:46px;text-align:right;">45%</span></div>
               </div>
@@ -468,6 +476,7 @@
           <details class="model-advanced"><summary>Advanced model settings</summary>
             {#each [['base','Base thickness (mm)',1,10,.5,2],['relief','Terrain relief (mm)',1,80,1,12],['buildingScale','Building height multiplier',.1,10,.1,1],['roadWidth','Street width (mm)',.2,3,.1,.7],['roadRise','Street rise (mm)',.1,2,.1,.5],['areaRise','Area / river rise (mm)',.1,2,.1,.3]] as [key,label,min,max,step,value]}<div class="cust-row"><label class="ui-label" for={'model-'+key}>{label}</label><input id={'model-'+key} type="range" {min} {max} {step} {value}><output id={'model-'+key+'-value'}>{value}</output></div>{/each}
             <label class="ui-label" for="model-fallbackHeight">Missing building height (metres)</label><input id="model-fallbackHeight" type="number" min="1" max="100" value="9">
+            <label class="ui-label" for="model-minBuildingArea">Minimum building footprint (mm²)</label><input id="model-minBuildingArea" type="number" min="0" max="20" step="0.1" value="0.8">
             <p class="control-help">Buildings use OSM height, then levels × 3 m, then this fallback. Roofs are flat, founded into the terrain; rise is at least 0.4 mm. Terrain relief is independently scaled. These are map models, not survey-accurate architectural replicas.</p>
           </details>
           <button id="updateModel" class="btn-main">Update 3D model</button>
@@ -487,6 +496,8 @@
             <div class="export-step" data-export-step="render"><span class="export-dot"></span><span>Render</span></div>
             <div class="export-step" data-export-step="save"><span class="export-dot"></span><span>Save</span></div>
           </div>
+          <progress id="exportProgress" max="100" value="0" aria-label="Export progress"></progress>
+          <div id="exportError" class="error-report" hidden role="alert"><strong id="exportErrorTitle"></strong><span id="exportErrorMessage"></span><span id="exportErrorAction" class="error-action"></span><details><summary>Technical details</summary><code id="exportErrorTechnical"></code></details><button id="retryExport" class="btn-secondary" type="button">Retry export</button></div>
         </div>
         <div class="group mode-3d">
           <span class="ui-label">Export the previewed model</span>
