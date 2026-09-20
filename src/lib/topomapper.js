@@ -3,11 +3,12 @@ import { createGeometry } from './geometry.js';
 import { latitudeY, validateBounds } from './terrain.js';
 import { runWorker } from './worker-client.js';
 import { escapeXml } from './xml.js';
-import { parseBuildings, parseAreas, clipBuildings, buildingPath, prepareBuildingLod, coastlineAreas } from './buildings.js';
+import { parseBuildings, parseAreas, clipBuildings, buildingPath, prepareBuildingLod, coastlineAreas, joinCoastlines } from './buildings.js';
 import { DESIGN_PRESETS, applyDesignPreset } from './presets.js';
 
 import {initModelWorkflow} from './model-workflow.js';
 import {describeError,terrainProgress} from './operation-status.js';
+import {requestMapData,MAP_TOTAL_TIMEOUT_MS,MAP_QUERY_TIMEOUT_SECONDS} from './map-service.js';
 
 export function initTopomapper() {
   // --- STATE ---
@@ -56,7 +57,7 @@ export function initTopomapper() {
           scaleByRank: true
         }
       },
-      layerOrder: ['labels', 'buildings', 'roads', 'rivers', 'water', 'green', 'contours'],
+      layerOrder: ['labels', 'buildings', 'roads', 'rivers', 'contours', 'water', 'green'],
       bbox: null,
       renderBbox: null,
       terrainData: null,
@@ -562,15 +563,7 @@ export function initTopomapper() {
       return rings;
     }
 
-    const overpassServers = [
-      'https://overpass-api.de/api/interpreter',
-      'https://overpass.kumi.systems/api/interpreter',
-      'https://overpass.nchc.org.tw/api/interpreter'
-    ];
-
-    const OVERPASS_REQUEST_TIMEOUT_MS = 12000;
-    const OSM_TOTAL_TIMEOUT_MS = 20000;
-    const buildOverpassQuery = (bbox) => `[out:json][maxsize:33554432][timeout:25];
+    const buildOverpassQuery = (bbox) => `[out:json][maxsize:33554432][timeout:${MAP_QUERY_TIMEOUT_SECONDS}];
       (
         way["building"]["building"!="no"](${bbox});
         relation["building"]["building"!="no"](${bbox});
@@ -689,29 +682,7 @@ export function initTopomapper() {
       });
     };
 
-    const fetchOverpass = async (query, signal) => {
-      let lastError = null;
-      for(const server of overpassServers) {
-        if(signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
-        try {
-          const response = await fetchJsonWithTimeout(
-            server,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: `data=${encodeURIComponent(query)}`,
-              signal
-            },
-            OVERPASS_REQUEST_TIMEOUT_MS
-          );
-          if(response.remark || !Array.isArray(response.elements)) throw new Error('Map data service returned incomplete data. Try a smaller area or retry.');
-          return response;
-        } catch (err) {
-          lastError = err;
-        }
-      }
-      throw lastError || new Error('Overpass error');
-    };
+    const fetchOverpass = (query,signal) => requestMapData(query,{signal,progress:detail=>showGenerationStatus({phase:'map',title:'Loading map layers',detail})});
 
     const getTiledBboxes = (sw, ne) => {
       const midLat = (sw.lat + ne.lat) / 2;
@@ -738,7 +709,7 @@ export function initTopomapper() {
       updateMapDataStatus({ announce: true, loading: true });
       const controller = new AbortController();
       linkAbort(signal, controller);
-      const timeoutId = setTimeout(() => controller.abort(), OSM_TOTAL_TIMEOUT_MS);
+      const timeoutId = setTimeout(() => controller.abort(), MAP_TOTAL_TIMEOUT_MS);
       const attemptFetch = async (bboxes) => {
         const osmData = buildEmptyOsmData();
         for(const bbox of bboxes) {
@@ -754,7 +725,7 @@ export function initTopomapper() {
         if(osmData.coastlineLines.length) {
           // Coastlines are commonly split into many OSM ways. Join them before clipping,
           // otherwise internal way endpoints cannot be closed against the output frame.
-          const joined=joinLineSegments(osmData.coastlineLines,.02,false);
+          const joined=joinCoastlines(osmData.coastlineLines);
           const clipped=joined.flatMap(line=>clipPolylineToPolygon(line,getClipPolygon()));
           osmData.waterAreas.push(...coastlineAreas(clipped,getClipPolygon()));
         }
@@ -955,7 +926,7 @@ export function initTopomapper() {
         if(dragHandle) {
           dragHandle.addEventListener('pointerdown', () => { handleActive = true; });
           dragHandle.addEventListener('pointerup', () => { handleActive = false; });
-          dragHandle.addEventListener('pointerleave', () => { handleActive = false; });
+          dragHandle.addEventListener('pointercancel', () => { handleActive = false; });
         }
         item.querySelectorAll('[data-move]').forEach((btn) => {
           btn.addEventListener('click', (e) => {
@@ -1008,21 +979,15 @@ export function initTopomapper() {
         item.addEventListener('drop', (e) => {
           e.preventDefault();
           if(!draggedItem || draggedItem === item) return;
-          const siblings = Array.from(container.children).filter(el => el.dataset.layer);
-          const draggedIndex = siblings.indexOf(draggedItem);
-          const targetIndex = siblings.indexOf(item);
-          if(draggedIndex < targetIndex) {
-            container.insertBefore(draggedItem, item.nextSibling);
-          } else {
-            container.insertBefore(draggedItem, item);
-          }
+          // Honor the same before/after position shown by the drop indicator.
+          const rect=item.getBoundingClientRect();
+          container.insertBefore(draggedItem,e.clientY<rect.top+rect.height/2?item:item.nextSibling);
           syncLayerOrder(container);
           markPreviewDirty();
           pushHistoryState();
           insertIndicator.style.display = 'none';
         });
       });
-      syncLayerOrder(container);
     };
 
     const layerStack = $('layerStack');
@@ -1690,6 +1655,7 @@ export function initTopomapper() {
           const item = layerStack.querySelector(`[data-layer="${key}"]`);
           if(item) layerStack.appendChild(item);
         });
+        syncLayerOrder(layerStack);
       }
       updateGradientPreview();
       applyTheme();
@@ -1857,7 +1823,7 @@ export function initTopomapper() {
       else void generateArea(mode);
     };
     $('retryGeneration').onclick=()=>void generateArea(lastRequestedMode);
-    async function generateArea(mode) {
+    async function generateArea(mode,retryBounds=null) {
       if(activeJob || exportBusy || disposed) return;
       lastRequestedMode=mode;
       previewScale=1; cameraZoom=1;
@@ -1876,7 +1842,7 @@ export function initTopomapper() {
       $('suggestionBox').style.display='none';
       try {
         updateVf();
-        const bounds = structuredClone(state.bbox);
+        const bounds = structuredClone(retryBounds||state.bbox);
         validateBounds(bounds);
         const key = bboxKey(bounds.sw, bounds.ne);
         const terrain = terrainCache.get(key) || await runWorker('terrain', bounds, {
@@ -1899,8 +1865,9 @@ export function initTopomapper() {
         showGenerationStatus({phase:'render',percent:100,state:mapOk?'success':'warning',title:mapOk?'Area ready':'Terrain ready with missing layers',detail:terrain.source+(mapOk?' · Map layers loaded.':' · Map overlays unavailable; terrain-only work remains available.')});
         $('retryGeneration').hidden=mapOk;
         lastFrame={wMm:state.wMm,hMm:state.hMm,shape:state.shape};
-        $('terrainSource').textContent = mapOk ? terrain.source : `${terrain.source} · Map overlays unavailable. Close the preview and retry to load buildings, roads and water.`;
+        $('terrainSource').textContent = mapOk ? terrain.source : `${terrain.source} · ${state.osmStatus.error} Use Retry map layers below.`;
         $('terrainSource').classList.toggle('error',!mapOk);
+        $('retryMapLayers').hidden=mapOk;
         openPreview();
       } catch(error) {
         Object.assign(state, previous);
@@ -2418,6 +2385,7 @@ export function initTopomapper() {
       $('previousPreview').focus();
     };
     $('closePreview').onclick = closePreview;
+    $('retryMapLayers').onclick=()=>{const bounds=structuredClone(state.renderBbox);closePreview();void generateArea(outputMode,bounds);};
     document.addEventListener('keydown', event => {
       if($('purposeDialog').open)return;
       if(!$('modal').classList.contains('open')) return;

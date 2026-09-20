@@ -38,32 +38,66 @@ export function prepareBuildingLod(buildings,{minArea=.5,tolerance=.06,maxBuildi
 }
 
 export function coastlineAreas(lines,clipPolygon) {
-  const clip=clipPolygon.concat([clipPolygon[0]]), closed=[], open=[];
+  const frame=area(clipPolygon)>0?clipPolygon:clipPolygon.slice().reverse();
+  const clip=frame.concat([frame[0]]), rings=[], open=[];
   const onSegment=(p,a,b)=>Math.abs((b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]))<1e-4&&p[0]>=Math.min(a[0],b[0])-1e-4&&p[0]<=Math.max(a[0],b[0])+1e-4&&p[1]>=Math.min(a[1],b[1])-1e-4&&p[1]<=Math.max(a[1],b[1])+1e-4;
-  const edgeOf=p=>clipPolygon.findIndex((a,i)=>onSegment(p,a,clipPolygon[(i+1)%clipPolygon.length]));
+  const position=p=>{
+    const i=frame.findIndex((a,j)=>onSegment(p,a,frame[(j+1)%frame.length]));
+    if(i<0)return null;
+    const a=frame[i],b=frame[(i+1)%frame.length];
+    return (i+Math.hypot(p[0]-a[0],p[1]-a[1])/Math.hypot(b[0]-a[0],b[1]-a[1]))%frame.length;
+  };
   for(const line of lines||[]) {
     if(line.length<2)continue;
-    if(same(line[0],line.at(-1))){closed.push([line]);continue;}
-    const start=edgeOf(line[0]),end=edgeOf(line.at(-1));if(start<0||end<0)continue;
-    const boundary=[line.at(-1)];let edge=end,guard=0;
-    while(edge!==start&&guard++<clipPolygon.length+1){boundary.push(clipPolygon[(edge+1)%clipPolygon.length]);edge=(edge+1)%clipPolygon.length;}
-    boundary.push(line[0]);
-    const candidate=line.concat(boundary.slice(1));
-    // OSM coastline direction keeps land on the left in geographic coordinates.
-    // Projected screen Y is inverted, so water is the positive-area side here.
-    if(area(candidate)>0)open.push([candidate]);
-    else {
-      const reverseBoundary=[line.at(-1)];edge=end;guard=0;
-      while(edge!==start&&guard++<clipPolygon.length+1){reverseBoundary.push(clipPolygon[edge]);edge=(edge-1+clipPolygon.length)%clipPolygon.length;}
-      reverseBoundary.push(line[0]);const other=line.concat(reverseBoundary.slice(1));
-      if(area(other)>0)open.push([other]);
+    if(same(line[0],line.at(-1))){rings.push(line);continue;}
+    const start=position(line[0]),end=position(line.at(-1));
+    if(start!==null&&end!==null)open.push({line,start,end});
+  }
+  // In screen coordinates water lies on the positive-winding side of a directed
+  // OSM coastline. Follow shorelines and the clockwise frame to polygonize water.
+  // Connecting to the next start (not necessarily this line's own start) retains
+  // multiple bays, channels and shorelines crossing the same edge.
+  const used=new Set(),n=frame.length;
+  for(let seed=0;seed<open.length;seed++) {
+    if(used.has(seed))continue;
+    const ring=[];let current=seed;
+    for(let guard=0;guard<=open.length;guard++) {
+      if(used.has(current))throw new Error('Coastline geometry is incomplete. Try a smaller area.');
+      used.add(current);
+      const record=open[current];ring.push(...record.line);
+      let next=-1,distance=Infinity;
+      open.forEach((candidate,i)=>{
+        const delta=(candidate.start-record.end+n)%n;
+        if(delta<distance){distance=delta;next=i;}
+      });
+      for(let vertex=Math.floor(record.end)+1;vertex<record.end+distance-1e-8;vertex++)ring.push(frame[vertex%n]);
+      if(next===seed){ring.push(ring[0]);rings.push(ring);break;}
+      current=next;
     }
   }
-  try {
-    let water=open.length?polygonClipping.union(...open):closed.length?[clip]:[];
-    if(closed.length&&water.length)water=polygonClipping.difference(water,...closed);
-    return water.map((polygons,index)=>({id:`coastline/${index}`,name:'Coastal water',polygons:[polygons]}));
-  } catch { return []; }
+  const waterRings=rings.filter(r=>area(r)>1e-8),landRings=rings.filter(r=>area(r)<-1e-8);
+  let water=waterRings.length?polygonClipping.union(...waterRings.map(r=>[r])):landRings.length?[[clip]]:[];
+  if(landRings.length&&water.length)water=polygonClipping.difference(water,...landRings.map(r=>[r]));
+  return water.map((polygon,index)=>({id:`coastline/${index}`,name:'Coastal water',polygons:[polygon]}));
+}
+
+export function joinCoastlines(lines) {
+  const pending=Array.from(new Map(lines.filter(l=>l.length>=2).map(l=>[JSON.stringify(l),l.slice()])).values()),result=[];
+  while(pending.length){
+    let line=pending.pop(),changed=true;
+    while(changed&&!same(line[0],line.at(-1))){
+      changed=false;
+      for(let i=0;i<pending.length;i++){
+        const next=pending[i];
+        if(same(line.at(-1),next[0]))line.push(...next.slice(1));
+        else if(same(next.at(-1),line[0]))line=next.slice(0,-1).concat(line);
+        else continue;
+        pending.splice(i,1);changed=true;break;
+      }
+    }
+    result.push(line);
+  }
+  return result;
 }
 function joinRings(segments) {
   const pending = segments.filter(s=>s.length>=2).map(s=>s.slice()), rings=[];

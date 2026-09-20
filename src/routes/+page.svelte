@@ -148,6 +148,7 @@
       </div>
       <button id="changeOutput" class="btn-secondary">Change output · 2D / 3D</button>
       <div id="terrainSource" class="status-text"></div>
+      <button id="retryMapLayers" class="btn-secondary" type="button" hidden>Retry map layers</button>
       <details class="source-details"><summary>Data sources & credits</summary><div class="status-text">Data: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Mapzen terrain source credits</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>. Keep source credits with published exports.</div></details>
 
         <div class="stepper">
@@ -212,7 +213,7 @@
         <div class="group">
           <div class="ui-label">Map layers</div>
           <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
-            Toggle layers, adjust their appearance, or reorder them. Top layers draw above lower ones.
+            Top of this list = foreground. Move a layer up to bring it forward, or down to send it behind others. Transparent fills let lower layers show through. Shading stays below all layers.
           </p>
           <div id="layerStack" class="layer-list">
             <div class="layer-item" data-layer="labels" draggable="true">

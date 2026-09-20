@@ -41,5 +41,5 @@ export function applyDesignPreset(state, key) {
   Object.assign(state.mapFeatures.labels,{enabled:false,color:p.labels,opacity:100,size:0.7,weight:'normal',style:'normal'});
   Object.assign(state.mapFeatures.labels.background,{enabled:true,color:p.background});
   Object.assign(state.png,{layered:p.layered,scheme:'color',blend:'normal',gradientOpacity:35,gradientShift:0,gradientScale:100});
-  state.layerOrder=['labels','buildings','roads','rivers','water','green','contours'];
+  state.layerOrder=['labels','buildings','roads','rivers','contours','water','green'];
 }

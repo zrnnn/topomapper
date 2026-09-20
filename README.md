@@ -1,100 +1,153 @@
-﻿# Topomapper (dev)
+# Topomapper
 
-Interactive 2D map and 3D print-model generator built with SvelteKit and MapLibre GL JS. It remains a static GitHub Pages app; no React migration or application server is required.
+Create printable maps and 3D landscape models from places around the world, directly in your browser.
 
-## Workflow
+[Open Topomapper](https://zrnnn.github.io/topomapper/)
 
-1. Search for a place and frame an area. Continue to choose **2D map** or **3D print**. Large selections display a warning before loading.
-2. For 2D, choose Alpine Atlas, Urban Figureground, Midnight Blueprint, Contour Study, Shaded Landscape, or Laser Linework. Advanced layer order, colors, line widths, shading and label controls remain available. Export PNG (raster), SVG (vector with optional embedded shading), or DXF (editable outlines in millimetres).
-3. For 3D, choose Landscape, City Block (flat base), or Terrain Study. Set print width, mesh quality, terrain/building/street/water/river/green layers, and advanced relief/base/embossing settings. Update the model, orbit the preview, then export the exact same fused geometry as 3MF, STL or OBJ.
+See the [release verification notes](docs/RELEASE-REVIEW.md) for tested behavior and remaining limitations.
 
-### Printable model behavior
+## What can I make?
 
-- Manifold WebAssembly fuses all selected solids in a worker. Streets, rivers, water and green areas are actual terrain-following raised geometry. Internal overlapping surfaces are removed. 3MF stores face colors; STL and OBJ are geometry-only.
-- Building footprints and area multipolygons retain courtyard/island holes. Buildings use OSM height, levels × 3 m, then the adjustable fallback height. Roofs are flat; buildings extend into the terrain and have a minimum 0.4 mm visible rise. Tiny footprints can be omitted by their final printed area; dense results are capped at the 2,500 largest buildings and complex outlines are simplified at output scale, with the omissions reported in the UI. Relief height and building height exaggeration are independently controlled. These are cartographic models, not detailed architectural or survey replicas.
-- Changing settings invalidates export until the new preview succeeds. Failed jobs never export a partial model. Unavailable OSM data blocks selected overlay layers; disable them for terrain-only output or reload the area. Empty mapped layers are reported.
-- Mesh quality is bounded to 40–240 samples per side, print width to 50–400 mm, retained buildings to 2,500 and street/river input to 40,000 points. Workers have a 90-second limit and can be cancelled. Loading, modeling and export panels report their current phase, progress and actionable failure details while preserving the last successful result.
-- 3D geometry, rendering and compression are lazy-loaded. Models are north-up, Z-up and sized in millimetres. Verify scale, minimum feature sizes, materials and support requirements in your slicer before printing. Surface colors are not a guarantee of multi-material slicing support.
+- Paper maps and posters with terrain shading, contour lines, buildings, roads and water.
+- SVG and DXF artwork for vector editing, CAD and laser preparation.
+- 3D terrain and city models with raised buildings and selected map layers, downloadable as 3MF, STL or OBJ.
 
-## Requirements
+No account or API key is required. Internet access is needed to search for places and download elevation and map data. Rendering and file generation run in your browser.
 
-- Node.js 22.12+ (CI uses Node 24)
+## Step 1: Choose an area
+
+Type a place in **Location Search**, then press **Enter** or **Search**. Select a result and move or zoom the map until the frame covers your desired area.
+
+Open **Frame & Dimensions** to adjust the output width, height and shape. Dimensions describe the final output in millimetres. Map zoom controls how much real-world geography fits into that output.
+
+Choose **Continue · choose output**, then **2D map** or **3D print**. Large selections display a warning. Start with a small neighbourhood when you want detailed buildings.
+
+![Illustrated area selection workflow](docs/images/01-area.svg)
+
+*The three illustrations in this guide explain the workflow; they are not screenshots or real geographic data.*
+
+## Step 2: Design a 2D map
+
+Choose a preset in the **Design** tab:
+
+| Preset | Suggested use |
+| --- | --- |
+| Alpine Atlas | Balanced topographic maps |
+| Urban Figureground | Buildings and urban layout |
+| Midnight Blueprint | Dark building-map artwork |
+| Contour Study | Minimal elevation linework |
+| Shaded Landscape | Shaded raster posters |
+| Laser Linework | Vector outlines for CAD or laser preparation |
+
+Under **Map Layers**, toggle contours, buildings, roads, rivers, water areas, green areas and place names. Expand a layer to change its appearance. Move layers with arrows or drag handles; layers at the top draw above those below. Presets place contour lines above area fills. Transparent fills reveal lower layers; terrain shading stays at the bottom. The same order is used for the 2D preview, PNG and SVG. DXF contains editable linework; its appearance depends on your CAD application. In 3D, physical height and camera position determine visibility.
+
+Line widths use millimetres. **Bold Every Nth** emphasizes selected contours; 0 disables emphasis. Adjust density and smoothing to balance detail and readability.
+
+Zoom the preview with the mouse wheel or **− / + / Fit**. Preview zoom does not change export dimensions. Turn **Auto Preview** off while making several expensive changes, then choose **Update preview**. Undo and redo apply to design changes.
+
+![Illustrated 2D design workflow](docs/images/02-design.svg)
+
+### Large building datasets
+
+**Minimum footprint (mm²)** removes buildings that would be too small in the final output. A 1 × 1 mm footprint has an area of 1 mm². Complex outlines are simplified, and dense selections retain up to 2,500 of the largest buildings. The interface reports omissions.
+
+A threshold of 0 disables the small-footprint filter, but the count limit and outline simplification still apply. Neighbouring buildings are not merged into city blocks.
+
+### Export a 2D map
+
+Choose **Continue to Export** or the **Export** tab.
+
+| Format | Purpose | Output |
+| --- | --- | --- |
+| PNG | Paper, posters and image editing | Raster image; higher resolution uses more memory |
+| SVG | Vector editing and scalable artwork | Vector paths, with optional embedded raster shading |
+| DXF | CAD and laser preparation | Editable linework in millimetres, not a shaded image |
+
+Check laser paths in your machine software. When printing paper maps, use the intended scale rather than automatic page fitting.
+
+## Step 3: Create a 3D print
+
+Choose **Landscape model** for terrain with map layers, **City block** for a flat base, or **Terrain study** for terrain alone.
+
+Set print width and mesh quality, then select terrain, buildings, streets, water areas, rivers and green areas. Advanced controls include base thickness, relief height, building-height scale, fallback height, minimum building footprint, and raised-layer dimensions.
+
+Choose **Update model**. Drag to orbit, scroll or use **− / +** to zoom, and choose **Reset view** to restore the camera. Rebuild after changing settings before exporting.
+
+![Illustrated 3D printing workflow](docs/images/03-print.svg)
+
+| Format | Contents |
+| --- | --- |
+| 3MF | Geometry, millimetre units and face colors |
+| STL | Geometry only; choose millimetres when importing |
+| OBJ | Geometry only; confirm scale in the receiving application |
+
+Selected layers are fused into a solid. Water and green areas are raised surfaces, not automatically carved channels. Buildings use mapped height, then floor count × 3 metres, then your fallback height. Roofs are flat. Terrain relief and building exaggeration have separate controls.
+
+Inspect scale, minimum features, supports and colors in your slicer. Face colors do not guarantee automatic multi-material slicing. These are simplified cartographic models, not survey data or detailed architectural replicas.
+
+## Loading and troubleshooting
+
+Loading panels show elevation, map layers and preview stages. Model generation and export show their current operation. Percentages describe workflow progress, not time remaining.
+
+- **Request failed or timed out:** retry, check your connection or select a smaller area.
+- **Elevation unavailable:** the app tries a lower-resolution fallback source.
+- **Map layers missing:** terrain-only work may remain available. Use **Retry map layers** inside the preview to reload the same area. The app tries an alternate service and smaller sections automatically, with a total map-loading limit of 90 seconds. For 3D, disable unavailable overlays to generate terrain only.
+- **Selection too detailed:** increase the minimum building footprint, lower mesh quality, disable dense layers or choose a smaller area.
+- **Model/export failure:** follow the displayed action and inspect technical details. The previous successful result is preserved.
+
+Generation can be cancelled. Export before closing or reloading: project save/restore is not implemented.
+
+## Coverage and limitations
+
+Water Areas includes lakes, reservoirs, ponds, basins, lagoons and bays. Rivers is a separate layer. Multipolygons can retain courtyard and island holes.
+
+Coastal sea/ocean areas are derived from directed shorelines, including same-edge crossings, multiple bays and island holes. Fully offshore frames without shoreline cannot be inferred from the current data source. Incomplete or inconsistent source geometry may require a smaller selection.
+
+Other limits include 40–240 mesh samples per side, 50–400 mm 3D print width, 2,500 retained buildings, geometry-size limits and a 90-second worker timeout. Large requests can still exceed browser capacity. Building heights and map coverage vary by location.
+
+## Data, privacy and credits
+
+Search terms are sent to public Nominatim. Map bounds are sent to Overpass. Elevation tile requests go to the Mapzen source; the fallback sends sample coordinates to Open-Elevation. These services receive normal request information, including your IP address.
+
+The app also loads basemap tiles from OpenTopoMap and fonts from Google Fonts. These providers receive normal browser requests. The app has no account system or application backend. Public services have no availability guarantee.
+
+Map features are © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright). Basemap cartography is © [OpenTopoMap](https://opentopomap.org/about). Elevation uses [Mapzen terrain tiles](https://registry.opendata.aws/terrain-tiles/) with [source credits and licence terms](https://github.com/tilezen/joerd/blob/master/docs/attribution.md). Preserve applicable credits when sharing exports.
 
 ## Development
 
+Requires Node.js 22.12 or later; CI uses Node 24.
+
 ```sh
 npm ci
-npm run dev -- --host 127.0.0.1 --port 5173
+npm run dev -- --host 127.0.0.1
 ```
 
-## Build (static)
-
-```sh
-npm run build
-```
-
-The static output is written to `build/` (GitHub Pages friendly). The app uses a base path of `/topomapper` in production builds.
-
-## Verification
+To test and preview the production build:
 
 ```sh
 npm test
 npm run build
-```
-
-Pull requests and development branches run both checks. Deployment from `main` also runs the tests first.
-
-## Release candidate 0.1.0-rc.1
-
-- Terrain comes from public Mapzen Terrarium tiles hosted on AWS, decoded in a Web Worker. Up to four tiles are fetched concurrently, with a 64-tile limit, request timeouts, and bounded in-memory caches.
-- If tiles fail, Open-Elevation is tried using sequential 512-location batches at lower resolution. Both providers are validated before rendering. Cancellation stops background terrain processing; failures preserve the previous preview.
-- Terrain samples and map overlays share Web Mercator coordinates. Selections crossing the date line or outside 85°S–85°N are rejected explicitly.
-- Mobile selection frames and preview sizing are fixed. Generate stays visible, dimension fields commit on blur, layer switches support keyboards, the preview traps focus and closes with Escape, and manual preview refresh is available.
-- Contours preserve boundary endpoints, are clipped to the selected shape, simplified to limit point growth, and cached independently of colors and line widths.
-- 3MF creation and compression run in a worker. Meshes use outward-facing triangles and a 2 mm base; tests check closed edges and winding for rectangle, circle and hexagon terrain.
-- SVG label text/font attributes are escaped; label size and line widths use millimetres. DXF declares millimetres and permits map-only exports. PNG failures no longer silently omit overlays.
-- Water areas recognize lakes, ponds, reservoirs, basins, lagoons and bays. Directed OpenStreetMap coastlines are closed against the selected frame to render coastal sea/ocean, while island coastlines remain holes. A fully offshore frame containing no coastline cannot be inferred from Overpass alone.
-- The 2D preview supports mouse-wheel zoom plus explicit −, + and Fit controls; the same controls drive the 3D camera. Selecting a search result applies its center and zoom immediately, preventing a quick Continue click from capturing an in-between animated frame.
-
-### Services and attribution
-
-Location search runs only on Search or Enter, with caching and a per-client rate limit; it is not autocomplete. It uses the public Nominatim service. Map overlays use public Overpass endpoints. These public services have no availability guarantee; larger deployments should use an appropriately provisioned search/Overpass service.
-
-Elevation uses [Mapzen terrain tiles](https://registry.opendata.aws/terrain-tiles/), with [source credits and licence terms](https://github.com/tilezen/joerd/blob/master/docs/attribution.md). Map features are © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright); basemap cartography is © [OpenTopoMap](https://opentopomap.org/about). Preserve applicable source credits when publishing exported work. Heights are resampled and smoothed for artwork and fabrication, not survey or navigation use.
-
-### Remaining release gates
-
-This is a development release candidate, not a production deployment. Before tagging a stable release:
-
-- Check exports in an independent CAD application and 3MF slicer, plus real Safari/Firefox and touch devices.
-- Add project save/restore and automated end-to-end browser coverage. Expand fixtures for unusual/incomplete OSM relations and dense urban areas.
-- Further split the large imperative UI module and move raster shading off the main thread. MapLibre still dominates the initial map bundle.
-- The dependency audit currently retains three low-severity findings in the SvelteKit → cookie build/server chain. No high/critical findings remain after compatible updates; this deployment is static and does not run a cookie-handling server. Do not apply the audit's suggested downgrade to an obsolete SvelteKit release.
-
-## Preview production build
-
-```sh
 npm run preview -- --host 127.0.0.1 --port 4173
 ```
 
+Open http://127.0.0.1:4173/topomapper/ for the production preview.
+
 ## GitHub Pages
 
-- Base path is `/topomapper` when `NODE_ENV=production`; adjust `paths.base` in `svelte.config.js` if the repo name changes.
-- Deploy via the workflow `.github/workflows/pages.yml` (builds and publishes `build/` to GitHub Pages).
-- A `.nojekyll` file in `static/` prevents GitHub Pages from ignoring underscore-prefixed files.
+The static build is written to `build/`; the production base path is `/topomapper`. Set the repository's Pages source to **GitHub Actions**.
 
-## Manual GitHub Pages publish (fallback)
+A push to `main` runs tests and builds the site, then deploys the Pages artifact. Check the deployment job and the published URL after release. Development branches and pull requests run verification without deploying Pages.
 
-1. Run `npm run build`
-2. Publish the `build/` folder
+If the repository name changes, update the base path in `svelte.config.js`.
 
-If the repo name changes, update `paths.base` in `svelte.config.js`.
+## Code layout
 
-## Notes
+- `src/routes/+page.svelte`: interface
+- `src/lib/topomapper.js`: map selection, 2D design and export
+- `src/lib/model*.js`: 3D workflow, geometry and export
+- `src/lib/terrain*.js`: elevation processing
+- `src/app.css`: shared styling
+- `tests/`: geometry, worker and stability checks
+- `legacy/`: historical implementation, not the current app
 
-- Main UI lives in `src/routes/+page.svelte`.
-- Core app logic is in `src/lib/topomapper.js`.
-- Global styles are in `src/app.css`.
-- Static assets (logo/icon) are in `static/assets`.
-- Contour styling includes a "Bold Every Nth" slider (0–20, default 0). Presets use fine 0.10–0.12 mm lines without bold bands; advanced emphasis remains available.
-- Location results use an opaque, scrollable panel above the sidebar controls. Search runs on Search/Enter, not on every keystroke.
+See [LICENSE](LICENSE) for the project licence.
