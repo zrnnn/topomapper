@@ -513,8 +513,8 @@
         </div>
         <div class="group mode-3d">
           <span class="ui-label">Export the previewed model</span>
-          <p class="control-help">A fused solid in millimetres. All selected layers share the exact preview geometry. 3MF includes surface colors; STL and OBJ are geometry-only. Your slicer and printer determine color/material support.</p>
-          <label class="ui-label" for="model-format">File format</label><select id="model-format"><option value="3mf">3MF · geometry + colors</option><option value="stl">STL · universal print mesh</option><option value="obj">OBJ · general 3D mesh</option></select>
+          <p class="control-help">3MF keeps map layers aligned as named parts. Choose a filament for each part in your slicer. STL and OBJ contain the fused surface. All formats use millimetres.</p>
+          <label class="ui-label" for="model-format">File format</label><select id="model-format"><option value="3mf">3MF · colored map parts</option><option value="stl">STL · universal print mesh</option><option value="obj">OBJ · general 3D mesh</option></select>
           <button id="exportModel" class="btn-main" disabled>Download model</button><p class="control-help">Inspect the result in your slicer before printing. Ultra quality and dense cities can take longer; use a small area first.</p>
         </div>
         <div class="mode-2d">

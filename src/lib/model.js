@@ -62,11 +62,31 @@ export function roadRings(lines,width) {
 }
 const rgb = hex => [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);
 
+function printableMesh(solid, heightMm, withColors = false) {
+  const raw=solid.getMesh(), stride=raw.numProp;
+  const parent=Array.from({length:raw.vertProperties.length/stride},(_,i)=>i);
+  const root=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
+  for(let i=0;i<raw.mergeFromVert.length;i++)parent[root(raw.mergeFromVert[i])]=root(raw.mergeToVert[i]);
+  const index=new Map(),v=[],t=[],colors=[];
+  const vertex=i=>{
+    const r=root(i);if(index.has(r))return index.get(r);
+    const j=r*stride,id=v.length;
+    v.push([raw.vertProperties[j],heightMm-raw.vertProperties[j+1],raw.vertProperties[j+2]]);index.set(r,id);return id;
+  };
+  for(let i=0;i<raw.triVerts.length;i+=3) {
+    const ids=Array.from(raw.triVerts.slice(i,i+3));
+    t.push(ids.map(vertex).reverse());
+    const j=ids[0]*stride;
+    if (withColors) colors.push('#'+[3,4,5].map(k=>Math.round(Math.max(0,Math.min(1,raw.vertProperties[j+k]??.7))*255).toString(16).padStart(2,'0')).join(''));
+  }
+  return withColors ? {v,t,colors} : {v,t};
+}
+
 export async function buildModel(engine, state, settings, progress=()=>{}) {
   validateModelSettings(settings);
   if(!state.terrainData) throw new Error('Load an area before building a model.');
   const input=modelInput(state,settings), s=input.state;
-  const reliefHeight=terrainReliefHeight({...s,terrainData:state.terrainData},settings.relief);
+  const reliefHeight=terrainReliefHeight(s,settings.relief);
   const areaRecords=[...(settings.buildings?input.buildings:[]),...(settings.water?input.water:[]),...(settings.green?input.green:[])];
   let points=0;for(const record of areaRecords)for(const polygon of record.polygons)for(const ring of polygon){points+=ring.length;if(points>150000)throw new Error('Area geometry exceeds 150,000 points. Select a smaller area or disable buildings / area layers.');}
   if((settings.roads?input.roads:[]).reduce((n,line)=>n+roadPoints(line).length,0)+(settings.rivers?input.rivers:[]).reduce((n,line)=>n+roadPoints(line).length,0)>40000) throw new Error('Street/river geometry is too large for browser modeling. Select a smaller area or disable those layers.');
@@ -83,6 +103,7 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
     const terrain=fromMesh(terrainMesh);
     if(terrain.status()!=='NoError') throw new Error('Terrain mesh validation failed. Try a different mesh quality.');
     const solids=[colored(terrain,'#D4D6C8')];
+    const overlays = [];
     const drape=(rings,rise,color,name)=>{
       if(!rings.length)return;
       progress({percent:30+solids.length*7,detail:`Building ${name} geometry`});
@@ -91,19 +112,28 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
       const shifted=keep(terrain.translate([0,0,rise]));
       const layer=keep(shifted.intersect(prism));
       if(layer.status()!=='NoError')throw new Error(`${name} geometry could not be modeled. Reduce the area or disable this layer.`);
-      solids.push(colored(layer,color));
+      if (!layer.isEmpty()) {
+        overlays.push({name,color,solid:layer});
+        solids.push(colored(layer,color));
+      }
     };
-    if(settings.green)drape(input.green.flatMap(f=>f.polygons.flat()),settings.areaRise,'#91AA85','green areas');
-    if(settings.water)drape(input.water.flatMap(f=>f.polygons.flat()),settings.areaRise,'#6A9EA9','water');
-    if(settings.rivers)drape(roadRings(input.rivers,settings.roadWidth*.8),settings.areaRise,'#6A9EA9','rivers');
-    if(settings.roads)drape(roadRings(input.roads,settings.roadWidth),settings.roadRise,'#536C68','streets');
+    if(settings.green)drape(input.green.flatMap(f=>f.polygons.flat()),settings.areaRise,'#91AA85','Green areas');
+    if(settings.water)drape(input.water.flatMap(f=>f.polygons.flat()),settings.areaRise,'#6A9EA9','Water');
+    if(settings.rivers)drape(roadRings(input.rivers,settings.roadWidth*.8),settings.areaRise,'#6A9EA9','Rivers');
+    if(settings.roads)drape(roadRings(input.roads,settings.roadWidth),settings.roadRise,'#536C68','Roads');
     if(settings.buildings) {
       progress({percent:62,detail:`Extruding ${input.buildings.length} building footprints`});
       const buildings=buildBuildingMeshes(s,input.buildings,{resolution:settings.resolution,targetHeight:reliefHeight,buildingScale:settings.buildingScale,fallbackHeight:settings.fallbackHeight});
+      const buildingSolids = [];
       for(const {mesh} of buildings) {
         mesh.v.forEach(v=>{if(v[2]>0)v[2]+=settings.base-2;});
         const solid=fromMesh(mesh);
         if(solid.status()!=='NoError')throw new Error('A building mesh is invalid. Try a smaller area or turn buildings off.');
+        buildingSolids.push(solid);
+      }
+      if (buildingSolids.length) {
+        const solid = keep(Manifold.union(buildingSolids));
+        overlays.push({name:'Buildings', color:'#DDA95E', solid});
         solids.push(colored(solid,'#DDA95E'));
       }
     }
@@ -111,24 +141,35 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
     const fused=keep(Manifold.union(solids));
     if(fused.status()!=='NoError'||fused.isEmpty()) throw new Error('Solid fusion failed. Reduce model detail or disable a layer. No partial model was exported.');
     progress({percent:94,detail:'Checking the final surface and layer colors'});
-    const raw=fused.getMesh(), stride=raw.numProp;
-    const parent=Array.from({length:raw.vertProperties.length/stride},(_,i)=>i);
-    const root=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
-    for(let i=0;i<raw.mergeFromVert.length;i++)parent[root(raw.mergeFromVert[i])]=root(raw.mergeToVert[i]);
-    const index=new Map(),v=[],t=[],colors=[];
-    const vertex=i=>{
-      const r=root(i);if(index.has(r))return index.get(r);
-      const j=r*stride,id=v.length;
-      v.push([raw.vertProperties[j],s.hMm-raw.vertProperties[j+1],raw.vertProperties[j+2]]);index.set(r,id);return id;
-    };
-    for(let i=0;i<raw.triVerts.length;i+=3) {
-      const ids=Array.from(raw.triVerts.slice(i,i+3));
-      t.push(ids.map(vertex).reverse());
-      const j=ids[0]*stride;
-      colors.push('#'+[3,4,5].map(k=>Math.round(Math.max(0,Math.min(1,raw.vertProperties[j+k]??.7))*255).toString(16).padStart(2,'0')).join(''));
+    const mesh = printableMesh(fused, s.hMm, true);
+    // Keep the base intact. Allocate raised material in visible priority order.
+    let claimed = terrain;
+    let partVolume = terrain.volume();
+    const parts = [];
+    for (const {name, color, solid} of overlays.reverse()) {
+      const exposed = keep(solid.subtract(claimed));
+      if (exposed.status() !== 'NoError') throw new Error('Could not separate printable ' + name + '.');
+      if (exposed.isEmpty()) continue;
+      const volume = exposed.volume();
+      if (!Number.isFinite(volume) || volume < 0) throw new Error('Invalid printable volume for ' + name + '.');
+      if (volume === 0) continue;
+      partVolume += volume;
+      parts.unshift({name, color, mesh: printableMesh(exposed, s.hMm)});
+      claimed = keep(claimed.add(solid));
     }
-    const result={mesh:{v,t,colors},counts,buildingStats:input.buildingStats,width:s.wMm,height:s.hMm,reliefHeight,triangles:t.length,volume:fused.volume(),settings:{...settings}};
-    progress({percent:100,detail:`Ready · ${t.length.toLocaleString()} triangles`});
+    const volume = fused.volume();
+    if (Math.abs(partVolume - volume) > Math.max(.001, volume * 1e-5)) {
+      throw new Error('Layer volumes differ from the fused model. Reduce mesh detail and retry.');
+    }
+    parts.unshift({name: settings.terrain ? 'Terrain' : 'Base', color: '#D4D6C8',
+      mesh: overlays.length ? printableMesh(terrain, s.hMm) : mesh});
+    const credits = [settings.terrain ? state.terrainData.source : 'Flat base'];
+    if (overlays.length) {
+      credits.push('Map data © OpenStreetMap contributors (https://www.openstreetmap.org/copyright)');
+      if (state.mapSource?.includes('OpenFreeMap')) credits.push('OpenMapTiles / OpenFreeMap');
+    }
+    const result={mesh,parts,credits:credits.filter(Boolean).join(' · '),counts,buildingStats:input.buildingStats,width:s.wMm,height:s.hMm,reliefHeight,triangles:mesh.t.length,volume,settings:{...settings}};
+    progress({percent:100,detail:`Ready · ${mesh.t.length.toLocaleString()} triangles`});
     return result;
   } finally { owned.reverse().forEach(object=>object.delete()); }
 }

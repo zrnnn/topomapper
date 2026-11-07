@@ -67,7 +67,6 @@ export function initTopomapper() {
       bbox: null,
       renderBbox: null,
       terrainData: null,
-      contourPaths: [],
       osmData: null,
       osmStatus: { loaded: false, error: null, tiles: 1, ignored: false },
       previewDirty: false,
@@ -1771,9 +1770,24 @@ export function initTopomapper() {
       }
       return buildingCache.buildings;
     }
+    function contourGroups() {
+      if (!state.contour.enabled || !state.terrainData?.delta) return [];
+      const {wMm, hMm} = state;
+      const key = [state.terrainVersion,wMm,hMm,state.shape,state.contour.density,state.contour.smooth].join(':');
+      if(contourCache.key !== key) {
+        const clip = getClipPolygon();
+        const groups = getContourLevels().map(level =>
+          buildPolylines(getContourSegments(level,wMm,hMm)).flatMap(line =>
+            clipPolylineToPolygon(smoothPolyline(line,state.contour.smooth),clip)
+          )
+        );
+        contourCache = {key,groups};
+      }
+      return contourCache.groups;
+    }
     function buildSvgMarkup({ includeBackground = true, includeGradient = true, includeFrame = true } = {}) {
       const {wMm, hMm} = state;
-      let svg = `<svg id="prevSvg" width="${wMm}mm" height="${hMm}mm" viewBox="0 0 ${wMm} ${hMm}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
+      let svg = `<svg id="prevSvg" width="${wMm}mm" height="${hMm}mm" viewBox="0 0 ${wMm} ${hMm}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">`;
       svg+='<desc>Topomapper. Map data © OpenStreetMap contributors.'+(state.osmStatus?.source?.includes('OpenFreeMap')?' Generalized city geometry © OpenMapTiles, served by OpenFreeMap.':'')+'</desc>';
       const clipPathD = getShapePathD();
       svg += `<defs><clipPath id="shapeClip"><path d="${clipPathD}"/></clipPath></defs>`;
@@ -1786,7 +1800,7 @@ export function initTopomapper() {
         if(previewUrl) {
           const blendMode = state.png.blend || 'normal';
           const blendStyle = updateBlendStyle(blendMode);
-          svg += `<image href="${previewUrl}" x="0" y="0" width="${wMm}" height="${hMm}" preserveAspectRatio="none"${blendStyle} />`;
+          svg += `<image xlink:href="${previewUrl}" x="0" y="0" width="${wMm}" height="${hMm}" preserveAspectRatio="none"${blendStyle} />`;
         }
       }
 
@@ -1794,12 +1808,12 @@ export function initTopomapper() {
         buildings: () => {
           const style=state.mapFeatures.buildings;
           if(!style.enabled) return '';
-          return `<g id="buildings" fill="${style.filled?style.color:'none'}" stroke="${style.width>0?style.outline:'none'}" stroke-width="${style.width}" opacity="${toUnitOpacity(style.opacity)}" fill-rule="evenodd" stroke-linejoin="miter">`+
+          return `<g id="buildings" inkscape:groupmode="layer" inkscape:label="Buildings" fill="${style.filled?style.color:'none'}" stroke="${style.width>0?style.outline:'none'}" stroke-width="${style.width}" opacity="${toUnitOpacity(style.opacity)}" fill-rule="evenodd" stroke-linejoin="miter">`+
             visibleBuildings().map(building=>`<path d="${buildingPath(building)}"/>`).join('')+'</g>';
         },
         green: () => {
           if(!state.osmData || !state.mapFeatures.greenAreas.enabled || !state.osmData.greenAreas.length) return '';
-          let out = `<g id="greenAreas" fill-rule="evenodd" fill="${state.mapFeatures.greenAreas.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.greenAreas.opacity)}">`;
+          let out = `<g id="greenAreas" inkscape:groupmode="layer" inkscape:label="Green areas" fill-rule="evenodd" fill="${state.mapFeatures.greenAreas.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.greenAreas.opacity)}">`;
           state.osmData.greenAreas.forEach((area) => {
             const d = buildingPath(area);
             if(d) out += `<path d="${d}"/>`;
@@ -1808,7 +1822,7 @@ export function initTopomapper() {
         },
         water: () => {
           if(!state.osmData || !state.mapFeatures.waterAreas.enabled || !state.osmData.waterAreas.length) return '';
-          let out = `<g id="waterAreas" fill-rule="evenodd" fill="${state.mapFeatures.waterAreas.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.waterAreas.opacity)}">`;
+          let out = `<g id="waterAreas" inkscape:groupmode="layer" inkscape:label="Water" fill-rule="evenodd" fill="${state.mapFeatures.waterAreas.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.waterAreas.opacity)}">`;
           state.osmData.waterAreas.forEach((area) => {
             const d = buildingPath(area);
             if(d) out += `<path d="${d}"/>`;
@@ -1817,7 +1831,7 @@ export function initTopomapper() {
         },
         rivers: () => {
           if(!state.osmData || !state.mapFeatures.rivers.enabled || !state.osmData.waterLines.length) return '';
-          let out = `<g id="rivers" stroke="${state.mapFeatures.rivers.color}" stroke-width="${state.mapFeatures.rivers.width}" stroke-opacity="${toUnitOpacity(state.mapFeatures.rivers.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+          let out = `<g id="rivers" inkscape:groupmode="layer" inkscape:label="Rivers" stroke="${state.mapFeatures.rivers.color}" stroke-width="${state.mapFeatures.rivers.width}" stroke-opacity="${toUnitOpacity(state.mapFeatures.rivers.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
           state.osmData.waterLines.forEach((line) => {
             const d = pathFromCoords(line, false);
             if(d) out += `<path d="${d}"/>`;
@@ -1826,7 +1840,7 @@ export function initTopomapper() {
         },
         roads: () => {
           if(!state.osmData || !state.mapFeatures.roads.enabled || !state.osmData.roadLines.length) return '';
-          let out = `<g id="roads" stroke="${state.mapFeatures.roads.color}" stroke-opacity="${toUnitOpacity(state.mapFeatures.roads.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+          let out = `<g id="roads" inkscape:groupmode="layer" inkscape:label="Roads" stroke="${state.mapFeatures.roads.color}" stroke-opacity="${toUnitOpacity(state.mapFeatures.roads.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
           state.osmData.roadLines.forEach((line) => {
             const d = pathFromCoords(roadPoints(line), false);
             if(d) out += `<path d="${d}" stroke-width="${(state.mapFeatures.roads.width*(line.scale||1)).toFixed(3)}"/>`;
@@ -1834,7 +1848,6 @@ export function initTopomapper() {
           return out + `</g>`;
         },
         contours: () => {
-          state.contourPaths = [];
           if(!state.contour.enabled) return '';
           if(state.terrainData?.delta === 0) return '';
           if(!state.terrainData) {
@@ -1842,22 +1855,11 @@ export function initTopomapper() {
             const cy = hMm / 2;
             return `<text x="${cx}" y="${cy}" text-anchor="middle" font-family="SF Pro Text, Segoe UI, Roboto, sans-serif" font-size="6" fill="#9AA3B2">Elevation data missing. Try generating again.</text>`;
           }
-          const key = [state.terrainVersion,wMm,hMm,state.shape,state.contour.density,state.contour.smooth].join(':');
-          if(contourCache.key !== key) {
-            const clip = getClipPolygon();
-            const groups = getContourLevels().map(level =>
-              buildPolylines(getContourSegments(level,wMm,hMm)).flatMap(line =>
-                clipPolylineToPolygon(smoothPolyline(line,state.contour.smooth),clip)
-              )
-            );
-            contourCache = {key,groups};
-          }
           const emphasisEvery = Math.max(0,Math.round(state.contour.emphasisEvery || 0));
-          let out = `<g id="contours" stroke="${state.contour.color}" stroke-opacity="${toUnitOpacity(state.contour.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
-          contourCache.groups.forEach((paths,index) => {
+          let out = `<g id="contours" inkscape:groupmode="layer" inkscape:label="Contours" stroke="${state.contour.color}" stroke-opacity="${toUnitOpacity(state.contour.opacity)}" fill="none" stroke-linecap="round" stroke-linejoin="round">`;
+          contourGroups().forEach((paths,index) => {
             const lineWidth = state.contour.width * (emphasisEvery > 0 && (index+1)%emphasisEvery === 0 ? 2 : 1);
             paths.forEach(path => {
-              state.contourPaths.push(path);
               const d=path.map((pt,i)=>`${i?'L':'M'} ${pt[0].toFixed(2)} ${pt[1].toFixed(2)}`).join(' ');
               out += `<path d="${d}" stroke-width="${lineWidth}" />`;
             });
@@ -1879,7 +1881,7 @@ export function initTopomapper() {
           const haloColor = state.mapFeatures.labels.background.color || state.theme.background;
           const fontWeight = state.mapFeatures.labels.weight || 'normal';
           const fontStyle = state.mapFeatures.labels.style || 'normal';
-          let out = `<g id="placeLabels" font-family="${escapeXml(fontFamily)}" text-anchor="middle" fill="${state.mapFeatures.labels.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.labels.opacity)}" paint-order="stroke" font-weight="${fontWeight}" font-style="${fontStyle}">`;
+          let out = `<g id="placeLabels" inkscape:groupmode="layer" inkscape:label="Place names" font-family="${escapeXml(fontFamily)}" text-anchor="middle" fill="${state.mapFeatures.labels.color}" fill-opacity="${toUnitOpacity(state.mapFeatures.labels.opacity)}" paint-order="stroke" font-weight="${fontWeight}" font-style="${fontStyle}">`;
           state.osmData.labels.forEach((place) => {
             const [x, y] = projectToSvg(place.lat, place.lon);
             const size = getLabelSize(place);
@@ -1925,52 +1927,12 @@ export function initTopomapper() {
     $('btnDXF').onclick = async () => {
       if(!state.terrainData && !state.osmData) return;
       await runExportFlow('DXF', async (onSave) => {
-        buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: true });
-        let dxf = "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n";
-        const rgbToAci = ({ r, g, b }) => {
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          if(max < 40) return 7;
-          if(max - min < 20 && max > 200) return 7;
-          if(r >= g && r >= b) {
-            if(g > 200 && b < 120) return 2;
-            if(b > 200 && g < 120) return 6;
-            return 1;
-          }
-          if(g >= r && g >= b) {
-            if(b > 200) return 4;
-            return 3;
-          }
-          if(b >= r && b >= g) return 5;
-          return 7;
-        };
-        const writePolyline = (layer, pts, color, forceClosed = null) => {
-          if(pts.length < 2) return;
-          const first = pts[0];
-          const last = pts[pts.length - 1];
-          const closed = forceClosed ?? (Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.01);
-          const outPts = closed ? pts.slice(0, -1) : pts;
-          const rgb = colorToRgb(color);
-          const aci = rgbToAci(rgb);
-          const trueColor = (rgb.r << 16) + (rgb.g << 8) + rgb.b;
-          dxf += `0\nLWPOLYLINE\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n90\n${outPts.length}\n70\n${closed ? 1 : 0}\n`;
-          outPts.forEach(p => dxf += `10\n${p[0].toFixed(6)}\n20\n${(state.hMm - p[1]).toFixed(6)}\n`);
-        };
-        const writeText = (layer, text, x, y, height, color) => {
-          if(!text) return;
-          const rgb = colorToRgb(color);
-          const aci = rgbToAci(rgb);
-          const trueColor = (rgb.r << 16) + (rgb.g << 8) + rgb.b;
-          const safeText = String(text).replace(/[\r\n\t]+/g, ' ').trim();
-          if(!safeText) return;
-          dxf += `0\nTEXT\n8\n${layer}\n62\n${aci}\n420\n${trueColor}\n10\n${x.toFixed(6)}\n20\n${(state.hMm - y).toFixed(6)}\n40\n${height.toFixed(6)}\n1\n${safeText}\n50\n0\n`;
-        };
+        const {createMapDrawing} = await import('./dxf.js');
+        const {writePolyline, writeText, serialize} = createMapDrawing(state.hMm);
         const clipPoly = getClipPolygon();
         if(polygonArea(clipPoly) < 0) clipPoly.reverse();
-        if(state.contour.enabled) {
-          state.contourPaths.forEach(path => {
-            clipPolylineToPolygon(path, clipPoly).forEach(seg => writePolyline('CONTOURS', seg, state.contour.color, false));
-          });
+        for (const paths of contourGroups()) {
+          for (const path of paths) writePolyline('CONTOURS', path, state.contour.color);
         }
         if(state.osmData) {
           if(state.mapFeatures.buildings.enabled) visibleBuildings().forEach(building=>building.polygons.forEach(polygon=>polygon.forEach(ring=>writePolyline('BUILDINGS',ring,state.mapFeatures.buildings.outline,true))));
@@ -2000,7 +1962,7 @@ export function initTopomapper() {
           }
         }
         writePolyline('FRAME', ensureClosed(clipPoly), state.contour.color, true);
-        dxf += "0\nENDSEC\n0\nEOF";
+        const dxf = serialize();
         if(onSave) await onSave();
         save(new Blob([dxf], {type:'application/dxf'}), 'Topomapper.dxf');
       });

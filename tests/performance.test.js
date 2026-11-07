@@ -55,3 +55,19 @@ test('Quick 3D previews retain dimensions and relief but cannot be exported as p
   assert.ok(result.mesh.t.length>0);assert.ok(result.reliefHeight>0);
   await assert.rejects(exportModel(result,'stl'),/Prepare the printable model/);
 });
+
+test('Persistent cache requests use only the digest of a custom provider query',async()=>{
+  const saved=[];
+  const previous={caches:globalThis.caches,location:globalThis.location};
+  try {
+    globalThis.location={origin:'https://topomapper.invalid'};
+    globalThis.caches={open:async()=>({put:async url=>saved.push(url),keys:async()=>[]})};
+    const {cacheBytes}=await import('../src/lib/data-cache.js');
+    await cacheBytes('osm-v2:https://provider.invalid/private?token=fixture',new Uint8Array([1,2]));
+    assert.match(saved[0],/^https:\/\/topomapper\.invalid\/__topomapper_cache__\/[0-9a-f]{64}$/);
+  } finally {
+    for(const [key,value] of Object.entries(previous)){
+      if(value===undefined)delete globalThis[key];else globalThis[key]=value;
+    }
+  }
+});

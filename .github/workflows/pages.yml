@@ -29,6 +29,21 @@ jobs:
         run: npm ci
       - name: Build
         run: npm test && npm run build
+      - name: Verify browser downloads and reopen the CAD drawing
+        env:
+          TOPOMAPPER_URL: http://127.0.0.1:4173/topomapper/
+        run: |
+          export CHROME_BIN="$(command -v google-chrome)" EXPORT_DIR="$RUNNER_TEMP/exports"
+          mkdir -p "$RUNNER_TEMP/map-site"
+          ln -s "$PWD/build" "$RUNNER_TEMP/map-site/topomapper"
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory "$RUNNER_TEMP/map-site" &
+          server=$!
+          trap 'kill "$server"' EXIT
+          curl --retry 8 --retry-connrefused --fail --silent "$TOPOMAPPER_URL" -o /dev/null
+          npm run test:exports
+          python3 -m venv "$RUNNER_TEMP/dxf-reader"
+          "$RUNNER_TEMP/dxf-reader/bin/pip" install 'ezdxf==1.4.5'
+          "$RUNNER_TEMP/dxf-reader/bin/python" scripts/check-dxf.py "$EXPORT_DIR/map.dxf"
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -47,3 +62,24 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release Topomapper ')
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish the deployed version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          test "$(git log -1 --format=%s)" = "Release Topomapper $version"
+          tag="v$version"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq .object.sha)" = "$GITHUB_SHA"
+          else
+            gh release create "$tag" --target "$GITHUB_SHA" --title "Topomapper $version" --notes-file docs/RELEASE-REVIEW.md
+          fi

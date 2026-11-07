@@ -28,9 +28,11 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
       const query=buildOverpassQuery(state,bbox,perimeter,stage),cacheKey='osm-v2:'+JSON.stringify(endpoints)+':'+query;
       const cached=await cachedBytes(cacheKey);
       if(cached){publish(stage,'Reusing saved '+labels[stage]);return JSON.parse(new TextDecoder().decode(cached));}
-      const result=await request(query,{signal,endpoints,budget,progress:detail=>publish(stage,detail)});
-      const bytes=new TextEncoder().encode(JSON.stringify(result));
-      await cacheBytes(cacheKey,bytes);return result;
+      let responseBytes;
+      const result = await request(query,{signal,endpoints,budget,
+        onBytes: bytes => { responseBytes = bytes; }, progress:detail=>publish(stage,detail)});
+      await cacheBytes(cacheKey,responseBytes ?? new TextEncoder().encode(JSON.stringify(result)));
+      return result;
     };
     try{return (await load({sw,ne})).elements;}
     catch(error){

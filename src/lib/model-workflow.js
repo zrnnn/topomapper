@@ -29,7 +29,7 @@ export function initModelWorkflow(state,{save,runExportFlow,signal,onStatus=()=>
         if(missing.length)throw new Error('Map overlays are unavailable for '+missing.join(', ')+'. Retry those layers or disable them before preparing the printable model.');
       }
       const cacheKey=JSON.stringify([state.terrainVersion,state.osmDataVersion,settings]);
-      const next=!quick&&prepared?.key===cacheKey?prepared.model:await runWorker(quick?'model-preview':'model',{state:{wMm:state.wMm,hMm:state.hMm,shape:state.shape,terrainData:state.terrainData,renderBbox:state.renderBbox,osmData:state.osmData},settings},{signal:controller.signal,timeoutMs:Math.max(1,deadline-Date.now()),progress:p=>status(p.detail,p.percent,quick)});
+      const next=!quick&&prepared?.key===cacheKey?prepared.model:await runWorker(quick?'model-preview':'model',{state:{wMm:state.wMm,hMm:state.hMm,shape:state.shape,terrainData:state.terrainData,renderBbox:state.renderBbox,mapSource:state.osmStatus.source,osmData:state.osmData},settings},{signal:controller.signal,timeoutMs:Math.max(1,deadline-Date.now()),progress:p=>status(p.detail,p.percent,quick)});
       if(disposed||generation!==revision)return;
       if(!preview){const {createModelPreview}=await import('./preview3d.js');if(disposed||generation!==revision)return;preview=createModelPreview($('preview3d'));}
       preview.set(next);previewRevision=revision;
@@ -45,7 +45,7 @@ export function initModelWorkflow(state,{save,runExportFlow,signal,onStatus=()=>
   $('prepareModel').onclick=()=>build(false);
   $('retryModel').onclick=()=>build(true);
   $('cancelModel').onclick=()=>job?.abort();
-  $('exportModel').onclick=async()=>{if(!model)return;const {display,...current}=model,format=$('model-format').value;await runExportFlow(format.toUpperCase(),async onSave=>{const file=await runWorker('model-export',{model:current,format},{signal});await onSave();save(file.blob,file.name);});};
+  $('exportModel').onclick=async()=>{if(!model)return;const format=$('model-format').value;await runExportFlow(format.toUpperCase(),async onSave=>{const file=await runWorker('model-export',{model:format==='3mf'?{parts:model.parts,credits:model.credits}:{mesh:model.mesh},format},{signal});await onSave();save(file.blob,file.name);});};
   sync();
   return {configureArea:({overview,samples,minArea,buildingsAvailable:available=true,loadLayers=null})=>{buildingsAvailable=available;availableLayers=loadLayers;settings=overview?{...settings,...MODEL_PRESETS.overview,preset:'overview'}:{...settings,...(settings.preset==='overview'?MODEL_PRESETS.landscape:{}),preset:'custom',resolution:samples>=240?160:100,minBuildingArea:minArea};if(availableLayers){for(const key of layers)settings[key]=availableLayers[key]!==false;settings.preset='custom';}if(!buildingsAvailable)settings.buildings=false;$('model-buildings').disabled=!buildingsAvailable;$('model-buildings').title=buildingsAvailable?'Raised buildings':'Not requested. Use Layers in the toolbar to load buildings.';invalidate();sync();},open:(deadline)=>{if(previewRevision!==revision&&!job)void build(true,deadline);},invalidate,zoom:direction=>preview?.zoom(direction),resetView:()=>preview?.reset(),dispose(){clearTimeout(previewTimer);disposed=true;job?.abort();preview?.dispose();}};
 }

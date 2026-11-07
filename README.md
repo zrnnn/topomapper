@@ -2,20 +2,16 @@
 
 Create printable 2D maps and 3D landscape models from places around the world, directly in your browser.
 
-[Open Topomapper](https://zrnnn.github.io/topomapper/) · Current release: **0.2.0**
+[Open Topomapper](https://zrnnn.github.io/topomapper/) · [Release 0.3.0](https://github.com/zrnnn/topomapper/releases/tag/v0.3.0)
 
-## What is new in 0.2.0?
+## What changed in 0.3.0?
 
-- A simpler area-first workflow: select **2D map** or **3D print**, then choose exactly which data layers to load with clear on/off switches.
-- A single responsive workspace toolbar for area selection, 2D/3D preview, export, zoom controls and detailed progress.
-- Faster whole-city mapping through adaptive OpenFreeMap vector tiles, bounded geometry, caching and automatic level-of-detail selection.
-- More reliable worldwide terrain with Mapzen, Mapterhorn and Open-Elevation fallbacks.
-- Raised 3D buildings, class-scaled roads, water, green areas and rivers in printable 3MF, STL and OBJ models.
-- A print-aware 3D pipeline that omits sub-0.2 mm details, supports 10–500% terrain relief and validates fused printable solids before download.
-- Improved water and coastline handling, layer ordering, preview pan/zoom, in-interface warnings and recoverable partial results.
-- A muted earth-tone interface, improved responsive layouts and an updated Topomapper identity.
+- Open DXF downloads in CAD at their designed millimetre size. Contours, buildings, water, roads, labels and the frame have named layers with their own colors.
+- Edit SVG paths and text in Inkscape. The Shaded Landscape preset embeds the relief image so the drawing can travel as one file.
+- Print a map in several colors. A 3MF contains one aligned assembly with named terrain or base, green areas, water, rivers, roads and buildings wherever those layers have printable geometry.
+- DXF export now reads current contour settings directly, including with Auto Preview off. Successful map requests reuse the downloaded bytes for caching.
 
-See the [release verification notes](docs/RELEASE-REVIEW.md) for tested behavior and remaining limitations.
+See the [release verification results](docs/RELEASE-REVIEW.md) for application versions, map sizes and slicing checks.
 
 ## Workspace navigation and live progress
 
@@ -91,10 +87,10 @@ Choose **Continue to Export** or the **Export** tab.
 | Format | Purpose | Output |
 | --- | --- | --- |
 | PNG | Paper, posters and image editing | Raster image; higher resolution uses more memory |
-| SVG | Vector editing and scalable artwork | Vector paths, with optional embedded raster shading |
-| DXF | CAD and laser preparation | Editable linework in millimetres, not a shaded image |
+| SVG | Vector editing and scalable artwork | Editable named layers, text and optional embedded raster shading |
+| DXF | CAD and laser preparation | AutoCAD 2007 DXF with colored layers, closed outlines, millimetres and UTF-8 labels |
 
-Check laser paths in your machine software. When printing paper maps, use the intended scale rather than automatic page fitting.
+In FreeCAD, enable text import if you want place names. In laser software, assign cut or engrave operations to the imported layers and check the frame size. When printing paper maps, use the intended scale rather than automatic page fitting.
 
 ## Step 3: Create a 3D print
 
@@ -110,13 +106,13 @@ Choose **Prepare printable model** when you are ready. This runs full mesh prepa
 
 | Format | Contents |
 | --- | --- |
-| 3MF | Geometry, millimetre units and face colors |
+| 3MF | Aligned multipart model in millimetres, with a display color for each map part |
 | STL | Geometry only; choose millimetres when importing |
 | OBJ | Geometry only; confirm scale in the receiving application |
 
-Selected layers are fused into a solid. Water and green areas are raised surfaces, not automatically carved channels. Buildings use mapped height, then floor count × 3 metres, then your fallback height. Roofs are flat. Terrain vertical scale and building exaggeration have separate controls; the model status reports the resulting elevation range in millimetres.
+In Bambu Studio, import the 3MF and expand **Topomapper** in the **Objects** list. Add your filament colors, assign each part its filament, then slice and inspect the preview by filament. Several parts can share a spool. The 3MF carries no printer profile. STL and OBJ use one fused surface. Water and green areas are raised surfaces, not automatically carved channels. Buildings use mapped height, then floor count × 3 metres, then your fallback height. Roofs are flat. Terrain vertical scale and building exaggeration have separate controls; the model status reports the resulting elevation range in millimetres.
 
-Inspect scale, minimum features, supports and colors in your slicer. Face colors do not guarantee automatic multi-material slicing. These are simplified cartographic models, not survey data or detailed architectural replicas.
+Inspect scale, minimum features, supports and colors in your slicer. These are simplified cartographic models, not survey data or detailed architectural replicas.
 
 For standard FDM printability, 3D footprints whose smallest X or Y dimension is below 0.2 mm are omitted after scaling. Raised street widths are also kept at a minimum of 0.2 mm. This rule affects the model, not high-resolution 2D exports.
 
@@ -127,7 +123,7 @@ Loading panels show elevation, map layers and preview stages. Model generation a
 - **Request failed or timed out:** retry, check your connection or select a smaller area.
 - **Elevation unavailable:** the app tries a lower-resolution fallback source.
 - **Map layers missing:** terrain and any successful earlier stages remain available. Use **Retry map layers** inside the preview to reload the same area. The app tries alternate services and smaller sections automatically, within the remaining shared area-generation deadline. For 3D, disable unavailable overlays to generate terrain only.
-- **Provider quota or rate limit:** the app shows the returned HTTP status or Overpass remark, temporarily cools down that provider, and tries another. Wait and retry, reduce detail, or enter an HTTPS Overpass-compatible endpoint under **Frame & Dimensions**.
+- **Provider quota or rate limit:** the app shows the returned HTTP status or a summary of the Overpass error, temporarily cools down that provider, and tries another. Wait and retry, reduce detail, or enter an HTTPS Overpass-compatible endpoint under **Frame & Dimensions**.
 - **Selection too detailed:** increase the minimum building footprint, lower mesh quality, disable dense layers or choose a smaller area.
 - **Model/export failure:** follow the displayed action and inspect technical details. The previous successful result is preserved.
 
@@ -176,13 +172,20 @@ npm run build
 npm run preview -- --host 127.0.0.1 --port 4173
 ```
 
-Open http://127.0.0.1:4173/topomapper/ for the production preview.
+Open the [local production preview](http://127.0.0.1:4173/topomapper/). With the server running, use the following checks to download real files from the interface and open the CAD drawing with an independent reader. Set `CHROME_BIN` to your Chromium or Chrome executable. The browser uses repeatable terrain and map fixtures.
+
+```sh
+CHROME_BIN=/usr/bin/chromium EXPORT_DIR=/tmp/topomapper-exports npm run test:exports
+python3 -m venv /tmp/topomapper-reader
+/tmp/topomapper-reader/bin/pip install ezdxf==1.4.5
+/tmp/topomapper-reader/bin/python scripts/check-dxf.py /tmp/topomapper-exports/map.dxf
+```
 
 ## GitHub Pages
 
 The static build is written to `build/`; the production base path is `/topomapper`. Set the repository's Pages source to **GitHub Actions**.
 
-A push to `main` runs tests and builds the site, then deploys the Pages artifact. Check the deployment job and the published URL after release. Development branches and pull requests run verification without deploying Pages.
+A push to `main` runs the unit tests, builds the site, exercises the download buttons and reopens the DXF before deploying Pages. A release commit titled `Release Topomapper <package version>` also publishes the matching tag and GitHub Release after deployment. Check the deployment job and the published URL after release. Development branches and pull requests run verification without deploying Pages.
 
 If the repository name changes, update the base path in `svelte.config.js`.
 

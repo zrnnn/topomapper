@@ -23,7 +23,7 @@ async function withProviderSlot(endpoint,signal,task){
     return await task();
   }finally{release();if(providerQueue.get(endpoint)===queued)providerQueue.delete(endpoint);}
 }
-export async function requestMapData(query,{signal,progress=()=>{},fetchImpl=fetch,timeoutMs=MAP_REQUEST_TIMEOUT_MS,endpoints=MAP_PROVIDERS,preferLastSuccessful=true,budget}={}){
+export async function requestMapData(query,{signal,progress=()=>{},fetchImpl=fetch,timeoutMs=MAP_REQUEST_TIMEOUT_MS,endpoints=MAP_PROVIDERS,preferLastSuccessful=true,budget,onBytes}={}){
   if(preferLastSuccessful)endpoints=rankProviders(endpoints);
   const errors=[];
   for(let i=0;i<endpoints.length;i++){
@@ -45,14 +45,27 @@ export async function requestMapData(query,{signal,progress=()=>{},fetchImpl=fet
             }
             throw new Error(`${new URL(endpoints[i]).hostname}: HTTP ${response.status}${response.status===429?' rate limit exceeded':''}`);
           }
-          const data=response.body||response.arrayBuffer?JSON.parse(new TextDecoder().decode(await readBounded(response,{budget,signal:controller.signal,onProgress:p=>progress(downloadDetail(endpoints[i],p))}))):await response.json();
+          let bytes;
+          if (response.body || response.arrayBuffer) {
+            bytes = await readBounded(response,{budget,signal:controller.signal,
+              onProgress:p=>progress(downloadDetail(endpoints[i],p))});
+          }
+          const data = bytes ? JSON.parse(new TextDecoder().decode(bytes)) : await response.json();
           progress(`Checking map data from ${new URL(endpoints[i]).hostname}`);
-          if(data.remark||!Array.isArray(data.elements))throw new Error(String(data.remark||'Map service returned incomplete data').replace(/\s+/g,' ').slice(0,220));
+          if (data.remark || !Array.isArray(data.elements)) {
+            const reason = mapFailure(data.remark);
+            const messages = {quota:'API rate limit exceeded', timeout:'query timed out', size:'response exceeds size limit'};
+            throw Object.assign(new Error(new URL(endpoints[i]).hostname + ': ' +
+              (messages[reason] || 'incomplete map response')), {code:reason});
+          }
+          if (bytes) onBytes?.(bytes);
           const elapsed=performance.now()-started;
           speeds.set(endpoints[i],speeds.has(endpoints[i])?speeds.get(endpoints[i])*.7+elapsed*.3:elapsed);
           return data;
         }catch(error){
           if(error.name==='AbortError'&&!signal?.aborted)throw Object.assign(new Error('Map service request timed out'),{code:'timeout'});
+          // Fetch exceptions can contain the custom endpoint, including its query token.
+          if (error instanceof TypeError) throw new Error(new URL(endpoints[i]).hostname + ': connection failed');
           throw error;
         }finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
       });

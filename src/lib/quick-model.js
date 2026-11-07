@@ -9,7 +9,7 @@ import {createGeometry} from './geometry.js';
 export function buildQuickModel(state,settings){
   validateModelSettings(settings);
   const input=modelInput(state,settings),s=input.state;
-  const reliefHeight=terrainReliefHeight({...s,terrainData:state.terrainData},settings.relief);
+  const reliefHeight=terrainReliefHeight(s,settings.relief);
   const geometry=createGeometry(s),mesh={v:[],t:[],colors:[]};
   const add=(part,color)=>{
     if(mesh.t.length+part.t.length>250000)throw new Error('Preview geometry is too large. Reduce detail or disable a layer.');

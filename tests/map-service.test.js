@@ -42,3 +42,22 @@ test('Concurrent tiles never send more than one request to the same provider',as
   await Promise.all([requestMapData('a',{endpoints:['https://one.concurrent.test'],preferLastSuccessful:false,fetchImpl}),requestMapData('b',{endpoints:['https://one.concurrent.test'],preferLastSuccessful:false,fetchImpl})]);
   assert.equal(peak,1);
 });
+test('Custom endpoint credentials never appear in provider errors or mirror progress', async()=>{
+  const endpoint='https://private.test/secret-path?key=opaque-value';
+  for (const fetchImpl of [async()=>{throw new TypeError('Cannot fetch '+endpoint);},
+    async()=>({ok:true,json:async()=>({remark:'quota exceeded for '+endpoint})})]) {
+    const messages=[];
+    await assert.rejects(requestMapData('query',{endpoints:[endpoint],fetchImpl,progress:m=>messages.push(m)}),error=>{
+      messages.push(error.message);return true;
+    });
+    assert.doesNotMatch(messages.join(' '),/secret-path|opaque-value/);
+  }
+});
+test('Only validated responses supply their original bytes to the cache', async()=>{
+  const valid='{"elements": [], "generator": "fixture"}';
+  const saved=[];
+  let attempts=0;
+  await requestMapData('query',{endpoints:['https://a.cache.test','https://b.cache.test'],
+    fetchImpl:async()=>new Response(++attempts===1?'{"remark":"timeout"}':valid),onBytes:b=>saved.push(b)});
+  assert.deepEqual(saved.map(bytes=>new TextDecoder().decode(bytes)),[valid]);
+});
