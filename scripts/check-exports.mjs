@@ -39,10 +39,21 @@ try {
     {type:'way',id:5,tags:{waterway:'river'},geometry:geometry([[0,0],[2,2]])},
     {type:'node',id:6,lat:47.5576,lon:10.7498,tags:{place:'town',name:'München & <Ufer>'}}
   ];
+  let waterAvailable=false;
+  const retryQueries=[];
   await context.route('**/*', async route => {
     const request = route.request(), target = new URL(request.url());
     if (target.origin === new URL(url).origin) return route.continue();
-    if (request.method()==='POST') return route.fulfill({json:{elements}});
+    if (request.method()==='POST') {
+      const query=new URLSearchParams(request.postData()).get('data');
+      if(waterAvailable)retryQueries.push(query);
+      if(!waterAvailable && query.includes('coastline')){
+        if(target.hostname==='overpass-api.de')return route.fulfill({status:502,body:''});
+        if(target.hostname==='maps.mail.ru')return route.fulfill({status:504,body:''});
+        return route.fulfill({json:{remark:'runtime error: Query timed out',elements:[]}});
+      }
+      return route.fulfill({json:{elements}});
+    }
     if (target.pathname.endsWith('.png')) return route.fulfill({contentType:'image/png',body:Buffer.from(tile,'base64')});
     return route.abort();
   });
@@ -54,6 +65,26 @@ try {
   for (const box of await page.locator('#purposeDialog input[type=checkbox]:enabled').all()) await box.check();
   await click('#btnGen');
   await ready();
+  const source=page.locator('#terrainSource');
+  assert.match(await source.textContent(),/water areas:.*timed out.*504/);
+  assert.ok(await page.locator('#retryMapLayers').isVisible());
+  async function preparePrintable(){
+    await page.waitForFunction(()=>document.querySelector('#modelTitle').textContent.includes('Quick preview ready'));
+    await page.locator('#prepareModel').evaluate(button=>button.click());
+    await page.waitForFunction(()=>!document.querySelector('#exportModel').disabled || !document.querySelector('#modelError').hidden,null,{timeout:90000});
+  }
+  await step('3d');
+  await preparePrintable();
+  assert.ok(await page.locator('#exportModel').isDisabled());
+  assert.match(await page.locator('#modelErrorTechnical').textContent(),/unavailable for water\./);
+  await step('2d');
+  waterAvailable=true;
+  await click('#retryMapLayers');
+  await ready();
+  assert.equal(await page.locator('#retryMapLayers').isVisible(),false);
+  assert.doesNotMatch(await source.textContent(),/unavailable|timed out|502|504/);
+  assert.equal(retryQueries.length,1,'Retry should fetch only the failed water layer');
+  assert.match(retryQueries[0],/coastline/);
   async function download(selector, name) {
     const pending = page.waitForEvent('download');
     await click(selector);
@@ -90,9 +121,8 @@ try {
     if (preset==='shaded') assert.equal(image.shading,true);
   }
   await step('3d');
-  await page.waitForFunction(()=>document.querySelector('#modelTitle').textContent.includes('Quick preview ready'));
-  await page.locator('#prepareModel').evaluate(button=>button.click());
-  await page.waitForFunction(()=>!document.querySelector('#exportModel').disabled,null,{timeout:90000});
+  await preparePrintable();
+  assert.equal(await page.locator('#exportModel').isDisabled(),false,await page.locator('#modelErrorTechnical').textContent());
   await step('export');
   for (const format of ['3mf','stl','obj']) {
     await page.selectOption('#model-format',format);
@@ -105,6 +135,29 @@ try {
       for (const name of ['Terrain','Green areas','Water','Rivers','Roads','Buildings']) assert.ok(names.includes(`value="${name}"`));
     }
   }
+  await click('#closePreview');
+  await page.setViewportSize({width:390,height:844});
+  await click('#btnGen');
+  await click('#choose3d');
+  for(const box of await page.locator('#purposeDialog input[type=checkbox]').all()){
+    if(await box.isEnabled())await box.uncheck();
+  }
+  assert.ok(await page.locator('#btnGen').isDisabled());
+  assert.match(await page.locator('#areaPolicyWarning').textContent(),/Select at least one layer/);
+  await page.locator('#load-terrain').check();
+  const queryCount=retryQueries.length;
+  await click('#btnGen');
+  await ready();
+  assert.match(await source.textContent(),/No map layers requested/);
+  await preparePrintable();
+  assert.equal(await page.locator('#exportModel').isDisabled(),false,await page.locator('#modelErrorTechnical').textContent());
+  await step('export');
+  await page.selectOption('#model-format','3mf');
+  const single=await JSZip.loadAsync(await download('#exportModel','terrain-only.3mf'));
+  const parts=await single.file('Metadata/model_settings.config').async('string');
+  assert.match(parts,/value="Terrain"/);
+  assert.doesNotMatch(parts,/value="(?:Water|Rivers|Green areas|Roads|Buildings)"/);
+  assert.equal(retryQueries.length,queryCount);
   assert.deepEqual(errors,[]);
   console.log('Verified SVG, DXF, PNG, 3MF, STL and OBJ downloads in',directory);
 } finally {

@@ -25,9 +25,11 @@ export async function cachedBytes(key){
   }catch{return null;}
 }
 let writes=Promise.resolve();
+let pendingBytes=0;
 export async function cacheBytes(key,data){
   remember(key,data);
-  if(data.byteLength>8*1024*1024||typeof caches==='undefined')return;
+  if(data.byteLength>8*1024*1024||typeof caches==='undefined'||pendingBytes+data.byteLength>LIMIT)return;
+  pendingBytes+=data.byteLength;
   // Serialize eviction, including writes from parallel tile downloads.
   writes=writes.catch(()=>{}).then(async()=>{
     const cache=await caches.open('topomapper-geography-v1');
@@ -39,5 +41,5 @@ export async function cacheBytes(key,data){
       if(++count>128||retained>64*1024*1024||Date.now()-Number(entry.headers.get('x-saved-at'))>TTL)await cache.delete(request);
     }
   });
-  await writes.catch(()=>{});
+  try { await writes.catch(()=>{}); } finally { pendingBytes-=data.byteLength; }
 }

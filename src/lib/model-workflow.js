@@ -24,8 +24,9 @@ export function initModelWorkflow(state,{save,runExportFlow,signal,onStatus=()=>
       for(const key of numeric)settings[key]=Number($('model-'+key).value);
       if(!quick&&!state.osmStatus.loaded&&layers.slice(1).some(key=>settings[key]))throw new Error('Map overlays are unavailable. Use Retry map layers, or choose Terrain study to build a terrain-only model.');
       if(!quick&&state.osmStatus.completed){
-        const stages={buildings:'buildings',roads:'roads',water:'areas',green:'areas',rivers:'rivers'};
-        const missing=Object.keys(stages).filter(key=>settings[key]&&!state.osmStatus.completed.includes(stages[key]));
+        const completed=new Set(state.osmStatus.completed);
+        if(completed.has('areas')){completed.add('water');completed.add('green');}
+        const missing=layers.slice(1).filter(key=>settings[key]&&!completed.has(key));
         if(missing.length)throw new Error('Map overlays are unavailable for '+missing.join(', ')+'. Retry those layers or disable them before preparing the printable model.');
       }
       const cacheKey=JSON.stringify([state.terrainVersion,state.osmDataVersion,settings]);

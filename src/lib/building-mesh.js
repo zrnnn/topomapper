@@ -1,4 +1,5 @@
 import earcut, {flatten, deviation} from 'earcut';
+import {ringBounds} from './geometry.js';
 
 export function extrudeBuilding(polygon, bottom, top) {
   if(!Number.isFinite(top)||!Number.isFinite(bottom)||top<=bottom) throw new Error('Invalid building height.');
@@ -33,11 +34,11 @@ export function buildBuildingMeshes(state, buildings, options = {}) {
   const mmPerMetre=state.wMm/metresWide;
   const meshes=[];
   for(const building of buildings) for(const polygon of building.polygons) {
-    const ring=polygon[0], xs=ring.map(p=>p[0]),ys=ring.map(p=>p[1]);
+    const {minX,minY,maxX,maxY}=ringBounds(polygon[0]);
     // Enclose the terrain interpolation/smoothing neighbourhood beneath the footprint.
     const pad=Math.ceil(2*Math.max(T.rows,T.cols)/Math.max(40,options.resolution||160))+2;
-    const c0=Math.max(0,Math.floor(Math.min(...xs)/state.wMm*(T.cols-1))-pad), c1=Math.min(T.cols-1,Math.ceil(Math.max(...xs)/state.wMm*(T.cols-1))+pad);
-    const r0=Math.max(0,Math.floor(Math.min(...ys)/state.hMm*(T.rows-1))-pad), r1=Math.min(T.rows-1,Math.ceil(Math.max(...ys)/state.hMm*(T.rows-1))+pad);
+    const c0=Math.max(0,Math.floor(minX/state.wMm*(T.cols-1))-pad), c1=Math.min(T.cols-1,Math.ceil(maxX/state.wMm*(T.cols-1))+pad);
+    const r0=Math.max(0,Math.floor(minY/state.hMm*(T.rows-1))-pad), r1=Math.min(T.rows-1,Math.ceil(maxY/state.hMm*(T.rows-1))+pad);
     let ground=0;
     for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++) ground=Math.max(ground,T.h[r*T.cols+c]*terrainScale);
     const metres=building.height.source==='fallback' ? fallback : building.height.metres;

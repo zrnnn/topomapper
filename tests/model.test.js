@@ -71,3 +71,48 @@ for (const source of ['Mapzen terrain','Open-Elevation fallback']) {
     assert.equal(result.credits,source);
   });
 }
+
+test('Exported 3MF inlays stop 1 mm below the local surface and meet the ground without a gap',async()=>{
+  // Read the serialized meshes so coordinate transforms and part assignment are covered.
+  async function readParts(result) {
+    const file=await exportModel(result,'3mf');
+    const zip=await JSZip.loadAsync(await file.blob.arrayBuffer());
+    const xml=await zip.file('3D/3dmodel.model').async('string');
+    const parts=new Map();
+    for(const match of xml.matchAll(/<object id="\d+" name="([^"]+)"[^>]*><mesh>([\s\S]*?)<\/mesh><\/object>/g)){
+      const vertices=[...match[2].matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"\/>/g)].flatMap(v=>v.slice(1).map(Number));
+      const faces=[...match[2].matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"\/>/g)].flatMap(t=>t.slice(1).map(Number));
+      parts.set(match[1],new engine.Manifold(new engine.Mesh({numProp:3,vertProperties:Float32Array.from(vertices),triVerts:Uint32Array.from(faces)})));
+    }
+    return parts;
+  }
+  const settings={...defaultModel(),width:100,resolution:40,green:true,rivers:true,relief:500};
+  const samples=[['Green areas',12,52],['Water',67,16],['Rivers',80,42.5],['Roads',14,11],['Buildings',22,29],['Buildings',38,29]];
+  for(const [terrain,base] of [[true,4],[false,4],[false,1]]){
+    const configured={...settings,terrain,base,roadRise:3};
+    const reference=await buildModel(engine,state,{...configured,green:false,water:false,rivers:false,roads:false,buildings:false});
+    const source=await readParts(reference);
+    const parts=await readParts(await buildModel(engine,state,configured));
+    const ground=parts.values().next().value, original=source.values().next().value;
+    const lower=original.translate([0,0,-1]);
+    try {
+      for(const [name,part] of parts){
+        if(part===ground)continue;
+        const intrusion=part.intersect(lower);
+        try { assert.ok(Math.abs(intrusion.volume())<.001,name+' enters deep ground'); }
+        finally { intrusion.delete(); }
+      }
+      for(const [name,x,y] of samples){
+        const from=[x,state.hMm-y,-1],to=[x,state.hMm-y,100];
+        const hits=solid=>solid.rayCast(from,to).map(h=>h.position[2]);
+        const surface=hits(original).at(-1), boundary=Math.max(.2,surface-1);
+        const z=hits(parts.get(name));
+        assert.ok(Math.abs(z[0]-boundary)<.001,`${name} starts at ${z[0]}, expected ${boundary}`);
+        assert.ok(z.at(-1)>surface,name+' retains its raised geometry');
+        assert.ok(Math.abs(hits(ground).at(-1)-boundary)<.001,name+' socket');
+      }
+    } finally {
+      lower.delete();for(const solid of [...source.values(),...parts.values()])solid.delete();
+    }
+  }
+});

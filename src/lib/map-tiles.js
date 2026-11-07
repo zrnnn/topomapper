@@ -3,8 +3,8 @@ import {mapFailure} from './data-budget.js';
 
 // Sequential requests respect public service capacity. Keep a resumable checkpoint
 // for the current selection, rather than redownloading completed tiles on retry.
-export function createMapTileSession(bounds,{tileAreaKm2=9}={}) {
-  const side=Math.max(1,Math.ceil(Math.sqrt(areaPlan(bounds).km2/tileAreaKm2)));
+export function createMapTileSession(bounds,{tileAreaKm2=9,minSide=1}={}) {
+  const side=Math.max(minSide,Math.ceil(Math.sqrt(areaPlan(bounds).km2/tileAreaKm2)));
   if(side>16)throw new Error('This area needs more than 256 map tiles. Select a smaller region for browser loading.');
   const tiles=splitArea(bounds,side*side);
   return {pending:tiles.map(bounds=>({bounds,depth:0,weight:1/tiles.length})),elements:new Map(),done:0,covered:0,total:tiles.length,bytes:0};
@@ -24,8 +24,7 @@ export async function loadMapTiles(session,{request,signal,progress=()=>{},concu
       check();
       if(data.remark||!Array.isArray(data.elements))throw new Error('Incomplete map tile');
     }catch(error){
-      if(signal?.aborted)session.pending.unshift(tile);
-      check();
+      if(signal?.aborted){session.pending.unshift(tile);fatal=error;break;}
       if(mapFailure(error)!=='size'||tile.depth>=1||session.total+3>16){session.pending.unshift(tile);fatal=error;break;}
       const children=splitArea(tile.bounds,4).map(bounds=>({bounds,depth:tile.depth+1,weight:tile.weight/4}));
       session.pending.unshift(...children);session.total+=3;
@@ -39,7 +38,11 @@ export async function loadMapTiles(session,{request,signal,progress=()=>{},concu
       const key=`${element.type}/${element.id}`;
       if(!session.elements.has(key)&&!fresh.has(key)){fresh.set(key,element);bytes+=JSON.stringify(element).length*2;}
     }
-    if(session.bytes+bytes>64*1024*1024)throw new Error('Map data exceeds the 64 MB browser budget. Use city overview or select a smaller region.');
+    if(session.bytes+bytes>64*1024*1024){
+      session.pending.unshift(tile);
+      fatal=new Error('Map data exceeds the 64 MB browser budget. Use city overview or select a smaller region.');
+      break;
+    }
     for(const [key,element] of fresh)session.elements.set(key,element);
     session.bytes+=bytes;session.done++;session.covered+=tile.weight;
     report('Tile loaded and retained');

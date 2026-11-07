@@ -1,3 +1,12 @@
+export function ringBounds(ring) {
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const [x,y] of ring){
+    minX=Math.min(minX,x);maxX=Math.max(maxX,x);
+    minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+  }
+  return {minX,minY,maxX,maxY};
+}
+
 // All geometry uses millimetres, with north at y=0.
 export function simplifyPolyline(points, tolerance = 0.01) {
   if(points.length < 3) return points;

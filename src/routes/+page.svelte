@@ -93,6 +93,9 @@
           </p>
         </div>
         <div class="group">
+          <label class="ui-label" for="mapDetailSource">Map detail source</label>
+          <select id="mapDetailSource"><option value="auto">Automatic · fast vector tiles</option><option value="raw">Detailed OpenStreetMap · Overpass</option></select>
+          <p class="control-help">Vector tiles use generalized shapes and estimated building heights. Choose Overpass for source footprints and mapped height tags.</p>
           <label class="ui-label" for="customOverpassEndpoint">Optional map-data endpoint</label>
           <input id="customOverpassEndpoint" type="url" inputmode="url" placeholder="https://your-overpass.example/api/interpreter">
           <p class="control-help">Advanced fallback for a self-hosted or API-key Overpass-compatible endpoint. HTTPS only; the three public worldwide providers remain automatic fallbacks.</p>
@@ -169,7 +172,7 @@
       <div id="terrainSource" class="status-text"></div>
       <p id="previewLoadStatus" class="control-help" role="status" hidden></p>
       <button id="cancelPreviewLoad" class="btn-secondary" hidden>Stop loading more detail</button>
-      <details class="source-details"><summary>Loading details</summary><p id="loadMetrics" class="status-text">Waiting for area data.</p><span class="status-text">City tiles: © OpenMapTiles · © OpenStreetMap contributors, served by OpenFreeMap.</span></details>
+      <details class="source-details"><summary>Loading details</summary><p id="loadMetrics" class="status-text">Waiting for area data.</p><span class="status-text">Vector tile sources include OpenFreeMap / OpenMapTiles and VersaTiles / Shortbread. Map data © OpenStreetMap contributors.</span></details>
       <button id="retryMapLayers" class="btn-secondary" type="button" hidden>Retry map layers</button>
       <details class="source-details"><summary>Data sources & credits</summary><div class="status-text">Data: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Mapzen terrain source credits</a> · <a href="https://mapterhorn.com/attribution/" target="_blank" rel="noopener noreferrer">Mapterhorn terrain credits</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>. Keep source credits with published exports.</div></details>
 
@@ -513,7 +516,7 @@
         </div>
         <div class="group mode-3d">
           <span class="ui-label">Export the previewed model</span>
-          <p class="control-help">3MF keeps map layers aligned as named parts. Choose a filament for each part in your slicer. STL and OBJ contain the fused surface. All formats use millimetres.</p>
+          <p class="control-help">3MF keeps map layers aligned as named parts. Color inlays follow the terrain to a depth of 1 mm, leaving at least 0.2 mm of ground underneath. Choose a filament for each part in your slicer. STL and OBJ contain the fused surface. All formats use millimetres.</p>
           <label class="ui-label" for="model-format">File format</label><select id="model-format"><option value="3mf">3MF · colored map parts</option><option value="stl">STL · universal print mesh</option><option value="obj">OBJ · general 3D mesh</option></select>
           <button id="exportModel" class="btn-main" disabled>Download model</button><p class="control-help">Inspect the result in your slicer before printing. Ultra quality and dense cities can take longer; use a small area first.</p>
         </div>

@@ -532,7 +532,7 @@ export function initTopomapper() {
     async function fetchMapFeatures(sw,ne,signal,deadline) {
       state.osmStatus={loaded:false,error:null,tiles:1,ignored:false};
       state.osmData={buildings:[],waterAreas:[],greenAreas:[],waterLines:[],roadLines:[],labels:[]};
-      const snapshot={wMm:state.wMm,hMm:state.hMm,shape:state.shape,renderBbox:{sw,ne},cityOverview:state.cityOverview,includeBuildings:state.includeBuildings,includeMinorRoads:state.includeMinorRoads,loadLayers:state.loadLayers,mapFeatures:state.mapFeatures,outputMode};
+      const snapshot={rawMapDetail:$('mapDetailSource').value==='raw',wMm:state.wMm,hMm:state.hMm,shape:state.shape,renderBbox:{sw,ne},cityOverview:state.cityOverview,includeBuildings:state.includeBuildings,includeMinorRoads:state.includeMinorRoads,loadLayers:state.loadLayers,mapFeatures:state.mapFeatures,outputMode};
       try{
         const result=await runWorker('map',{state:snapshot,options:{deadline:deadline-15000,endpoints:getMapEndpoints()}},{
           signal,timeoutMs:Math.max(1,deadline-Date.now()-12000),progress:update=>{
@@ -1730,7 +1730,7 @@ export function initTopomapper() {
         showGenerationStatus({phase:'render',percent:100,state:mapComplete?'success':'warning',title:mapComplete?'Area ready':mapUsable?'Area ready with missing layers':'Terrain ready with missing layers',detail:terrain.source+(mapComplete?' · Map layers loaded.':mapUsable?` · Loaded layers remain available. ${state.osmStatus.error}`:' · Map overlays unavailable; terrain-only work remains available.')});
         $('retryGeneration').hidden=mapUsable;
         lastFrame={wMm:state.wMm,hMm:state.hMm,shape:state.shape};
-        $('terrainSource').textContent = (mapComplete ? terrain.source : `${terrain.source} · ${state.osmStatus.error}${mapUsable?' Loaded layers were preserved.':' Use Retry map layers below.'}`)+(state.cityOverview?' · Adaptive city detail. Use Layers in the toolbar to change the requested data.':'');
+        $('terrainSource').textContent = (mapComplete ? [terrain.source,state.osmStatus.source].filter(Boolean).join(' · ') : `${terrain.source} · ${state.osmStatus.error}${mapUsable?' Loaded layers were preserved.':' Use Retry map layers below.'}`)+(state.cityOverview?' · Adaptive city detail. Use Layers in the toolbar to change the requested data.':'');
         $('terrainSource').classList.toggle('error',!mapComplete);
         $('retryMapLayers').hidden=mapComplete;
         if($('modal').classList.contains('open')&&outputMode==='3d')modelWorkflow.open(deadline);
@@ -1788,7 +1788,7 @@ export function initTopomapper() {
     function buildSvgMarkup({ includeBackground = true, includeGradient = true, includeFrame = true } = {}) {
       const {wMm, hMm} = state;
       let svg = `<svg id="prevSvg" width="${wMm}mm" height="${hMm}mm" viewBox="0 0 ${wMm} ${hMm}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">`;
-      svg+='<desc>Topomapper. Map data © OpenStreetMap contributors.'+(state.osmStatus?.source?.includes('OpenFreeMap')?' Generalized city geometry © OpenMapTiles, served by OpenFreeMap.':'')+'</desc>';
+      svg+='<desc>Topomapper. Map data © OpenStreetMap contributors.'+(state.osmStatus?.source?.includes('OpenFreeMap')?' Generalized city geometry © OpenMapTiles, served by OpenFreeMap.':state.osmStatus?.source?.includes('VersaTiles')?' Vector tiles served by VersaTiles.':'')+'</desc>';
       const clipPathD = getShapePathD();
       svg += `<defs><clipPath id="shapeClip"><path d="${clipPathD}"/></clipPath></defs>`;
       svg += `<g clip-path="url(#shapeClip)">`;

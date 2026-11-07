@@ -1,8 +1,11 @@
 import {buildTerrainMesh} from './mesh.js';
 import {buildBuildingMeshes} from './building-mesh.js';
 import {clipBuildings,prepareBuildingLod} from './buildings.js';
-import {createGeometry} from './geometry.js';
+import {createGeometry,ringBounds} from './geometry.js';
 import {roadPoints} from './road-style.js';
+
+export const MATERIAL_INLAY_MM = 1;
+export const BOTTOM_SKIN_MM = 0.2;
 
 export const MODEL_PRESETS = {
   overview:{name:'City overview',description:'Whole-city relief with larger buildings. Draft mesh; streets off for faster modeling.',terrain:true,buildings:true,roads:false,water:true,green:false,rivers:false,relief:100,buildingScale:1,resolution:40,minBuildingArea:1.5},
@@ -18,8 +21,8 @@ function scaleRecords(records,scale) {
 function filterMinDimension(records,minDimension=.2) {
   return (records||[]).flatMap(record=>{
     const polygons=record.polygons.filter(polygon=>{
-      const ring=polygon[0]||[],xs=ring.map(p=>p[0]),ys=ring.map(p=>p[1]);
-      return ring.length>=4&&Math.max(...xs)-Math.min(...xs)>=minDimension&&Math.max(...ys)-Math.min(...ys)>=minDimension;
+      const ring=polygon[0]||[],{minX,minY,maxX,maxY}=ringBounds(ring);
+      return ring.length>=4 && maxX-minX>=minDimension && maxY-minY>=minDimension;
     });
     return polygons.length?[{...record,polygons}]:[];
   });
@@ -30,7 +33,7 @@ export function modelInput(state, settings) {
   const scaled={...state,wMm:settings.width,hMm:state.hMm*scale,terrainData};
   const geometry=createGeometry(scaled),shape=geometry.getClipPolygon();
   const lines=records=>(records||[]).flatMap(line=>geometry.clipPolylineToPolygon(roadPoints(line).map(([x,y])=>[x*scale,y*scale]),shape).map(points=>Array.isArray(line)?points:{...line,points}));
-  const buildingLod=prepareBuildingLod(settings.buildings?clipBuildings(scaleRecords(state.osmData?.buildings,scale),shape):[],{minArea:settings.minBuildingArea,minDimension:.2,tolerance:.08,maxBuildings:2500});
+  const buildingLod=prepareBuildingLod(settings.buildings?clipBuildings(scaleRecords(state.osmData?.buildings?.filter(b=>!b.hide3d),scale),shape):[],{minArea:settings.minBuildingArea,minDimension:.2,tolerance:.08,maxBuildings:2500});
   return {state:scaled,buildings:buildingLod.buildings,buildingStats:buildingLod.stats,
     water:settings.water?filterMinDimension(clipBuildings(scaleRecords(state.osmData?.waterAreas,scale),shape)):[],green:settings.green?filterMinDimension(clipBuildings(scaleRecords(state.osmData?.greenAreas,scale),shape)):[],
     roads:settings.roads?lines(state.osmData?.roadLines):[],rivers:settings.rivers?lines(state.osmData?.waterLines):[]};
@@ -102,19 +105,21 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
     terrainMesh.v.forEach(v=>{if(v[2]>0)v[2]+=settings.base-2;});
     const terrain=fromMesh(terrainMesh);
     if(terrain.status()!=='NoError') throw new Error('Terrain mesh validation failed. Try a different mesh quality.');
-    const solids=[colored(terrain,'#D4D6C8')];
+    const raisedTerrain=new Map();
     const overlays = [];
     const drape=(rings,rise,color,name)=>{
       if(!rings.length)return;
-      progress({percent:30+solids.length*7,detail:`Building ${name} geometry`});
+      progress({percent:37+overlays.length*7,detail:`Building ${name} geometry`});
       const cross=keep(new CrossSection(rings,'NonZero'));
       const prism=keep(cross.extrude(settings.base+reliefHeight+10));
-      const shifted=keep(terrain.translate([0,0,rise]));
-      const layer=keep(shifted.intersect(prism));
+      // Raise the top while keeping the bottom fixed, including on a thin flat base.
+      if (!raisedTerrain.has(rise)) {
+        raisedTerrain.set(rise,keep(terrain.warp(v=>{if(v[2]>0)v[2]+=rise;})));
+      }
+      const layer=keep(raisedTerrain.get(rise).intersect(prism));
       if(layer.status()!=='NoError')throw new Error(`${name} geometry could not be modeled. Reduce the area or disable this layer.`);
       if (!layer.isEmpty()) {
         overlays.push({name,color,solid:layer});
-        solids.push(colored(layer,color));
       }
     };
     if(settings.green)drape(input.green.flatMap(f=>f.polygons.flat()),settings.areaRise,'#91AA85','Green areas');
@@ -134,39 +139,43 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
       if (buildingSolids.length) {
         const solid = keep(Manifold.union(buildingSolids));
         overlays.push({name:'Buildings', color:'#DDA95E', solid});
-        solids.push(colored(solid,'#DDA95E'));
       }
     }
-    progress({percent:78,detail:`Fusing ${solids.length} solids into a printable model`});
-    const fused=keep(Manifold.union(solids));
-    if(fused.status()!=='NoError'||fused.isEmpty()) throw new Error('Solid fusion failed. Reduce model detail or disable a layer. No partial model was exported.');
-    progress({percent:94,detail:'Checking the final surface and layer colors'});
-    const mesh = printableMesh(fused, s.hMm, true);
-    // Keep the base intact. Allocate raised material in visible priority order.
-    let claimed = terrain;
-    let partVolume = terrain.volume();
-    const parts = [];
-    for (const {name, color, solid} of overlays.reverse()) {
-      const exposed = keep(solid.subtract(claimed));
-      if (exposed.status() !== 'NoError') throw new Error('Could not separate printable ' + name + '.');
-      if (exposed.isEmpty()) continue;
-      const volume = exposed.volume();
-      if (!Number.isFinite(volume) || volume < 0) throw new Error('Invalid printable volume for ' + name + '.');
-      if (volume === 0) continue;
-      partVolume += volume;
-      parts.unshift({name, color, mesh: printableMesh(exposed, s.hMm)});
-      claimed = keep(claimed.add(solid));
+    progress({percent:78,detail:'Cutting 1 mm terrain-following color inlays'});
+    const materials=[];
+    if (overlays.length) {
+      // Everything below this copy of the actual, smoothed print surface is ground.
+      let claimed=keep(terrain.translate([0,0,-MATERIAL_INLAY_MM]));
+      for (const {name,color,solid} of overlays.slice().reverse()) {
+        const shallow=keep(solid.subtract(claimed));
+        const part=keep(shallow.trimByPlane([0,0,1],BOTTOM_SKIN_MM));
+        if (part.status()!=='NoError') throw new Error('Could not separate printable '+name+'.');
+        if (part.isEmpty()) continue;
+        const volume=part.volume();
+        if (!Number.isFinite(volume)||volume<0) throw new Error('Invalid printable volume for '+name+'.');
+        if (volume===0) continue;
+        materials.unshift({name,color,solid:part});
+        claimed=keep(claimed.add(solid));
+      }
     }
-    const volume = fused.volume();
-    if (Math.abs(partVolume - volume) > Math.max(.001, volume * 1e-5)) {
-      throw new Error('Layer volumes differ from the fused model. Reduce mesh detail and retry.');
-    }
-    parts.unshift({name: settings.terrain ? 'Terrain' : 'Base', color: '#D4D6C8',
-      mesh: overlays.length ? printableMesh(terrain, s.hMm) : mesh});
+    // Remove the sockets from the ground so slicers see one material at every point.
+    const inserts=materials.map(part=>part.solid);
+    const ground=inserts.length ? keep(terrain.subtract(keep(Manifold.union(inserts)))) : terrain;
+    if (ground.status()!=='NoError'||ground.isEmpty()) throw new Error('Terrain inlay sockets could not be prepared.');
+    materials.unshift({name:settings.terrain?'Terrain':'Base',color:'#D4D6C8',solid:ground});
+    progress({percent:94,detail:'Checking the final surface and material volumes'});
+    const fused=keep(Manifold.union(materials.map(({solid,color})=>colored(solid,color))));
+    if (fused.status()!=='NoError'||fused.isEmpty()) throw new Error('Solid fusion failed. Reduce model detail or disable a layer.');
+    const volume=fused.volume();
+    const partVolume=materials.reduce((sum,part)=>sum+part.solid.volume(),0);
+    if (Math.abs(partVolume-volume)>Math.max(.001,volume*1e-5)) throw new Error('Layer volumes differ from the fused model. Reduce mesh detail and retry.');
+    const mesh=printableMesh(fused,s.hMm,true);
+    const parts=materials.map(({name,color,solid})=>({name,color,mesh:materials.length===1?mesh:printableMesh(solid,s.hMm)}));
     const credits = [settings.terrain ? state.terrainData.source : 'Flat base'];
     if (overlays.length) {
       credits.push('Map data © OpenStreetMap contributors (https://www.openstreetmap.org/copyright)');
       if (state.mapSource?.includes('OpenFreeMap')) credits.push('OpenMapTiles / OpenFreeMap');
+      if (state.mapSource?.includes('VersaTiles')) credits.push('VersaTiles / Shortbread');
     }
     const result={mesh,parts,credits:credits.filter(Boolean).join(' · '),counts,buildingStats:input.buildingStats,width:s.wMm,height:s.hMm,reliefHeight,triangles:mesh.t.length,volume,settings:{...settings}};
     progress({percent:100,detail:`Ready · ${mesh.t.length.toLocaleString()} triangles`});

@@ -49,3 +49,14 @@ test('Concurrent loading uses independent lanes without exceeding three requests
   }});
   assert.deepEqual([...lanes].sort(),[0,1,2]);assert.equal(peak,3);
 });
+
+test('A tile rejected by the retained-memory limit remains pending and can be resumed',async()=>{
+  const session=createMapTileSession(bounds);
+  session.bytes=64*1024*1024;
+  await assert.rejects(loadMapTiles(session,{request:async()=>({elements:[{type:'way',id:7}]})}),/64 MB/);
+  assert.equal(session.done,0);assert.equal(session.elements.size,0);
+  assert.equal(session.pending.length,session.total);
+  session.bytes=0;
+  await loadMapTiles(session,{request:async()=>({elements:[]})});
+  assert.equal(session.covered,1);
+});

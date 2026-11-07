@@ -92,3 +92,43 @@ for(const shape of ['rect','circle','hex']) {
     assert.ok(volume>0,'positive enclosed volume');
   });
 }
+
+test('A long narrow selection uses a coarser terrain zoom within its 64-tile limit',async()=>{
+  const pixels=new Uint8ClampedArray(256*256*4);
+  for(let i=0;i<pixels.length;i+=4)pixels.set([128,0,0,255],i);
+  const calls=[];
+  const result=await loadTiles({sw:{lat:47,lng:8},ne:{lat:47.001,lng:12}},{rows:160,cols:160,
+    fetchTile:async(z,x,y)=>{calls.push([z,x,y]);return pixels;}});
+  assert.ok(calls.length>0 && calls.length<=64);assert.equal(result.h.length,160*160);assert.equal(result.min,0);
+});
+
+test('A failed terrain batch starts no new downloads and emits no progress during fallback',async()=>{
+  const messages=[];
+  const pixels=new Uint8ClampedArray(256*256*4);
+  let calls=0,release;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const run=loadTiles({sw:{lat:47,lng:11},ne:{lat:47.01,lng:11.35}},{rows:160,cols:160,progress:m=>messages.push(m),
+    fetchTile:async()=>{if(++calls===1)throw Error('tile offline');await gate;return pixels;}});
+  await assert.rejects(run,/tile offline/);
+  const started=calls,before=messages.length;
+  release();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(calls,started);assert.equal(messages.length,before);
+});
+
+test('A terrain server returning an HTML error with HTTP 200 cannot poison the next download',async()=>{
+  const url='https://terrain-cache.fixture/edge.png';
+  const previousFetch=globalThis.fetch,bitmap=Object.getOwnPropertyDescriptor(globalThis,'createImageBitmap');
+  let calls=0;
+  try{
+    globalThis.fetch=async()=>{calls++;return new Response('<html>temporary gateway error</html>');};
+    globalThis.createImageBitmap=async blob=>{
+      assert.match(await blob.text(),/gateway error/);
+      throw new Error('Image decoding failed');
+    };
+    for(let i=0;i<2;i++)await assert.rejects(loadTiles(bounds,{maxZoom:0,rows:2,cols:2,tileUrl:()=>url}),/Image decoding failed/);
+    assert.equal(calls,2);
+  }finally{
+    globalThis.fetch=previousFetch;
+    if(bitmap)Object.defineProperty(globalThis,'createImageBitmap',bitmap);else delete globalThis.createImageBitmap;
+  }
+});

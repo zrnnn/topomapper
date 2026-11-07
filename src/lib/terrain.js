@@ -20,7 +20,9 @@ export function normalizeTerrain(heights, rows, cols, source) {
   return { rows, cols, min, max, delta:max-min, h:Float32Array.from(heights,v=>v-min), source };
 }
 async function request(url, options={}) {
-  const response = await fetch(url, {...options, signal:AbortSignal.timeout(25000)});
+  const timeout=AbortSignal.timeout(25000);
+  const signal=options.signal?AbortSignal.any([options.signal,timeout]):timeout;
+  const response=await fetch(url,{...options,signal});
   if(!response.ok) throw new Error(`${new URL(url).hostname}: elevation service returned HTTP ${response.status}${[429,406].includes(response.status)?' · API rate limit exceeded':''}.`);
   return response;
 }
@@ -37,34 +39,54 @@ export async function loadTiles(bounds, {rows=160, cols=160, fetchTile, progress
   validateBounds(bounds);
   const {sw,ne}=bounds, north=latitudeY(ne.lat), south=latitudeY(sw.lat);
   const west=(sw.lng+180)/360, east=(ne.lng+180)/360;
-  const zoom=Math.max(0,Math.min(maxZoom,Math.ceil(Math.log2(Math.max(cols/(east-west),rows/(south-north))/tileSize))));
-  const n=2**zoom, size=n*tileSize;
-  const x0=west*size, x1=Math.min(size-1,east*size), y0=north*size, y1=Math.min(size-1,south*size);
-  const tiles=new Map(), jobs=[];
-  for(let y=Math.floor(y0/tileSize);y<=Math.floor((y1+1)/tileSize);y++) {
-    for(let x=Math.floor(x0/tileSize);x<=Math.floor((x1+1)/tileSize);x++) {
-      if(x<n && y<n) jobs.push({x,y});
-    }
-  }
-  if(jobs.length>64) throw new Error('Choose a less elongated frame for terrain generation.');
-  let done=0, cursor=0;
+  let zoom=Math.max(0,Math.min(maxZoom,Math.ceil(Math.log2(Math.max(cols/(east-west),rows/(south-north))/tileSize))));
+  const extent=z=>{
+    const n=2**z,size=n*tileSize;
+    const x0=Math.min(size-1,west*size),x1=Math.min(size-1,east*size);
+    const y0=north*size,y1=Math.min(size-1,south*size);
+    return {size,x0,x1,y0,y1,left:Math.floor(x0/tileSize),right:Math.min(n-1,Math.floor((x1+1)/tileSize)),
+      top:Math.floor(y0/tileSize),bottom:Math.min(n-1,Math.floor((y1+1)/tileSize))};
+  };
+  const targetZoom=zoom;
+  let frame=extent(zoom);
+  while((frame.right-frame.left+1)*(frame.bottom-frame.top+1)>64)frame=extent(--zoom);
+  if(zoom<targetZoom)progress('Using lower-resolution elevation tiles to fit the long frame within the 64-tile limit');
+  const {size,x0,x1,y0,y1}=frame,tiles=new Map(),jobs=[];
+  for(let y=frame.top;y<=frame.bottom;y++)for(let x=frame.left;x<=frame.right;x++)jobs.push({x,y});
+  const batch=new AbortController(),signal=batch.signal;
+  let done=0,cursor=0;
   const getTile=fetchTile || (async (z,x,y)=>{
     const url=tileUrl(z,x,y);
-    let bytes=await cachedBytes(url);
-    const detail=text=>progress({phase:'terrain',percent:8+Math.round(done/jobs.length*47),detail:text});
-    if(!bytes){detail(`Connecting to ${new URL(url).hostname} · terrain tiles`);bytes=await readBounded(await request(url),{maxBytes:2*1024*1024,onProgress:p=>detail(downloadDetail(url,p)+` · ${done}/${jobs.length} terrain tiles ready`)});await cacheBytes(url,bytes);}
-    else detail(`Using cached terrain · ${done}/${jobs.length} tiles ready`);
+    // Older caches may contain HTTP 200 error pages saved before image decoding.
+    const key='terrain-image-v2:'+url;
+    let bytes=await cachedBytes(key);
+    signal.throwIfAborted();
+    const detail=text=>{if(!signal.aborted)progress({phase:'terrain',percent:8+Math.round(done/jobs.length*47),detail:text});};
+    const cached=!!bytes;
+    if(!cached){
+      detail(`Connecting to ${new URL(url).hostname} · terrain tiles`);
+      bytes=await readBounded(await request(url,{signal}),{signal,maxBytes:2*1024*1024,
+        onProgress:p=>detail(downloadDetail(url,p)+` · ${done}/${jobs.length} terrain tiles ready`)});
+    } else detail(`Using cached terrain · ${done}/${jobs.length} tiles ready`);
     detail(`Decoding terrain tile · ${done}/${jobs.length} tiles ready`);
-    return decodeImage(new Blob([bytes],{type:tileSize===512?'image/webp':'image/png'}),tileSize);
+    const pixels=await decodeImage(new Blob([bytes],{type:tileSize===512?'image/webp':'image/png'}),tileSize);
+    if(!cached)void cacheBytes(key,bytes);
+    return pixels;
   });
-  await Promise.all(Array.from({length:Math.min(4,jobs.length)},async()=>{
-    while(cursor<jobs.length) {
-      const {x,y}=jobs[cursor++];
-      const pixels=await getTile(zoom,x,y);
-      if(pixels.length!==tileSize*tileSize*4) throw new Error('Invalid terrain tile.');
-      tiles.set(`${x},${y}`,pixels);progress(`Loading terrain ${++done}/${jobs.length}`);
-    }
-  }));
+  try{
+    await Promise.all(Array.from({length:Math.min(4,jobs.length)},async()=>{
+      while(cursor<jobs.length) {
+        const {x,y}=jobs[cursor++];
+        const pixels=await getTile(zoom,x,y);
+        signal.throwIfAborted();
+        if(pixels.length!==tileSize*tileSize*4)throw new Error('Invalid terrain tile.');
+        tiles.set(`${x},${y}`,pixels);progress(`Loading terrain ${++done}/${jobs.length}`);
+      }
+    }));
+  }catch(error){
+    batch.abort();
+    throw error;
+  }
   const sample=(x,y)=>{
     x=Math.max(0,Math.min(size-1,x)); y=Math.max(0,Math.min(size-1,y));
     const pixels=tiles.get(`${Math.floor(x/tileSize)},${Math.floor(y/tileSize)}`);

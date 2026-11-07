@@ -1,5 +1,5 @@
 import earcut,{flatten} from 'earcut';
-import {modelInput,validateModelSettings,terrainReliefHeight,roadRings} from './model.js';
+import {modelInput,validateModelSettings,terrainReliefHeight,roadRings,MATERIAL_INLAY_MM,BOTTOM_SKIN_MM} from './model.js';
 import {buildTerrainMesh} from './mesh.js';
 import {buildBuildingMeshes} from './building-mesh.js';
 import {createGeometry} from './geometry.js';
@@ -33,7 +33,14 @@ export function buildQuickModel(state,settings){
   for(const [key,width,rise,color] of [['rivers',settings.roadWidth*.8,settings.areaRise,'#6A9EA9'],['roads',settings.roadWidth,settings.roadRise,'#536C68']])
     for(const ring of roadRings(input[key],width))surface([ring],rise,color);
   if(settings.buildings)for(const {mesh:building} of buildBuildingMeshes(s,input.buildings,{resolution:settings.resolution,targetHeight:reliefHeight,buildingScale:settings.buildingScale,fallbackHeight:settings.fallbackHeight})){
-    building.v.forEach(v=>{if(v[2]>0)v[2]+=settings.base-2;});add(building,'#DDA95E');
+    for (const v of building.v) {
+      if (v[2]>0) v[2]+=settings.base-2;
+      else {
+        const surfaceZ=settings.base+(s.terrainData.delta?geometry.getZInterpolated(v[0]/s.wMm,v[1]/s.hMm)*reliefHeight/s.terrainData.delta:0);
+        v[2]=Math.max(BOTTOM_SKIN_MM,surfaceZ-MATERIAL_INLAY_MM);
+      }
+    }
+    add(building,'#DDA95E');
   }
   return {mesh,width:s.wMm,height:s.hMm,reliefHeight,triangles:mesh.t.length,counts:Object.fromEntries(['buildings','roads','water','green','rivers'].map(key=>[key,input[key].length])),buildingStats:input.buildingStats,settings:{...settings},previewOnly:true};
 }

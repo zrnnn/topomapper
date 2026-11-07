@@ -1,5 +1,5 @@
 import polygonClipping from 'polygon-clipping';
-import {simplifyPolyline} from './geometry.js';
+import {simplifyPolyline,ringBounds} from './geometry.js';
 
 // Reuse the relation assembler for landcover, retaining inner rings (islands).
 export function parseAreas(elements, project, predicate) {
@@ -25,8 +25,11 @@ export function prepareBuildingLod(buildings,{minArea=.5,minDimension=0,toleranc
   const original=(buildings||[]).length, originalPoints=(buildings||[]).reduce((sum,b)=>sum+b.polygons.flat(2).length,0);
   const candidates=(buildings||[]).flatMap(building=>{
     const polygons=building.polygons.filter(polygon=>{
-      const ring=polygon[0]||[],xs=ring.map(p=>p[0]),ys=ring.map(p=>p[1]);
-      return ring.length>=4&&polygonArea(polygon)>=minArea&&(!minDimension||Math.max(...xs)-Math.min(...xs)>=minDimension&&Math.max(...ys)-Math.min(...ys)>=minDimension);
+      const ring=polygon[0]||[];
+      if(ring.length<4 || polygonArea(polygon)<minArea)return false;
+      if(!minDimension)return true;
+      const {minX,minY,maxX,maxY}=ringBounds(ring);
+      return maxX-minX>=minDimension && maxY-minY>=minDimension;
     });
     const footprint=polygons.reduce((sum,polygon)=>sum+polygonArea(polygon),0);
     return polygons.length?[{...building,polygons,footprint}]:[];
@@ -67,7 +70,7 @@ export function coastlineAreas(lines,clipPolygon) {
     for(let guard=0;guard<=open.length;guard++) {
       if(used.has(current))throw new Error('Coastline geometry is incomplete. Try a smaller area.');
       used.add(current);
-      const record=open[current];ring.push(...record.line);
+      const record=open[current];for(const point of record.line)ring.push(point);
       let next=-1,distance=Infinity;
       open.forEach((candidate,i)=>{
         const delta=(candidate.start-record.end+n)%n;
@@ -92,7 +95,7 @@ export function joinCoastlines(lines) {
       changed=false;
       for(let i=0;i<pending.length;i++){
         const next=pending[i];
-        if(same(line.at(-1),next[0]))line.push(...next.slice(1));
+        if(same(line.at(-1),next[0])){for(let j=1;j<next.length;j++)line.push(next[j]);}
         else if(same(next.at(-1),line[0]))line=next.slice(0,-1).concat(line);
         else continue;
         pending.splice(i,1);changed=true;break;
@@ -111,7 +114,7 @@ function joinRings(segments) {
       for(let i=0;i<pending.length;i++) {
         let segment=pending[i];
         if(same(ring.at(-1),segment.at(-1))) segment=segment.slice().reverse();
-        if(same(ring.at(-1),segment[0])) {ring.push(...segment.slice(1));pending.splice(i,1);changed=true;break;}
+        if(same(ring.at(-1),segment[0])) {for(let j=1;j<segment.length;j++)ring.push(segment[j]);pending.splice(i,1);changed=true;break;}
         if(same(ring[0],segment[0])) segment=segment.slice().reverse();
         if(same(ring[0],segment.at(-1))) {ring=segment.slice(0,-1).concat(ring);pending.splice(i,1);changed=true;break;}
       }
@@ -123,7 +126,7 @@ function joinRings(segments) {
 
 export function parseBuildings(elements, project) {
   const result=[], consumed=new Set(), seen=new Set();
-  const geometry = value => Array.isArray(value) && value.every(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)) ? value.map(p=>project(p.lat,p.lon)) : [];
+  const geometry = value => Array.isArray(value) && value.every(p=>Number.isFinite(p?.lat)&&Number.isFinite(p.lon)) ? value.map(p=>project(p.lat,p.lon)) : [];
   const add = (element,polygons) => {
     const id=`${element.type}/${element.id}`;
     if(seen.has(id) || !polygons.length) return;
@@ -133,12 +136,12 @@ export function parseBuildings(elements, project) {
   // Relations first: suppress duplicate outer ways only when a valid relation is retained.
   for(const element of elements) {
     if(element.type!=='relation' || !element.tags?.building || element.tags.building==='no' || !Array.isArray(element.members)) continue;
-    const outer=joinRings(element.members.filter(m=>m.role==='outer'||!m.role).map(m=>geometry(m.geometry)));
-    const inner=joinRings(element.members.filter(m=>m.role==='inner').map(m=>geometry(m.geometry)));
+    const outer=joinRings(element.members.filter(m=>m && (m.role==='outer'||!m.role)).map(m=>geometry(m.geometry)));
+    const inner=joinRings(element.members.filter(m=>m?.role==='inner').map(m=>geometry(m.geometry)));
     try {
       const polygons=outer.length ? polygonClipping.difference(outer.map(r=>[r]),...inner.map(r=>[r])) : [];
       add(element,polygons);
-      if(polygons.length) element.members.forEach(m=>{if(m.type==='way')consumed.add(m.ref);});
+      if(polygons.length) element.members.forEach(m=>{if(m?.type==='way')consumed.add(m.ref);});
     } catch { /* Invalid OSM geometry is omitted; never fabricate a footprint. */ }
   }
   for(const element of elements) {

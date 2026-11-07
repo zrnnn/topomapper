@@ -97,3 +97,12 @@ test('Directed coastline creates coastal water and closed islands cut holes',()=
   const coast=coastlineAreas([[[0,5],[10,5]]],frame);assert.equal(coast.length,1);assert.ok(coast[0].polygons[0][0].length>=4);
   const island=coastlineAreas([[[3,3],[3,7],[7,7],[7,3],[3,3]]],frame);assert.equal(island[0].polygons[0].length,2);
 });
+
+test('A dense 150,000-vertex footprint fits the print dimension check and simplifies to a small ring',()=>{
+  const edge=Array.from({length:150000},(_,i)=>[i/15000,0]);
+  const ring=edge.concat([[10,0],[10,10],[0,10],[0,0]]);
+  const result=prepareBuildingLod([{polygons:[[ring]]}],{minDimension:.2,tolerance:.08});
+  assert.equal(result.stats.shown,1);
+  assert.equal(result.stats.originalPoints,ring.length);
+  assert.ok(result.stats.points<=6);
+});
