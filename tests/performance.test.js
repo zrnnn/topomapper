@@ -279,3 +279,32 @@ test('Metropolitan building continuation preserves first batch and marks complet
   const resumed=await loadMapLayers(area,{...options,previous:failed});
   assert.equal(resumed.status.error,null);assert.equal(resumed.data.buildings.length,2);
 });
+
+test('Long roads and rivers are clipped to the frame before simplification and budgeting',async()=>{
+  const {parseMapStage}=await import('../src/lib/map-parser.js');
+  const geometry=Array.from({length:201},(_,i)=>({lat:47.05,lon:10.05+i*.01}));
+  const road={type:'way',id:1,tags:{highway:'primary'},geometry};
+  const river={type:'way',id:2,tags:{waterway:'river'},geometry};
+  const roads=parseMapStage([road],state,'roads').roadLines;
+  const rivers=parseMapStage([river],state,'rivers').waterLines;
+  assert.equal(roads.length,1);assert.equal(rivers.length,1);
+  assert.equal(roads[0].roadClass,'primary');
+  for(const line of [roads[0].points,rivers[0]]){
+    assert.ok(line.length<20);assert.ok(Math.abs(line[0][0])<1e-8);
+    assert.ok(Math.abs(line.at(-1)[0]-state.wMm)<1e-8);
+  }
+});
+
+test('Dense buildings fit the remaining point budget without simplifying completed roads',async()=>{
+  const area={...state,wMm:50,hMm:50,loadLayers:{water:false,green:false,labels:false,rivers:false,roads:true,buildings:true}};
+  const road={roadClass:'primary',points:Array.from({length:5000},(_,i)=>[i/100,25+(i%2)*.35])};
+  const ring=[[1,1],[3,1],[3,3],[1,3],[1,1]];
+  const buildings=Array.from({length:2500},(_,i)=>({id:String(i),polygons:[[ring]]}));
+  const previous={data:{...emptyMapData(),roadLines:[road]},status:{completed:['roads'],source:'fixture'}};
+  const result=await loadMapLayers(area,{previous,cityLoader:async()=>({data:{buildings},source:'fixture',tiles:1})});
+  assert.deepEqual(result.status.completed,['roads','buildings']);
+  assert.deepEqual(result.data.roadLines,[road]);
+  assert.ok(result.data.buildings.length>0 && result.data.buildings.length<buildings.length);
+  assert.equal(countMapPoints(result.data),result.status.pointStats.points);
+  assert.match(result.status.error,/footprint|buildings omitted/);
+});

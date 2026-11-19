@@ -132,3 +132,13 @@ test('A terrain server returning an HTML error with HTTP 200 cannot poison the n
     if(bitmap)Object.defineProperty(globalThis,'createImageBitmap',bitmap);else delete globalThis.createImageBitmap;
   }
 });
+
+test('A corrupted elevation patch triggers fallback while gradual high relief survives',async()=>{
+  const corrupt=normalizeTerrain([44,45,140,55,-4838,177,66,164,222],3,3,'corrupt tile');
+  const gradual=normalizeTerrain([44,700,1420,640,1300,2021,1290,1940,2700],3,3,'smooth source');
+  const reports=[];
+  const neighborhood={sw:{lat:35,lng:135},ne:{lat:35.001,lng:135.001}};
+  const result=await loadTerrain(neighborhood,{primary:async()=>corrupt,secondary:async()=>gradual,progress:text=>reports.push(text)});
+  assert.equal(result,gradual);
+  assert.match(reports.join(' '),/Abrupt elevation jumps.*Looking for another/);
+});

@@ -134,11 +134,31 @@ export async function loadLookup(bounds, {progress=()=>{}, fetchBatch}={}) {
   }
   return normalizeTerrain(heights,rows,cols,'Open-Elevation fallback · 64 × 64 samples');
 }
+function checkTerrainJumps(terrain,{sw,ne}){
+  const {h,rows,cols}=terrain;
+  if(terrain.delta<=1500)return;
+  const metresPerWorld=40075017*Math.cos((sw.lat+ne.lat)*Math.PI/360);
+  const sampleWidth=(ne.lng-sw.lng)/360*metresPerWorld/(cols-1);
+  const sampleHeight=(latitudeY(sw.lat)-latitudeY(ne.lat))*metresPerWorld/(rows-1);
+  // Wide and coarse frames can legitimately span major cliffs or trenches.
+  // Close samples with kilometre-scale jumps indicate a damaged source tile.
+  const limitX=Math.max(1500,3*sampleWidth),limitY=Math.max(1500,3*sampleHeight);
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const i=r*cols+c;
+    if((c>0&&Math.abs(h[i]-h[i-1])>limitX)||(r>0&&Math.abs(h[i]-h[i-cols])>limitY)){
+      throw new Error(`Abrupt elevation jumps in ${terrain.source}`);
+    }
+  }
+}
 export async function loadTerrain(bounds, {primary=loadTiles,secondary=primary===loadTiles?loadMapterhorn:null,fallback=loadLookup,progress=()=>{},rows=160,cols=160}={}) {
   validateBounds(bounds);
   const errors=[];
   for(const provider of [primary,secondary,fallback].filter(Boolean)){
-    try{return await provider(bounds,{progress,rows,cols});}
+    try{
+      const terrain=await provider(bounds,{progress,rows,cols});
+      checkTerrainJumps(terrain,bounds);
+      return terrain;
+    }
     catch(error){errors.push(error.message);progress(`${error.message} · Looking for another elevation provider…`);}
   }
   throw new Error('Elevation services could not be reached or returned invalid data. Your previous preview is preserved. '+errors.join(' · '));

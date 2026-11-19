@@ -86,3 +86,23 @@ test('City building tile planning bounds Nuremberg, greater Berlin and oversized
   assert.equal(cityBuildingPlan({sw:{lat:52.34,lng:13.09},ne:{lat:52.68,lng:13.76}}).tiles.length,238);
   assert.equal(cityBuildingPlan({sw:{lat:35,lng:-10},ne:{lat:60,lng:20}}),null);
 });
+
+test('Geometry outside a cropped detail tile does not consume its vertex budget',()=>{
+  const quadrant=[[10,20],[1600,20],[1600,1600],[10,1600]];
+  const denseRing=Array.from({length:180004},(_,i)=>quadrant[i%4]);
+  const cropped={...state,renderBbox:{...state.renderBbox,sw:{lat:0,lng:45}}};
+  const bytes=polygonTile([denseRing],'water');
+  const result=decodeCityTile(bytes,{x:2,y:1,z:2},cropped,{neighborhood:true});
+  assert.equal(result.vertices,0);
+  assert.deepEqual(result.data.waterAreas,[]);
+});
+
+test('A malformed polygon cannot discard another polygon in the same feature',async()=>{
+  const {clipBuildings}=await import('../src/lib/buildings.js');
+  const ring=[[1,1],[4,1],[4,4],[1,4],[1,1]];
+  let omitted=0;
+  const clipped=clipBuildings([{id:'mixed',polygons:[[[]],[ring]]}],[[0,0],[8,0],[8,8],[0,8]],()=>omitted++);
+  assert.equal(omitted,1);
+  assert.equal(clipped[0].id,'mixed');
+  assert.deepEqual(clipped[0].polygons,[[ring]]);
+});

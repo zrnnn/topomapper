@@ -639,46 +639,66 @@ export function initTopomapper() {
     const search = async () => {
       const val = searchInput.value.trim();
       const box = $('suggestionBox');
-      if(val.length < 3 || activeSearch || activeJob) return;
-      const cached = searchCache.get(val.toLowerCase());
-      if(!cached && Date.now() - lastSearchAt < 1100) return;
-      activeSearch = new AbortController();
-      $('searchButton').disabled = true;
-      $('searchStatus').textContent = 'Searching…';
+      if(activeSearch || activeJob || choosingLayers) return;
+      if(val.length<3){
+        $('searchStatus').textContent='Enter at least three characters, or move the map.';
+        return;
+      }
+      const key=val.toLowerCase(),cached=searchCache.get(key);
+      if(!cached && Date.now()-lastSearchAt<1100){
+        $('searchStatus').textContent='Wait a moment before searching again.';
+        return;
+      }
+      const searchJob=new AbortController();
+      activeSearch=searchJob;
+      $('searchButton').disabled=true;
+      $('searchStatus').textContent='Searching…';
       try {
-        lastSearchAt = Date.now();
-        const results = cached || await fetchJsonWithTimeout(
-          'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(val) + '&limit=5',
-          {signal:activeSearch.signal}, 8000
+        if(!cached)lastSearchAt=Date.now();
+        const results=cached||await fetchJsonWithTimeout(
+          'https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(val)+'&limit=5',
+          {signal:searchJob.signal},8000
         );
-        if(disposed) return;
-        cachePut(searchCache, val.toLowerCase(), results);
+        if(disposed || searchJob.signal.aborted || activeJob || choosingLayers || searchInput.value.trim()!==val)return;
+        if(!Array.isArray(results))throw new Error('Invalid location response');
+        const matches=results.filter(item=>typeof item?.display_name==='string' &&
+          Number.isFinite(Number(item.lon)) && Number.isFinite(Number(item.lat)) && item.lon!=null && item.lat!=null);
+        cachePut(searchCache,key,matches);
         box.replaceChildren();
-        results.forEach(item => {
-          const button = document.createElement('button');
-          button.type = 'button'; button.className = 'suggestion-item';
-          button.textContent = item.display_name.split(',').slice(0,3).join(',');
-          button.onclick = () => {
-            // Apply the result immediately so Continue can never capture a half-finished fly animation.
+        matches.forEach(item=>{
+          const button=document.createElement('button');
+          button.type='button';button.className='suggestion-item';
+          button.textContent=item.display_name.split(',').slice(0,3).join(',');
+          button.onclick=()=>{
+            // Apply the result immediately so Continue captures a stable frame.
             map.jumpTo({center:[Number(item.lon),Number(item.lat)],zoom:14});
             updateVf();
-            box.style.display='none'; searchInput.value=button.textContent;
-            $('searchStatus').textContent = '';
+            box.style.display='none';searchInput.value=button.textContent;
+            $('searchStatus').textContent='';
           };
           box.appendChild(button);
         });
-        box.style.display = results.length ? 'block' : 'none';
-        $('searchStatus').textContent = results.length ? 'Choose a location below.' : 'No matches. Try a nearby city or move the map.';
-      } catch(error) {
-        if(!disposed) $('searchStatus').textContent = 'Search unavailable. You can still move and zoom the map.';
-      } finally {
-        activeSearch = null;
-        if(!disposed) $('searchButton').disabled = false;
+        box.style.display=matches.length?'block':'none';
+        $('searchStatus').textContent=matches.length?'Choose a location below.':'No matches. Try a nearby city or move the map.';
+      }catch(error){
+        if(!disposed && !searchJob.signal.aborted)$('searchStatus').textContent='Search unavailable. You can still move and zoom the map.';
+      }finally{
+        if(activeSearch===searchJob){
+          activeSearch=null;
+          if(!disposed && !activeJob)$('searchButton').disabled=false;
+        }
       }
     };
-    $('searchButton').onclick = search;
-    searchInput.addEventListener('keydown', event => { if(event.key === 'Enter') { event.preventDefault(); search(); } });
-    searchInput.addEventListener('input', () => { $('suggestionBox').style.display='none'; });
+    function clearSearch(){
+      activeSearch?.abort();
+      activeSearch=null;
+      if(!activeJob)$('searchButton').disabled=false;
+      $('suggestionBox').style.display='none';
+      $('searchStatus').textContent='';
+    }
+    $('searchButton').onclick=search;
+    searchInput.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();void search();}});
+    searchInput.addEventListener('input',clearSearch);
 
     // --- UI CONSTRUCTION ---
     document.querySelectorAll('.layer-head').forEach((head) => {
@@ -1630,8 +1650,8 @@ export function initTopomapper() {
     let overlayController=null;
     $('cancelGeneration').onclick = () => overlayController?overlayController.abort('keep-current'):activeJob?.abort();
     $('cancelPreviewLoad').onclick=()=>overlayController?.abort('export-current');
-    let outputMode='2d',lastRequestedMode='2d';
-    const modelWorkflow=initModelWorkflow(state,{runExportFlow,signal:lifetime.signal,onStatus:update=>{modelStatus=update;modelBusy=update.state==='loading';if(workspaceStep==='3')showExportReadiness();workspaceStatus.update('model',update);syncWorkspaceNavigation();}});
+    let outputMode='2d',lastRequest=null;
+    const modelWorkflow=initModelWorkflow(state,{runExportFlow,signal:lifetime.signal,onZoom:value=>{cameraZoom=value;syncPreviewZoom();},onStatus:update=>{modelStatus=update;modelBusy=update.state==='loading';if(workspaceStep==='3')showExportReadiness();workspaceStatus.update('model',update);syncWorkspaceNavigation();}});
     let previewScale=1, cameraZoom=1,previewPan={x:0,y:0};
     const canvasPreview=createCanvasPreview($('previewArea'),{onStart:()=>{if(outputMode==='2d')workspaceStatus.update('preview',{title:'Generating 2D preview',detail:'Rasterizing map layers at up to twice the preview resolution…'});},onReady:()=>{syncPreviewZoom();if(outputMode==='2d')workspaceStatus.update('preview',{state:'success',title:'2D preview ready',detail:'Drag to move, scroll to zoom, or continue to Export.',percent:100});},onError:error=>{workspaceStatus.update('preview',{state:'error',title:'Preview failed',detail:error.message});$('previewLoadStatus').hidden=false;$('previewLoadStatus').textContent=error.message;}});
     const syncPreviewZoom=()=>{
@@ -1642,7 +1662,7 @@ export function initTopomapper() {
       } else $('previewZoomValue').textContent=`${Math.round(cameraZoom*100)}%`;
     };
     const zoomPreview=direction=>{
-      if(outputMode==='3d'){cameraZoom=Math.max(.35,Math.min(4,cameraZoom*(direction>0?1.2:1/1.2)));modelWorkflow.zoom(direction);}
+      if(outputMode==='3d')modelWorkflow.zoom(direction);
       else previewScale=Math.max(.5,Math.min(2,previewScale*(direction>0?1.2:1/1.2)));
       syncPreviewZoom();
     };
@@ -1677,6 +1697,7 @@ export function initTopomapper() {
     }
     function chooseOutput(reuse=false) {
       if(activeJob||modelBusy||exportBusy)return;
+      clearSearch();
       if(reuse)closePreview();else {map.stop();updateVf();}
       setupBounds=structuredClone(reuse?state.renderBbox:state.bbox);
       setupInteractions=[map.dragPan,map.scrollZoom,map.boxZoom,map.doubleClickZoom,map.touchZoomRotate,map.keyboard].map(control=>[control,control.isEnabled()]);
@@ -1704,31 +1725,25 @@ export function initTopomapper() {
     };
     $('btnGen').onclick=()=>{
       if(!choosingLayers){chooseOutput(false);return;}
-      state.loadLayers=readLoadLayers();
-      if(draftMode==='3d')state.loadLayers.labels=false;
-      state.includeBuildings=state.loadLayers.buildings;
-      state.includeMinorRoads=state.loadLayers.roads&&state.loadLayers.minorRoads;
-      for(const [layer,key] of [['water','waterAreas'],['green','greenAreas'],['rivers','rivers'],['roads','roads'],['buildings','buildings'],['labels','labels']])state.mapFeatures[key].enabled=state.loadLayers[layer];
-      state.contour.enabled=state.loadLayers.terrain;
-      state.cityOverview=areaPlan(setupBounds).large;
-      const detail=detailPlan(setupBounds,state.wMm,state.hMm,state.cityOverview);
-      state.mapFeatures.buildings.minArea=detail.minArea;
-      modelWorkflow.configureArea({...detail,overview:state.cityOverview,buildingsAvailable:state.includeBuildings,loadLayers:state.loadLayers});
-      syncUiFromState();
-      const bounds=structuredClone(setupBounds),mode=draftMode;
-      finishLayerChoice();void generateArea(mode,bounds);
+      const layers=readLoadLayers();
+      if(draftMode==='3d')layers.labels=false;
+      const request={mode:draftMode,layers,bounds:structuredClone(setupBounds),frame:{wMm:state.wMm,hMm:state.hMm,shape:state.shape}};
+      finishLayerChoice();
+      void generateArea(request);
     };
     $('changeOutput').onclick=()=>chooseOutput(true);
-    $('retryGeneration').onclick=()=>void generateArea(lastRequestedMode);
-    async function generateArea(mode,retryBounds=null,retryLayers=false) {
+    $('retryGeneration').onclick=()=>{if(lastRequest)void generateArea(lastRequest);};
+    async function generateArea(request) {
       if(activeJob || exportBusy || disposed) return;
-      lastRequestedMode=mode;
-      outputMode=mode;
+      lastRequest=request;
+      const {mode,layers,bounds,frame,retryLayers}=request;
+      const cityOverview=areaPlan(bounds).large;
+      const detail=detailPlan(bounds,frame.wMm,frame.hMm,cityOverview);
       const deadline=Date.now()+MAP_TOTAL_TIMEOUT_MS;
-      previewScale=1; cameraZoom=1;previewPan={x:0,y:0};
+      clearSearch();
       const controller = new AbortController();
       activeJob = controller;
-      const previous = { terrainData: state.terrainData, osmData: state.osmData, osmStatus: state.osmStatus, renderBbox: state.renderBbox };
+      const savedLayers=retryLayers?{data:state.osmData,status:state.osmStatus}:null;
       const controls = Array.from(document.querySelectorAll('.sidebar input, .sidebar select, #btnGen, #previousPreview, #searchButton, #changeOutput, [data-map-zoom]'));
       const disabled = controls.map(el => el.disabled);
       controls.forEach(el => el.disabled = true);
@@ -1741,18 +1756,30 @@ export function initTopomapper() {
       showGenerationStatus({phase:'terrain',title:'Loading elevation',detail:'Connecting to the primary terrain source…'});
       $('suggestionBox').style.display='none';
       try {
-        updateVf();
-        const bounds = structuredClone(retryBounds||state.bbox);
         validateBounds(bounds);
-        const {rows,cols}=detailPlan(bounds,state.wMm,state.hMm,state.cityOverview);
-        const wantsTerrain=selectedLayers(state).terrain;
+        const {rows,cols}=detail;
+        const wantsTerrain=layers.terrain;
         const key = `${bboxKey(bounds.sw, bounds.ne)}:${wantsTerrain?cols+'x'+rows:'flat'}`;
         const terrain = !wantsTerrain?normalizeTerrain([0,0,0,0],2,2,'Flat base · elevation not requested'):terrainCache.get(key) || await runWorker('terrain', {...bounds,rows,cols}, {
           signal: controller.signal, timeoutMs:Math.min(100000,deadline-Date.now()-10000),progress: value => { if(!disposed) showGenerationStatus(terrainProgress(value)); }
         });
         if(controller.signal.aborted || disposed) throw new DOMException('Cancelled', 'AbortError');
         cachePut(terrainCache, key, terrain);
-        state.renderBbox = bounds;
+        Object.assign(state,frame,{renderBbox:bounds,cityOverview});
+        outputMode=mode;
+        previewScale=1;cameraZoom=1;previewPan={x:0,y:0};
+        if(!retryLayers){
+          state.loadLayers=layers;
+          state.includeBuildings=layers.buildings;
+          state.includeMinorRoads=layers.roads&&layers.minorRoads;
+          for(const [layer,key] of [['water','waterAreas'],['green','greenAreas'],['rivers','rivers'],['roads','roads'],['buildings','buildings'],['labels','labels']]){
+            state.mapFeatures[key].enabled=layers[layer];
+          }
+          state.contour.enabled=wantsTerrain;
+          state.mapFeatures.buildings.minArea=detail.minArea;
+          modelWorkflow.configureArea({...detail,overview:cityOverview,buildingsAvailable:layers.buildings,loadLayers:layers});
+          syncUiFromState();
+        }
         state.terrainData = terrain;
         $('terrainSource').classList.remove('warning');
         $('retryMapLayers').hidden=true;
@@ -1760,7 +1787,6 @@ export function initTopomapper() {
         $('terrainSource').textContent=terrain.source;
         state.terrainVersion++;
         state.pngPreviewCache = {key:null,dataUrl:null};
-        const savedLayers=retryLayers?{data:previous.osmData,status:previous.osmStatus}:null;
         state.osmData=savedLayers?.data??{buildings:[],waterAreas:[],greenAreas:[],waterLines:[],roadLines:[],labels:[]};
         state.osmStatus={...savedLayers?.status,loaded:!!savedLayers?.status.loaded,error:null,completed:savedLayers?.status.completed??[]};
         state.osmDataVersion=(state.osmDataVersion||0)+1;
@@ -1796,13 +1822,7 @@ export function initTopomapper() {
         $('retryMapLayers').hidden=!missing.length;
         if($('modal').classList.contains('open')&&outputMode==='3d')modelWorkflow.open();
       } catch(error) {
-        if(!state.terrainData)Object.assign(state, previous);
-        state.terrainVersion++;
-        state.pngPreviewCache = {key:null,dataUrl:null};
-        if(!disposed) {
-          if(state.terrainData) renderSVG();
-          showGenerationError(error);
-        }
+        if(!disposed)showGenerationError(error);
       } finally {
         overlayController=null;
         activeJob = null;
@@ -2252,11 +2272,15 @@ export function initTopomapper() {
       if(!state.terrainData||activeJob||modelBusy)return;
       if(choosingLayers)finishLayerChoice();
       if(target==='export'){setStep('3');openPreview();}
-      else {outputMode=target;previewScale=1;cameraZoom=1;previewPan={x:0,y:0};setStep('2');openPreview();}
+      else {outputMode=target;previewScale=1;previewPan={x:0,y:0};setStep('2');openPreview();}
       syncWorkspaceNavigation();
     },{signal:lifetime.signal}));
     syncWorkspaceNavigation();
-    $('retryMapLayers').onclick=()=>{const bounds=structuredClone(state.renderBbox);closePreview();void generateArea(outputMode,bounds,true);};
+    $('retryMapLayers').onclick=()=>{
+      const request={mode:outputMode,layers:selectedLayers(state),bounds:state.renderBbox,frame:lastFrame,retryLayers:true};
+      closePreview();
+      void generateArea(request);
+    };
     document.addEventListener('keydown', event => {
       if(choosingLayers)return;
       if(!$('modal').classList.contains('open')) return;

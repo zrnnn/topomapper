@@ -37,10 +37,11 @@ const simplifyData=(data,tolerance,minBuildingArea,maxBuildings,minSize)=>{
 export function applyMapPointBudget(data,{maxPoints=80000,minBuildingArea=1.5,maxBuildings=2500,fitBuildings=false,minSize=0}={}) {
   const originalPoints=countMapPoints(data);
   let result=data,tolerance=Math.max(.04,minSize/2);
+  const maxTolerance=fitBuildings?.2:1.28;
   for(;;){
     result=simplifyData(data,tolerance,minBuildingArea,maxBuildings,minSize);
-    if(countMapPoints(result)<=maxPoints || tolerance>=1.28)break;
-    tolerance=Math.min(1.28,tolerance*2);
+    if(countMapPoints(result)<=maxPoints || tolerance>=maxTolerance)break;
+    tolerance=Math.min(maxTolerance,tolerance*2);
   }
   let omittedForBudget=0;
   if(fitBuildings && countMapPoints(result)>maxPoints){

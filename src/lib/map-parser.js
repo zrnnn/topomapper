@@ -57,6 +57,8 @@ export function parseMapStage(elements,state,stage){
     if(layers.green && stage!=='water')data.greenAreas=parseAreas(elements,project,green);
   }
   const coasts=[],ids=new Set();
+  const geometry=createGeometry(state);
+  const {wMm,hMm}=state,frame=[[0,0],[wMm,0],[wMm,hMm],[0,hMm]];
   for(const el of elements){
     const key=el.type+'/'+el.id;if(ids.has(key))continue;ids.add(key);
     const t=el.tags||{};
@@ -74,8 +76,10 @@ export function parseMapStage(elements,state,stage){
       const finish=()=>{
         if(points.length>=2){
           if(coast)coasts.push(points);
-          else if(road)data.roadLines.push(roadRecord(points,t.highway));
-          else data.waterLines.push(points);
+          else for(const segment of geometry.clipPolylineToPolygon(points,frame)){
+            if(road)data.roadLines.push(roadRecord(segment,t.highway));
+            else data.waterLines.push(segment);
+          }
         }
         points=[];
       };
@@ -89,7 +93,7 @@ export function parseMapStage(elements,state,stage){
     }
   }
   if(coasts.length){
-    const geometry=createGeometry(state),clip=geometry.getClipPolygon();
+    const clip=geometry.getClipPolygon();
     data.waterAreas.push(...coastlineAreas(joinCoastlines(coasts).flatMap(line=>geometry.clipPolylineToPolygon(line,clip)),clip));
   }
   data.labels=data.labels.slice(0,36);return data;

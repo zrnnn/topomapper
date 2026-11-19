@@ -81,6 +81,15 @@ try {
   assert.ok(await page.locator('#retryMapLayers').isVisible());
   async function preparePrintable(){
     await page.waitForFunction(()=>document.querySelector('#modelTitle').textContent.includes('Quick preview ready'));
+  const zoom=page.locator('#previewZoomValue');
+  await click('#previewZoomIn');
+  assert.equal(await zoom.textContent(),'120%');
+  await page.locator('#preview3d canvas').hover();
+  await page.mouse.wheel(0,100);
+  await page.waitForFunction(()=>parseInt(document.querySelector('#previewZoomValue').textContent)<120);
+  await click('#previewZoomFit');
+  assert.equal(await zoom.textContent(),'100%');
+
     await page.locator('#prepareModel').evaluate(button=>button.click());
     await page.waitForFunction(()=>!document.querySelector('#exportModel').disabled || !document.querySelector('#modelError').hidden,null,{timeout:90000});
   }
@@ -302,6 +311,71 @@ try {
     assert.ok(await slow.locator('#modelFileLink').isHidden());
     assert.equal(invalidDownloads,0);
   }finally{releaseRoad();await slowContext.close();}
+  // Hold a search and the first tile of a replacement map until the user
+  // has moved on. The last successful drawing must still export at its own size.
+  const recoveryContext=await browser.newContext({viewport:{width:1440,height:960},acceptDownloads:true});
+  const recovery=await recoveryContext.newPage();
+  recovery.on('pageerror',error=>errors.push(error.message));
+  let releaseSearch,releaseElevation,searchStarted,elevationStarted;
+  const searchRequest=new Promise(resolve=>{searchStarted=resolve;});
+  const elevationRequest=new Promise(resolve=>{elevationStarted=resolve;});
+  const searchHold=new Promise(resolve=>{releaseSearch=resolve;});
+  const elevationHold=new Promise(resolve=>{releaseElevation=resolve;});
+  await recoveryContext.route('**/*',async route=>{
+    const req=route.request(),target=new URL(req.url());
+    if(target.origin===new URL(url).origin)return route.continue();
+    if(target.hostname==='nominatim.openstreetmap.org'){
+      searchStarted();
+      await searchHold;
+      return route.fulfill({json:[{lat:'47.55',lon:'10.75',display_name:'Old search'}]}).catch(()=>{});
+    }
+    if(target.pathname.includes('/terrarium/')){
+      elevationStarted();
+      await elevationHold;
+      return route.abort().catch(()=>{});
+    }
+    if(req.method()==='POST')return route.fulfill({json:{elements}});
+    if(target.pathname.endsWith('.png'))return route.fulfill({contentType:'image/png',body:Buffer.from(tile,'base64')});
+    return route.abort();
+  });
+  try{
+    await recovery.goto(url,{waitUntil:'networkidle'});
+    const search=recovery.locator('#searchInp');
+    await search.fill('Old search');
+    await recovery.locator('#searchButton').click();
+    await Promise.race([searchRequest,recovery.waitForTimeout(8000).then(()=>{throw Error('Search request never started');})]);
+    await search.fill('New search');
+    releaseSearch();
+    assert.ok(await recovery.locator('#searchButton').isEnabled());
+    assert.equal(await recovery.locator('#searchStatus').textContent(),'');
+    await recovery.locator('#btnGen').click();
+    await recovery.locator('#choose2d').click();
+    for(const box of await recovery.locator('#purposeDialog input[type=checkbox]').all())if(await box.isEnabled())await box.uncheck();
+    await recovery.locator('#load-water').check();
+    await recovery.locator('#btnGen').click();
+    await recovery.waitForFunction(()=>document.querySelector('#modal').classList.contains('open')&&!document.querySelector('#btnGen').disabled);
+    assert.ok(await recovery.locator('#suggestionBox').isHidden());
+    await recovery.locator('#closePreview').click();
+    await recovery.locator('#advancedControls > summary').click();
+    await recovery.locator('#dimW').fill('300');
+    await recovery.locator('#dimW').press('Tab');
+    await recovery.locator('#btnGen').click();
+    await recovery.locator('#choose3d').click();
+    await recovery.locator('#btnGen').click();
+    await Promise.race([elevationRequest,recovery.waitForTimeout(8000).then(()=>{throw Error('Elevation request never started');})]);
+    await recovery.locator('#cancelGeneration').click();
+    releaseElevation();
+    await recovery.locator('#previousPreview').click();
+    assert.equal(await recovery.locator('#modal').getAttribute('data-mode'),'2d');
+    await recovery.locator('#modal [data-workspace-step="export"]').click();
+    const previousDownload=recovery.waitForEvent('download');
+    await recovery.locator('#btnSVG').click();
+    const previousPath=join(directory,'previous-after-cancel.svg');
+    await (await previousDownload).saveAs(previousPath);
+    const previousDrawing=await readFile(previousPath,'utf8');
+    assert.match(previousDrawing,/width="200mm" height="140mm"/);
+    assert.match(previousDrawing,/id="waterAreas"/);
+  }finally{releaseSearch();releaseElevation();await recoveryContext.close();}
   assert.deepEqual(errors,[]);
   console.log('Verified SVG, DXF, PNG, 3MF, STL and OBJ downloads in',directory);
 } finally {

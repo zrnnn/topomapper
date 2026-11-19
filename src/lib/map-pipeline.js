@@ -8,7 +8,6 @@ import {cachedBytes,cacheBytes} from './data-cache.js';
 import {createMapTileSession,loadMapTiles} from './map-tiles.js';
 import {MIN_DETAIL_MM,printPointBudget,detailPlan} from './area-plan.js';
 import {selectionPolicy} from './selection-policy.js';
-import {limitCityFootprints} from './buildings.js';
 import {applyMapPointBudget,countMapPoints} from './map-lod.js';
 import {loadCityTiles,vectorTilePlan,cityBuildingPlan} from './city-tiles.js';
 import {requestedStages,filterSelectedLayers,selectedLayers,incompleteMapLayers} from './layer-selection.js';
@@ -21,7 +20,7 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
   const policy=selectionPolicy(state.renderBbox,state.outputMode);
   const maxPoints=printPointBudget(state.wMm,state.hMm,policy.maxMapPoints);
   const sourceCity=state.cityOverview;
-  let city=null,buildingTiles=0,coverage=previous?.status.buildingCoverage??null;
+  let city=null,buildingTiles=0,omittedPolygons=0,coverage=previous?.status.buildingCoverage??null;
   const requested=selectedLayers(state);
   const requestedGroups=requestedStages(state);
   if(previous){
@@ -159,7 +158,7 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
         if(stage==='buildings' && autoTiles && (!native||sourceCity) && budget.bytes<budget.maxBytes && cityBuildingPlan(bounds)){
           try{
             const buildings=await cityLoader(state,{signal,budget,cityBuildings:true,continuation:coverage,...tileReporter('City building tiles')});
-            return {incoming:{buildings:buildings.data.buildings},tileCount:buildings.tiles,nextCoverage:buildings.coverage,source:buildings.source,stageStart};
+            return {incoming:{buildings:buildings.data.buildings},tileCount:buildings.tiles,invalidPolygons:buildings.omittedPolygons,nextCoverage:buildings.coverage,source:buildings.source,stageStart};
           }catch(error){
             if(coverage || signal.aborted || budget.bytes>=budget.maxBytes)throw error;
             buildingTileError=error.message;
@@ -206,23 +205,34 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
     let work=pending.get(stage);
     pending.delete(stage);
     while(work){
-      const {incoming,error,source,advisory,tileCount=0,nextCoverage,stageStart}=await work;
+      const {incoming,error,source,advisory,tileCount=0,invalidPolygons=0,nextCoverage,stageStart}=await work;
       work=null;
       const lastDone=coverage?.done??0;
       try {
         if (error) throw error;
-        const candidate=emptyMapData();
-        for(const key of Object.keys(candidate))candidate[key]=data[key].concat(incoming[key]||[]);
-        if(tileCount){
-          const base={...data,buildings:[]};
-          const pool=nextCoverage?.start ? candidate.buildings : incoming.buildings;
-          candidate.buildings=limitCityFootprints(pool,maxPoints-countMapPoints(base));
-        }
+        const candidate={...emptyMapData(),...incoming};
+        // Completed layers have already passed the print budget. Preserve their
+        // geometry and allow the incoming layer only the remaining points.
+        const base=stage==='buildings'?{...data,buildings:[]}:data;
+        if(nextCoverage?.start)candidate.buildings=data.buildings.concat(candidate.buildings);
+        const basePoints=countMapPoints(base);
+        publish(stage,'Simplifying '+labels[stage]+' · checking the remaining data budget');
+        const bounded=applyMapPointBudget(candidate,{
+          maxPoints:maxPoints-basePoints,
+          minBuildingArea:state.mapFeatures.buildings.minArea,
+          maxBuildings:2500,minSize:MIN_DETAIL_MM,fitBuildings:stage==='buildings'
+        });
+        const combined=emptyMapData();
+        for(const key of Object.keys(combined))combined[key]=base[key].concat(bounded.data[key]);
         const ranks={city:1,town:2,village:3,suburb:4,neighbourhood:5,hamlet:6};
-        candidate.labels=Array.from(new Map(candidate.labels.map(label=>[label.name+':'+label.lat+':'+label.lon,label])).values()).sort((a,b)=>(ranks[a.place]||9)-(ranks[b.place]||9)).slice(0,36);
-        publish(stage,'Simplifying '+labels[stage]+' · checking the combined data budget');
-        const bounded=applyMapPointBudget(candidate,{maxPoints,minBuildingArea:state.mapFeatures.buildings.minArea,maxBuildings:2500,minSize:MIN_DETAIL_MM,fitBuildings:stage==='buildings'});
-        data=bounded.data;points=bounded.stats;source.split(' + ').forEach(name=>sources.add(name));buildingTiles+=tileCount;
+        combined.labels=Array.from(new Map(combined.labels.map(label=>[label.name+':'+label.lat+':'+label.lon,label])).values())
+          .sort((a,b)=>(ranks[a.place]||9)-(ranks[b.place]||9)).slice(0,36);
+        data=combined;
+        points={...bounded.stats,originalPoints:basePoints+bounded.stats.originalPoints,
+          points:basePoints+bounded.stats.points,tolerance:Math.max(points?.tolerance??0,bounded.stats.tolerance)};
+        source.split(' + ').forEach(name=>sources.add(name));
+        buildingTiles+=tileCount;
+        omittedPolygons+=invalidPolygons;
         if(advisory)errors.push(advisory);
         if(points.omittedForBudget)errors.push(points.omittedForBudget+' smaller or lower-priority buildings omitted to fit the point budget.');
         if(stage==='buildings')coverage=nextCoverage?.done<nextCoverage?.total?nextCoverage:null;
@@ -239,6 +249,8 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
       }
     }
   }
+  omittedPolygons+=city?.omittedPolygons??0;
+  if(omittedPolygons)errors.push(`${omittedPolygons} invalid map polygons skipped. Other features are available for export.`);
   if(coverage)errors.push(`Buildings cover ${coverage.done}/${coverage.total} tiles. Export this coverage now or choose Load more building tiles to resume.`);
   if(errors.length && tileError)errors.push('Vector tile sources: '+tileError+'.');
   return {data,status:{...status(),durationMs:Math.round(performance.now()-started)}};

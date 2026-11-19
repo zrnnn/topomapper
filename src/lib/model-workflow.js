@@ -5,7 +5,7 @@ import {filterSelectedLayers,incompleteMapLayers} from './layer-selection.js';
 import {runWorker} from './worker-client.js';
 import {describeError} from './operation-status.js';
 
-export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{}}) {
+export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{},onZoom=()=>{}}) {
   const $=id=>document.getElementById(id);
   let settings=defaultModel(),model=null,job=null,preview=null,disposed=false,revision=0,previewTimer=null,previewRevision=-1,prepared=null;
   let buildingsAvailable=true,availableLayers=null;
@@ -52,7 +52,7 @@ export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{}}) 
     if(!preview){
       const {createModelPreview}=await import('./preview3d.js');
       if(disposed || generation!==revision)return;
-      preview=createModelPreview($('preview3d'));
+      preview=createModelPreview($('preview3d'),onZoom);
     }
     preview.set(next);
     previewRevision=generation;

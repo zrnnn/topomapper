@@ -203,11 +203,23 @@ export function parseBuildings(elements, project) {
   return result;
 }
 
-export function clipBuildings(buildings, clipPolygon) {
+export function clipBuildings(buildings, clipPolygon, onOmitted=()=>{}) {
   const clip=[clipPolygon.concat([clipPolygon[0]])];
   return buildings.flatMap(building=>{
-    const polygons=polygonClipping.intersection(building.polygons,clip);
-    return polygons.length ? [{...building,polygons}] : [];
+    let polygons;
+    try{
+      polygons=polygonClipping.intersection(building.polygons,clip);
+    }catch{
+      // A malformed or nearly coincident ring can prevent the sweep from
+      // closing. Isolate the source polygon and retry on a finer print grid.
+      const snap=point=>point.map(value=>Math.round(value*100000)/100000);
+      const mask=clip.map(ring=>ring.map(snap));
+      polygons=building.polygons.flatMap(polygon=>{
+        try{return polygonClipping.intersection(polygon.map(ring=>ring.map(snap)),mask);}
+        catch{onOmitted();return [];}
+      });
+    }
+    return polygons.length?[{...building,polygons}]:[];
   });
 }
 

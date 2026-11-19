@@ -6,7 +6,7 @@ import {readBounded,DataLimitError,downloadDetail} from './data-budget.js';
 import {cachedBytes,cacheBytes} from './data-cache.js';
 import {emptyMapData,mapProjection} from './map-parser.js';
 import {roadRecord} from './road-style.js';
-import {createGeometry} from './geometry.js';
+import {createGeometry,simplifyPolyline} from './geometry.js';
 import {isLandmark,buildingHeight,clipBuildings,prepareBuildingLod,footprintArea,limitCityFootprints} from './buildings.js';
 import {selectedLayers} from './layer-selection.js';
 
@@ -131,7 +131,7 @@ async function loadTileSource(source,state,{signal,budget,progress=()=>{},fetchI
   }
   for(let attempt=0;attempt<2;attempt++){
     let footprints=[];
-    const results=new Array(plan.tiles.length);let cursor=0,done=0,vertices=0,failed=null;
+    const results=new Array(plan.tiles.length);let cursor=0,done=0,vertices=0,omittedPolygons=0,failed=null;
     const started=performance.now();
     onTileProgress({done:0,total:plan.tiles.length,elapsedMs:0});
     const batch=new AbortController();
@@ -145,21 +145,23 @@ async function loadTileSource(source,state,{signal,budget,progress=()=>{},fetchI
           progress(`Decoding city tile ${index+1}/${plan.tiles.length} · simplifying geometry`);
           const decoded=decodeCityTile(payload.bytes,tile,state,{neighborhood,source,cityBuildings});
           void payload.save?.();
-          if(cityBuildings){
+          omittedPolygons+=decoded.omittedPolygons;
+          if(cityBuildings||neighborhood){
             footprints=limitCityFootprints(footprints.concat(decoded.data.buildings),60000);
-          }else{
-            vertices+=decoded.vertices;if(vertices>180000)throw new DataLimitError('City tile geometry exceeds the detail budget');
-            results[index]=decoded.data;
+            decoded.data.buildings=[];
           }
+          vertices+=decoded.vertices;
+          if(vertices>180000)throw new DataLimitError('City tile geometry exceeds the detail budget');
+          results[index]=decoded.data;
           done++;onTileProgress({done,total:plan.tiles.length,elapsedMs:performance.now()-started});
           progress(`${source.name} · ${done}/${plan.tiles.length} tiles in batch${coverage?' · '+(coverage.start+done)+'/'+coverage.total+' in frame':''} · detail level ${plan.z}`);
         }}catch(error){failed??=error;batch.abort();}
       }));
       if(failed)throw failed;
       const data=emptyMapData();
-      if(cityBuildings)data.buildings=footprints;
-      else for(const item of results)for(const key of Object.keys(data))data[key].push(...item[key]);
-      return {data,coverage,tiles:plan.tiles.length,zoom:plan.z,source:source.name+(cityBuildings?' · simplified city buildings':neighborhood?' · detailed vector tiles':'')};
+      data.buildings=footprints;
+      if(!cityBuildings)for(const item of results)for(const key of Object.keys(data))data[key].push(...item[key]);
+      return {data,coverage,omittedPolygons,tiles:plan.tiles.length,zoom:plan.z,source:source.name+(cityBuildings?' · simplified city buildings':neighborhood?' · detailed vector tiles':'')};
     }catch(error){
       if(cityBuildings||neighborhood||!(error instanceof DataLimitError)||attempt||signal?.aborted||(budget && budget.bytes>=budget.maxBytes))throw error;
       plan=vectorTilePlan(state.renderBbox,{width:state.wMm,height:state.hMm,maxZoom:Math.max(0,plan.z-1)});
@@ -180,74 +182,72 @@ export function decodeCityTile(bytes,{x,y,z},state,{neighborhood=false,cityBuild
   const n=2**z;
   const tileRing=[[x/n*360-180,yLatitude(y/n)],[(x+1)/n*360-180,yLatitude(y/n)],[(x+1)/n*360-180,yLatitude((y+1)/n)],[x/n*360-180,yLatitude((y+1)/n)]].map(([lon,lat])=>project(lat,lon));
   const clip=geometry.clipPolygon(tileRing,[[0,0],[state.wMm,0],[state.wMm,state.hMm],[0,state.hMm]]);
-  if(clip.length<3)return {data,vertices:0};
-  let vertices=0;
+  if(clip.length<3)return {data,vertices:0,omittedPolygons:0};
+  const [tileLeft,tileTop]=tileRing[0], [tileRight,tileBottom]=tileRing[2];
+  const clippedTile=tileLeft<0||tileTop<0||tileRight>state.wMm||tileBottom>state.hMm;
+  let vertices=0,omittedPolygons=0;
   const selected=selectedLayers(state);
   const minArea=state.mapFeatures?.buildings?.minArea??0;
   const tileWidth=Math.abs(tileRing[1][0]-tileRing[0][0]),tileHeight=Math.abs(tileRing[2][1]-tileRing[1][1]);
+  const majorRoads=['motorway','trunk','primary','secondary','tertiary'];
+  const roadClasses=new Set(selected.minorRoads?[...majorRoads,'residential','service','unclassified']:majorRoads);
+  const minDimension=MIN_DETAIL_MM;
   for(const [name,category] of Object.entries(source.layers)){
     if(!selected[category] || (cityBuildings && category!=='buildings') || (category==='buildings' && !neighborhood && !cityBuildings))continue;
-    const layer=tile.layers[name];if(!layer)continue;
+    const layer=tile.layers[name];
+    if(!layer)continue;
+    // The tile grid and the print grid are both in Web Mercator. Project
+    // directly and count only geometry retained inside the selected extent.
+    const sx=tileWidth/layer.extent,sy=tileHeight/layer.extent;
+    const mapRing=ring=>ring.map(({x,y})=>[tileLeft+x*sx,tileTop+y*sy]);
     for(let i=0;i<layer.length;i++){
       const feature=layer.feature(i),p=feature.properties,kind=p.class??p.kind;
       const roadClass=kind==='minor'?'residential':kind;
-      if(category==='roads'&&!['motorway','trunk','primary','secondary','tertiary',...(selected.minorRoads?['residential','service','unclassified']:[])].includes(roadClass))continue;
+      if(category==='roads'&&!roadClasses.has(roadClass))continue;
       if(category==='green'&&!['wood','grass','grassland','forest','park','garden','recreation_ground','meadow'].includes(kind))continue;
-      if(cityBuildings){
-        // A z13 feature can pack hundreds of unrelated buildings into one
-        // multipolygon. Rank actual footprints; keep each courtyard with its shell.
-        if(feature.type!==3)continue;
-        const sx=tileWidth/layer.extent,sy=tileHeight/layer.extent;
-        const attributes=tileBuilding(p);
-        let part=0;
-        for(const rings of classifyRings(feature.loadGeometry())){
-          const polygon=rings.map(ring=>ring.map(pt=>[tileRing[0][0]+pt.x*sx,tileRing[0][1]+pt.y*sy]));
-          if(footprintArea(polygon)<minArea)continue;
-          const record={id:`${z}/${x}/${y}/${i}/${part++}`,polygons:[polygon],...attributes};
-          data.buildings.push(...clipBuildings([record],clip));
+      if(category==='labels'){
+        if(feature.type!==1 || !p.name)continue;
+        const geo=feature.toGeoJSON(x,y,z).geometry;
+        if(geo.type!=='Point')continue;
+        const [lon,lat]=geo.coordinates,[px,py]=project(lat,lon);
+        if(px>=0&&px<=state.wMm&&py>=0&&py<=state.hMm){
+          data.labels.push({name:p.name,lat,lon,place:name.startsWith('place')?kind:undefined,kind:name.startsWith('place')?'place':'peak'});
         }
         continue;
       }
-      if(category==='buildings' && state.cityOverview && minArea>0){
-        const [left,top,right,bottom]=feature.bbox();
-        const boxArea=(right-left)*(bottom-top)*tileWidth*tileHeight/(layer.extent*layer.extent);
-        if(boxArea<minArea)continue;
+      if(clippedTile){
+        const [minX,minY,maxX,maxY]=feature.bbox();
+        if(tileLeft+maxX*sx<0||tileTop+maxY*sy<0||tileLeft+minX*sx>state.wMm||tileTop+minY*sy>state.hMm)continue;
       }
-      const geo=feature.toGeoJSON(x,y,z).geometry;
-      const mapRing=ring=>ring.map(([lon,lat])=>project(lat,lon));
-      if(category==='labels' && geo.type==='Point'&&p.name){
-        const [lon,lat]=geo.coordinates,[px,py]=project(lat,lon);
-        if(px>=0&&px<=state.wMm&&py>=0&&py<=state.hMm)data.labels.push({name:p.name,lat,lon,place:name.startsWith('place')?kind:undefined,kind:name.startsWith('place')?'place':'peak'});
-        continue;
-      }
-      if(geo.type==='Polygon'||geo.type==='MultiPolygon'){
-        if(!['buildings','water','green'].includes(category))continue;
-        const polygons=(geo.type==='Polygon'?[geo.coordinates]:geo.coordinates).map(polygon=>polygon.map(mapRing));
-        vertices+=polygons.reduce((a,p)=>a+p.reduce((b,r)=>b+r.length,0),0);
-        if(vertices>180000)throw new DataLimitError('City tile geometry exceeds the detail budget');
-        const record={id:`${z}/${x}/${y}/${name}/${i}`,polygons};
-        // Remove tile buffer overlaps while retaining holes. Neighboring tile
-        // pieces meet at their true border, avoiding doubled transparent fills.
-        if(category==='buildings')Object.assign(record,tileBuilding(p));
-        const clipped=clipBuildings([record],clip);
-        const key=category==='buildings'?'buildings':category==='water'?'waterAreas':'greenAreas';
-        data[key].push(...clipped);
-      }else if((category==='roads'||category==='rivers') && (geo.type==='LineString'||geo.type==='MultiLineString')){
-        const lines=(geo.type==='LineString'?[geo.coordinates]:geo.coordinates).map(mapRing);
-        for(const line of lines){
-          vertices+=line.length;
-          if(vertices>180000)throw new DataLimitError('City tile geometry exceeds the detail budget');
-          for(const points of geometry.clipPolylineToPolygon(line,clip))
+      if(feature.type===3 && ['buildings','water','green'].includes(category)){
+        const building=category==='buildings';
+        const attributes=building?tileBuilding(p):{};
+        const polygons=classifyRings(feature.loadGeometry()).map(rings=>rings.map(mapRing))
+          .filter(polygon=>!building||footprintArea(polygon)>=minArea);
+        const kept=cityBuildings?polygons.map(polygon=>[polygon]):[polygons];
+        const key=building?'buildings':category==='water'?'waterAreas':'greenAreas';
+        for(const [part,group] of kept.entries()){
+          if(!group.length)continue;
+          const record={id:`${z}/${x}/${y}/${name}/${i}/${part}`,polygons:group,...attributes};
+          const clipped=clipBuildings([record],clip,()=>{omittedPolygons++;});
+          data[key].push(...clipped);
+          if(!building)for(const item of clipped)for(const polygon of item.polygons)for(const ring of polygon)vertices+=ring.length;
+        }
+      }else if(feature.type===2 && (category==='roads'||category==='rivers')){
+        for(const line of feature.loadGeometry()){
+          for(const segment of geometry.clipPolylineToPolygon(mapRing(line),clip)){
+            const points=simplifyPolyline(segment,minDimension/2);
+            vertices+=points.length;
             if(category==='roads')data.roadLines.push(roadRecord(points,roadClass));
             else data.waterLines.push(points);
+          }
         }
       }
+      if(vertices>180000)throw new DataLimitError('City tile geometry exceeds the detail budget');
     }
   }
-  if(cityBuildings){
-    const kept=prepareBuildingLod(data.buildings,{minArea,minDimension:MIN_DETAIL_MM,tolerance:.08,maxBuildings:2500});
-    data.buildings=kept.buildings;
-    vertices=kept.stats.points;
+  if(neighborhood||cityBuildings){
+    data.buildings=prepareBuildingLod(data.buildings,{minArea,minDimension,tolerance:.08,maxBuildings:2500}).buildings;
   }
-  return {data,vertices};
+  return {data,vertices,omittedPolygons};
 }

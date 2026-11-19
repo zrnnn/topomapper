@@ -2,7 +2,13 @@
 
 Create printable 2D maps and 3D landscape models from places around the world, directly in your browser.
 
-[Open Topomapper](https://zrnnn.github.io/topomapper/) · [Release 0.4.0](https://github.com/zrnnn/topomapper/releases/tag/v0.4.0)
+[Open Topomapper](https://zrnnn.github.io/topomapper/) · [Release 0.4.1](https://github.com/zrnnn/topomapper/releases/tag/v0.4.1)
+
+## What changed in 0.4.1?
+
+- Canceling a new selection during elevation loading preserves the previous map, its print dimensions and its output mode. Retrying an elevation failure uses the requested frame.
+- The map loader crops detailed tiles and road lines before budgeting geometry. Dense building layers use the remaining budget and preserve completed roads and waterways. A malformed polygon gets a local retry and can be skipped while other features load. Abrupt jumps between nearby elevation samples trigger an automatic provider fallback.
+- Location results stay tied to the search text. The 3D Fit button uses the entire model, including its height, and the zoom readout follows both the mouse wheel and toolbar buttons.
 
 ## What changed in 0.4.0?
 
