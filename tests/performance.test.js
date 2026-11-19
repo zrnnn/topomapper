@@ -249,3 +249,25 @@ test('A valid empty response replaces a damaged cached query and can be reused o
     assert.equal(calls,1);
   }
 });
+
+test('Metropolitan building continuation preserves first batch and marks completion only on the last batch',async()=>{
+  const area={...state,cityOverview:true,renderBbox:{sw:{lat:52.34,lng:13.09},ne:{lat:52.68,lng:13.76}},
+    loadLayers:{water:false,green:false,labels:false,rivers:false,roads:false,buildings:true}};
+  const coverage={start:0,done:32,total:70,zoom:13,template:'fixture',source:'fixture'};
+  const footprint=id=>({id,footprint:4,polygons:[[[[0,0],[2,0],[2,2],[0,2],[0,0]]]]});
+  const cityLoader=async(_s,options)=>{
+    assert.ok(options.cityBuildings);
+    const second=!!options.continuation;
+    if(second)assert.deepEqual(options.continuation,coverage);
+    return {source:'fixture',data:{buildings:[footprint(second?'b':'a')]},tiles:second?38:32,
+      coverage:second?{...coverage,start:32,done:70}:coverage};
+  };
+  const options={cityLoader,request:async()=>{throw Error('unexpected query');}};
+  const first=await loadMapLayers(area,options);
+  assert.equal(first.status.loaded,true);assert.match(first.status.error,/32\/70/);
+  assert.deepEqual(first.status.completed,[]);
+  const next=await loadMapLayers(area,{...options,previous:first});
+  assert.deepEqual(next.data.buildings.map(b=>b.id),['a','b']);
+  assert.deepEqual(next.status.completed,['buildings']);assert.equal(next.status.error,null);
+  assert.equal(next.status.buildingCoverage,null);assert.equal(next.status.tiles,70);
+});

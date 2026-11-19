@@ -163,7 +163,9 @@ export function initTopomapper() {
       const missing=outputMode==='3d'?modelWorkflow.incompleteLayers():
         incompleteMapLayers(state.osmStatus,Object.fromEntries(Object.entries(visible).filter(([key,value])=>value && active[key])));
       const notice=$('exportCoverageWarning');
-      notice.textContent=mapCoverageNotice(missing);
+      notice.textContent=missing.includes('buildings') && state.osmStatus.buildingCoverage
+        ? `Building tiles loaded: ${state.osmStatus.buildingCoverage.done}/${state.osmStatus.buildingCoverage.total}. Download the current coverage or choose Load more building tiles. `+mapCoverageNotice(missing.filter(key=>key!=='buildings'))
+        : mapCoverageNotice(missing);
       notice.hidden=!missing.length;
     }
     function showExportReadiness(){
@@ -174,7 +176,8 @@ export function initTopomapper() {
         outputMode==='3d'?(status?.printable?'Ready to download':'Ready to prepare'):'Choose a format';
       $('exportDetail').textContent=showModelStatus?status.detail:
         outputMode==='3d'?(status?.printable?'The printable mesh is ready. Choose a format to download it.':'Your download starts automatically after the printable mesh is ready.'):'Choose an export below to start the download.';
-      exportProgress.value=status?.state==='loading'?(status.percent??0):0;
+      if(status?.state==='loading' && !Number.isFinite(status.percent))exportProgress.removeAttribute('value');
+      else exportProgress.value=status?.state==='loading'?status.percent:0;
     }
     const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const setExportStatus = (phase, label) => {
@@ -1722,7 +1725,7 @@ export function initTopomapper() {
       $('cancelGeneration').hidden = false;
       $('cancelPreviewLoad').hidden=true;
       $('generationProgress').hidden=false;
-      showGenerationStatus({phase:'terrain',percent:3,title:'Loading elevation',detail:'Connecting to the primary terrain source…'});
+      showGenerationStatus({phase:'terrain',title:'Loading elevation',detail:'Connecting to the primary terrain source…'});
       $('suggestionBox').style.display='none';
       try {
         updateVf();
@@ -1750,7 +1753,7 @@ export function initTopomapper() {
         state.osmDataVersion=(state.osmDataVersion||0)+1;
         lastFrame={wMm:state.wMm,hMm:state.hMm,shape:state.shape};
         modelWorkflow.invalidate();setStep('2');openPreview(deadline);
-        showGenerationStatus({phase:'map',percent:62,title:'Loading map layers',detail:'Terrain is ready. Loading only your selected map layers…'});
+        showGenerationStatus({phase:'map',title:'Loading map layers',detail:'Terrain is ready. Loading only your selected map layers…'});
         overlayController=new AbortController();
         $('cancelPreviewLoad').hidden=false;
         const mapSignal=AbortSignal.any([controller.signal,overlayController.signal]);
@@ -1760,7 +1763,7 @@ export function initTopomapper() {
         const mapUsable=state.osmStatus.loaded;
         state.osmStatus.ignored = !mapUsable;
         outputMode=mode;modelWorkflow.invalidate();
-        showGenerationStatus({phase:'render',percent:94,title:'Preparing preview',detail:outputMode==='3d'?'Opening the 3D workspace…':'Rendering the 2D artwork…'});
+        showGenerationStatus({phase:'render',title:'Preparing preview',detail:outputMode==='3d'?'Opening the 3D workspace…':'Rendering the 2D artwork…'});
         if(outputMode==='2d')renderSVG();
         setStep(exportCurrent?'3':'2');
         showGenerationStatus({phase:'render',percent:100,state:mapComplete?'success':'warning',title:mapComplete?'Area ready':mapUsable?'Area ready with missing layers':'Terrain ready with missing layers',detail:terrain.source+(mapComplete?' · Map layers loaded.':mapUsable?` · Loaded layers remain available. ${state.osmStatus.error}`:' · Map overlays unavailable; terrain-only work remains available.')});
@@ -1768,6 +1771,7 @@ export function initTopomapper() {
         lastFrame={wMm:state.wMm,hMm:state.hMm,shape:state.shape};
         $('terrainSource').textContent = (mapComplete ? [terrain.source,state.osmStatus.source].filter(Boolean).join(' · ') : `${terrain.source} · ${state.osmStatus.error}${mapUsable?' Loaded layers were preserved.':' Use Retry map layers below.'}`)+(state.cityOverview?' · Adaptive city detail. Use Layers in the toolbar to change the requested data.':'');
         $('terrainSource').classList.toggle('warning',!mapComplete);
+        $('retryMapLayers').textContent=state.osmStatus.buildingCoverage?'Load more building tiles':'Retry map layers';
         $('retryMapLayers').hidden=mapComplete;
         if($('modal').classList.contains('open')&&outputMode==='3d')modelWorkflow.open();
       } catch(error) {

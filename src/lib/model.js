@@ -2,13 +2,14 @@ import {buildTerrainMesh} from './mesh.js';
 import {buildBuildingMeshes} from './building-mesh.js';
 import {clipBuildings,prepareBuildingLod} from './buildings.js';
 import {createGeometry,ringBounds} from './geometry.js';
+import {batchProgress} from './operation-status.js';
 import {roadPoints} from './road-style.js';
 
 export const MATERIAL_INLAY_MM = 1;
 export const BOTTOM_SKIN_MM = 0.2;
 
 export const MODEL_PRESETS = {
-  overview:{name:'City overview',description:'Whole-city relief with larger buildings. Draft mesh; streets off for faster modeling.',terrain:true,buildings:true,roads:false,water:true,green:false,rivers:false,relief:100,buildingScale:1,resolution:40,minBuildingArea:1.5},
+  overview:{name:'City overview',description:'Whole-city relief with larger buildings. Draft mesh; streets off for faster modeling.',terrain:true,buildings:true,roads:false,water:true,green:false,rivers:false,relief:100,buildingScale:1,resolution:40,minBuildingArea:.5},
   landscape:{name:'Landscape model',description:'Relief with buildings, streets and embossed water.',terrain:true,buildings:true,roads:true,water:true,green:false,rivers:false,relief:100,buildingScale:1},
   city:{name:'City block',description:'A flat architectural base with buildings and street context.',terrain:false,buildings:true,roads:true,water:true,green:true,rivers:false,relief:100,buildingScale:2},
   relief:{name:'Terrain study',description:'A clean terrain relief with no architectural overlays.',terrain:true,buildings:false,roads:false,water:false,green:false,rivers:false,relief:100,buildingScale:1}
@@ -130,18 +131,23 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
       progress({percent:62,detail:`Extruding ${input.buildings.length} building footprints`});
       const buildings=buildBuildingMeshes(s,input.buildings,{resolution:settings.resolution,targetHeight:reliefHeight,buildingScale:settings.buildingScale,fallbackHeight:settings.fallbackHeight});
       const buildingSolids = [];
+      const started=performance.now();
       for(const {mesh} of buildings) {
         mesh.v.forEach(v=>{if(v[2]>0)v[2]+=settings.base-2;});
         const solid=fromMesh(mesh);
         if(solid.status()!=='NoError')throw new Error('A building mesh is invalid. Try a smaller area or turn buildings off.');
         buildingSolids.push(solid);
+        if(buildingSolids.length%100===0)progress({title:'Building solids',detail:`${buildingSolids.length}/${buildings.length} footprints converted`,
+          ...batchProgress(buildingSolids.length,buildings.length,performance.now()-started)});
+
       }
       if (buildingSolids.length) {
+        progress({detail:'Joining building solids…'});
         const solid = keep(Manifold.union(buildingSolids));
         overlays.push({name:'Buildings', color:'#DDA95E', solid});
       }
     }
-    progress({percent:78,detail:'Cutting 1 mm terrain-following color inlays'});
+    progress({detail:'Cutting 1 mm terrain-following color inlays'});
     const materials=[];
     if (overlays.length) {
       // Everything below this copy of the actual, smoothed print surface is ground.
@@ -163,7 +169,7 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
     const ground=inserts.length ? keep(terrain.subtract(keep(Manifold.union(inserts)))) : terrain;
     if (ground.status()!=='NoError'||ground.isEmpty()) throw new Error('Terrain inlay sockets could not be prepared.');
     materials.unshift({name:settings.terrain?'Terrain':'Base',color:'#D4D6C8',solid:ground});
-    progress({percent:94,detail:'Checking the final surface and material volumes'});
+    progress({detail:'Checking the final surface and material volumes'});
     const fused=keep(Manifold.union(materials.map(({solid,color})=>colored(solid,color))));
     if (fused.status()!=='NoError'||fused.isEmpty()) throw new Error('Solid fusion failed. Reduce model detail or disable a layer.');
     const volume=fused.volume();

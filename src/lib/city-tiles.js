@@ -1,4 +1,4 @@
-import {VectorTile} from '@mapbox/vector-tile';
+import {VectorTile,classifyRings} from '@mapbox/vector-tile';
 import {PbfReader} from 'pbf';
 import {latitudeY,yLatitude,validateBounds} from './terrain.js';
 import {readBounded,DataLimitError,downloadDetail} from './data-budget.js';
@@ -6,7 +6,7 @@ import {cachedBytes,cacheBytes} from './data-cache.js';
 import {emptyMapData,mapProjection} from './map-parser.js';
 import {roadRecord} from './road-style.js';
 import {createGeometry} from './geometry.js';
-import {buildingHeight,clipBuildings} from './buildings.js';
+import {buildingHeight,clipBuildings,prepareBuildingLod,footprintArea,limitCityFootprints} from './buildings.js';
 import {selectedLayers} from './layer-selection.js';
 
 const tileSources=[
@@ -72,10 +72,17 @@ async function getBytes(url,{signal,budget,maxBytes=4*1024*1024,fetchImpl=fetch,
     clearTimeout(timer);
   }
 }
+// City footprints can use a coarser source zoom than individual building parts.
+export function cityBuildingPlan(bounds,zoom=13){
+  const plan=vectorTilePlan(bounds,{maxZoom:zoom,maxTiles:512,native:true});
+  return plan.z===zoom?plan:null;
+}
 export async function loadCityTiles(state,options={}){
   const failures=[];
   for(const source of tileSources){
+    if(options.continuation && options.continuation.source!==source.name)continue;
     options.signal?.throwIfAborted();
+    options.onTileProgress?.(null);
     try {
       return await loadTileSource(source,state,options);
     }catch(error){
@@ -86,7 +93,7 @@ export async function loadCityTiles(state,options={}){
   }
   throw new Error(failures.join(' · '));
 }
-async function loadTileSource(source,state,{signal,budget,progress=()=>{},fetchImpl=fetch,stallMs=12000,neighborhood=false}){
+async function loadTileSource(source,state,{signal,budget,progress=()=>{},fetchImpl=fetch,stallMs=12000,neighborhood=false,cityBuildings=false,onTileProgress=()=>{},continuation=null}){
   const metadata=await getBytes(source.url,{signal,budget,fetchImpl,stallMs,progress,maxBytes:128*1024});
   const meta=JSON.parse(new TextDecoder().decode(metadata.bytes));
   const path=meta.tiles?.[0];
@@ -98,13 +105,34 @@ async function loadTileSource(source,state,{signal,budget,progress=()=>{},fetchI
     throw new Error('Tile source does not include building detail');
   }
   void metadata.save?.();
-  const maxZoom=Math.min(neighborhood?14:12,meta.maxzoom??12);
-  // Buildings are generalized below native detail. Fall back to detailed queries
-  // if the source cannot cover this selection at z14 inside the tile budget.
-  let plan=vectorTilePlan(state.renderBbox,{width:state.wMm,maxZoom,native:neighborhood});
-  if (neighborhood && plan.z<14) throw new Error('Native neighborhood tile detail unavailable');
+  let plan,coverage=null;
+  if(cityBuildings){
+    const layer=meta.vector_layers?.find(layer=>layer.id===source.buildings);
+    const zoom=Math.max(13,layer?.minzoom??14);
+    if(!layer || zoom>(meta.maxzoom??14) || !(plan=cityBuildingPlan(state.renderBbox,zoom))){
+      throw new Error('Building tiles cannot cover this frame within the city tile limit');
+    }
+    const total=plan.tiles.length;
+    if(total>64){
+      const cx=(plan.tiles[0].x+plan.tiles.at(-1).x)/2,cy=(plan.tiles[0].y+plan.tiles.at(-1).y)/2;
+      const distance=t=>(t.x-cx)**2+(t.y-cy)**2;
+      plan.tiles.sort((a,b)=>distance(a)-distance(b)||a.y-b.y||a.x-b.x);
+      // Resume only the same tile edition. On an edition change the pipeline
+      // replaces the old footprint set with a fresh first batch.
+      const start=continuation?.template===template && continuation.zoom===zoom && continuation.total===total?continuation.done:0;
+      plan.tiles=plan.tiles.slice(start,start+32);
+      coverage={start,done:start+plan.tiles.length,total,zoom,source:source.name,template};
+    }
+  }else{
+    const maxZoom=Math.min(neighborhood?14:12,meta.maxzoom??12);
+    plan=vectorTilePlan(state.renderBbox,{width:state.wMm,maxZoom,native:neighborhood});
+    if(neighborhood && plan.z<14)throw new Error('Native neighborhood tile detail unavailable');
+  }
   for(let attempt=0;attempt<2;attempt++){
+    let footprints=[];
     const results=new Array(plan.tiles.length);let cursor=0,done=0,vertices=0,failed=null;
+    const started=performance.now();
+    onTileProgress({done:0,total:plan.tiles.length,elapsedMs:0});
     const batch=new AbortController();
     const tileSignal=signal?AbortSignal.any([signal,batch.signal]):batch.signal;
     try{
@@ -114,23 +142,31 @@ async function loadTileSource(source,state,{signal,budget,progress=()=>{},fetchI
           const index=cursor++,tile=plan.tiles[index],url=template.replace('{z}',tile.z).replace('{x}',tile.x).replace('{y}',tile.y);
           const payload=await getBytes(url,{signal:tileSignal,budget,fetchImpl,stallMs,progress:detail=>progress(`${detail} · tile ${index+1}/${plan.tiles.length}`)});
           progress(`Decoding city tile ${index+1}/${plan.tiles.length} · simplifying geometry`);
-          const decoded=decodeCityTile(payload.bytes,tile,state,{neighborhood,source});
+          const decoded=decodeCityTile(payload.bytes,tile,state,{neighborhood,source,cityBuildings});
           void payload.save?.();
-          vertices+=decoded.vertices;if(vertices>180000)throw new DataLimitError('City tile geometry exceeds the detail budget');
-          results[index]=decoded.data;progress(`${source.name} · ${++done}/${plan.tiles.length} tiles · detail level ${plan.z}`);
+          if(cityBuildings){
+            footprints=limitCityFootprints(footprints.concat(decoded.data.buildings),60000);
+          }else{
+            vertices+=decoded.vertices;if(vertices>180000)throw new DataLimitError('City tile geometry exceeds the detail budget');
+            results[index]=decoded.data;
+          }
+          done++;onTileProgress({done,total:plan.tiles.length,elapsedMs:performance.now()-started});
+          progress(`${source.name} · ${done}/${plan.tiles.length} tiles in batch${coverage?' · '+(coverage.start+done)+'/'+coverage.total+' in frame':''} · detail level ${plan.z}`);
         }}catch(error){failed??=error;batch.abort();}
       }));
       if(failed)throw failed;
-      const data=emptyMapData();for(const item of results)for(const key of Object.keys(data))data[key].push(...item[key]);
-      return {data,tiles:plan.tiles.length,zoom:plan.z,source:source.name+(neighborhood?' · detailed vector tiles':'')};
+      const data=emptyMapData();
+      if(cityBuildings)data.buildings=footprints;
+      else for(const item of results)for(const key of Object.keys(data))data[key].push(...item[key]);
+      return {data,coverage,tiles:plan.tiles.length,zoom:plan.z,source:source.name+(cityBuildings?' · simplified city buildings':neighborhood?' · detailed vector tiles':'')};
     }catch(error){
-      if(neighborhood||!(error instanceof DataLimitError)||attempt||signal?.aborted||(budget && budget.bytes>=budget.maxBytes))throw error;
+      if(cityBuildings||neighborhood||!(error instanceof DataLimitError)||attempt||signal?.aborted||(budget && budget.bytes>=budget.maxBytes))throw error;
       plan=vectorTilePlan(state.renderBbox,{width:state.wMm,maxZoom:Math.max(0,plan.z-1)});
       progress('City detail reduced to fit the data budget');
     }
   }
 }
-export function decodeCityTile(bytes,{x,y,z},state,{neighborhood=false,source=tileSources[0]}={}){
+export function decodeCityTile(bytes,{x,y,z},state,{neighborhood=false,cityBuildings=false,source=tileSources[0]}={}){
   const tile=new VectorTile(new PbfReader(bytes)),data=emptyMapData(),project=mapProjection(state),geometry=createGeometry(state);
   const n=2**z;
   const tileRing=[[x/n*360-180,yLatitude(y/n)],[(x+1)/n*360-180,yLatitude(y/n)],[(x+1)/n*360-180,yLatitude((y+1)/n)],[x/n*360-180,yLatitude((y+1)/n)]].map(([lon,lat])=>project(lat,lon));
@@ -138,14 +174,38 @@ export function decodeCityTile(bytes,{x,y,z},state,{neighborhood=false,source=ti
   if(clip.length<3)return {data,vertices:0};
   let vertices=0;
   const selected=selectedLayers(state);
+  const minArea=state.mapFeatures?.buildings?.minArea??0;
+  const tileWidth=Math.abs(tileRing[1][0]-tileRing[0][0]),tileHeight=Math.abs(tileRing[2][1]-tileRing[1][1]);
   for(const [name,category] of Object.entries(source.layers)){
-    if(!selected[category] || (category==='buildings' && !neighborhood))continue;
+    if(!selected[category] || (cityBuildings && category!=='buildings') || (category==='buildings' && !neighborhood && !cityBuildings))continue;
     const layer=tile.layers[name];if(!layer)continue;
     for(let i=0;i<layer.length;i++){
       const feature=layer.feature(i),p=feature.properties,kind=p.class??p.kind;
       const roadClass=kind==='minor'?'residential':kind;
       if(category==='roads'&&!['motorway','trunk','primary','secondary','tertiary',...(selected.minorRoads?['residential','service','unclassified']:[])].includes(roadClass))continue;
       if(category==='green'&&!['wood','grass','grassland','forest','park','garden','recreation_ground','meadow'].includes(kind))continue;
+      if(cityBuildings){
+        // A z13 feature can pack hundreds of unrelated buildings into one
+        // multipolygon. Rank actual footprints; keep each courtyard with its shell.
+        if(feature.type!==3)continue;
+        const sx=tileWidth/layer.extent,sy=tileHeight/layer.extent;
+        const height=buildingHeight({height:p.render_height??p.height});
+        let part=0;
+        for(const rings of classifyRings(feature.loadGeometry())){
+          const polygon=rings.map(ring=>ring.map(pt=>[tileRing[0][0]+pt.x*sx,tileRing[0][1]+pt.y*sy]));
+          if(footprintArea(polygon)<minArea)continue;
+          const record={id:`${z}/${x}/${y}/${i}/${part++}`,polygons:[polygon],name:'Building',
+            hide3d:p.hide_3d===true||p.hide_3d===1||p.hide_3d==='true',
+            height:{...height,estimated:true,source:height.source==='fallback'?'fallback':'tile'}};
+          data.buildings.push(...clipBuildings([record],clip));
+        }
+        continue;
+      }
+      if(category==='buildings' && state.cityOverview && minArea>0){
+        const [left,top,right,bottom]=feature.bbox();
+        const boxArea=(right-left)*(bottom-top)*tileWidth*tileHeight/(layer.extent*layer.extent);
+        if(boxArea<minArea)continue;
+      }
       const geo=feature.toGeoJSON(x,y,z).geometry;
       const mapRing=ring=>ring.map(([lon,lat])=>project(lat,lon));
       if(category==='labels' && geo.type==='Point'&&p.name){
@@ -181,6 +241,11 @@ export function decodeCityTile(bytes,{x,y,z},state,{neighborhood=false,source=ti
         }
       }
     }
+  }
+  if(cityBuildings){
+    const kept=prepareBuildingLod(data.buildings,{minArea,tolerance:.08,maxBuildings:2500});
+    data.buildings=kept.buildings;
+    vertices=kept.stats.points;
   }
   return {data,vertices};
 }

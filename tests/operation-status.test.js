@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {describeError,terrainProgress} from '../src/lib/operation-status.js';
+import {describeError,terrainProgress,batchProgress} from '../src/lib/operation-status.js';
 
 test('Errors are classified into actionable, bounded reports',()=>{
   assert.equal(describeError(new DOMException('Cancelled','AbortError'),'area').kind,'cancelled');
@@ -10,9 +10,11 @@ test('Errors are classified into actionable, bounded reports',()=>{
   assert.equal(describeError(new Error('Solid fusion failed'),'model').kind,'geometry');
   assert.ok(describeError(new Error('x'.repeat(500))).technical.length<=240);
 });
-test('Terrain progress maps provider counters into stable UI progress',()=>{
-  assert.deepEqual(terrainProgress('Loading terrain 2/4'),{phase:'terrain',detail:'Loading terrain 2/4',percent:32});
-  assert.equal(terrainProgress('Fallback terrain 256/512').percent,48);
+test('Measured batch progress uses completed units and leaves unknown waits open-ended',()=>{
+  assert.deepEqual(batchProgress(2,8,4000),{percent:25,etaSeconds:12});
+  assert.deepEqual(batchProgress(1,8,4000),{percent:12,etaSeconds:null});
+  assert.deepEqual(batchProgress(8,8,4000),{percent:100,etaSeconds:null});
+  assert.equal(terrainProgress('Looking for a provider').percent,undefined);
 });
 test('Provider quota responses are reported as limits with a fallback action',()=>{
   const report=describeError(new Error('Map service HTTP 429: rate limit exceeded'),'area');

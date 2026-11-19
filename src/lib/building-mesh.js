@@ -1,11 +1,14 @@
+import polygonClipping from 'polygon-clipping';
 import earcut, {flatten, deviation} from 'earcut';
 import {ringBounds} from './geometry.js';
+
+class TriangulationError extends Error {}
 
 export function extrudeBuilding(polygon, bottom, top) {
   if(!Number.isFinite(top)||!Number.isFinite(bottom)||top<=bottom) throw new Error('Invalid building height.');
   const rings=polygon.map(ring=>ring.slice(0,-1).map(p=>p.map(n=>Number(n.toFixed(6)))));
   const data=flatten(rings), indices=earcut(data.vertices,data.holes,2);
-  if(!indices.length||deviation(data.vertices,data.holes,2,indices)>1e-6) throw new Error('A building footprint could not be triangulated. Choose a smaller area.');
+  if(!indices.length||deviation(data.vertices,data.holes,2,indices)>1e-6) throw new TriangulationError('A building footprint could not be triangulated. Choose a smaller area.');
   const points=rings.flat(), n=points.length;
   const mesh={v:points.map(p=>[...p,bottom]).concat(points.map(p=>[...p,top])),t:[]};
   const edges=new Map();
@@ -44,7 +47,18 @@ export function buildBuildingMeshes(state, buildings, options = {}) {
     const metres=building.height.source==='fallback' ? fallback : building.height.metres;
     const height=Math.max(0.4,metres*mmPerMetre*scale);
     // Each closed building extends into the base for reliable slicer union with terrain.
-    meshes.push({name:building.name,mesh:extrudeBuilding(polygon,0,2+ground+height)});
+    const top=2+ground+height;
+    try{
+      meshes.push({name:building.name,mesh:extrudeBuilding(polygon,0,top)});
+    }catch(error){
+      if(!(error instanceof TriangulationError))throw error;
+      // Clipping or simplification can leave a self-touching ring. Resolve
+      // its boundary before triangulating the same footprint a second time.
+      const snapped=polygon.map(ring=>ring.map(point=>point.map(n=>Number(n.toFixed(6)))));
+      const repaired=polygonClipping.union(snapped);
+      if(!repaired.length)throw error;
+      for(const piece of repaired)meshes.push({name:building.name,mesh:extrudeBuilding(piece,0,top)});
+    }
   }
   return meshes;
 }

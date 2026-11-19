@@ -1,15 +1,22 @@
-# Topomapper 0.3.3
+# Topomapper 0.3.4
 
-A missing map layer now produces an inline coverage warning. You can download a 3D model with the terrain and features that loaded, or use **Retry map layers** to request the missing details. The same warning appears for affected visible layers in 2D exports.
+Select a city, choose 3D printing and enable **Buildings**. Automatic detail can use generalized building tiles at the zoom supported by the provider. Individual footprints are ranked at the selected print size. The city preset uses a 0.5 mm² footprint threshold and retains up to 2,500. The 3D printability filter also checks the 0.2 mm minimum feature dimension.
 
-While overlays are loading, choose **Use loaded layers & open Export** to stop waiting and use the latest completed layers. A retry keeps their geometry, including successful empty layers. Direct 3D downloads skip the extra display buffers for drawing the printable mesh. The printable geometry still goes through the solid and material-volume checks.
+City building frames requiring 65–512 tiles load from the center outward in batches of 32. **Load more building tiles** extends coverage. The current coverage is available for export after each successful batch. Larger selections use the filtered Overpass fallback. The toolbar shows a larger progress bar and a throughput-based estimate for the current tile batch when enough work has completed.
 
-## Verification
+## Live city checks
 
-- All 123 automated checks passed. They include grouped and empty layers, retrying with a provider that continues to fail, and mesh validation.
-- Desktop Chromium downloaded a 3MF after a simulated water timeout. Inspection found terrain, green areas, rivers, roads and buildings. A retry fetched only water, cleared the warning and restored the water part in the next download.
-- A mobile-sized Chromium window stopped a stalled roads request and downloaded a terrain-only 3MF. When the retry hit a simulated provider rate limit, the source summary reported the limit and a terrain STL still downloaded. These checks also exercised a 3D viewer without a graphics context.
-- An invalid print width produced an error and zero downloads. Cancelling printable model preparation also produced zero downloads.
-- Browser checks exercised SVG, DXF, PNG, 3MF, STL and OBJ with fixed map responses.
+| Selection | Verified result |
+| --- | --- |
+| Nuremberg, 279 km² browser frame | Chromium downloaded a 200 × 140 mm 3MF using Mapzen elevation and OpenFreeMap footprints. The model contained named Terrain and Buildings parts, 984 printable footprints and 74,946 triangles. |
+| Greater Berlin, roughly 1,718 km² | The single-query providers returned rate-limit or gateway responses. The tile route covered 238 tiles in eight batches and read 8.55 MB of decoded data. The 200 mm flat-base 3MF contained 134 printable footprints. Loading the building batches took 3.7 seconds in the test environment, excluding user interaction and model preparation. |
+| Berlin, 979 km² browser frame | The coverage indicator advanced from 32/140 to 64/140 after one click. Chromium downloaded a partial flat-base 3MF with 314 printable footprints. |
 
-[Previous release review](https://github.com/zrnnn/topomapper/blob/v0.3.2/docs/RELEASE-REVIEW.md)
+The footprint counts describe features retained at print scale. Provider coverage, building heights, source generalization, network speed and chosen print dimensions affect the result.
+
+## Regression checks
+
+- 127 automated tests, including grouped city footprints, courtyards, a self-crossing building outline, partial coverage and tile-batch estimates.
+- Production build and Chromium coverage of the six download formats, partial maps, cancellation, retry and mobile layout.
+
+[Previous release review](https://github.com/zrnnn/topomapper/blob/v0.3.3/docs/RELEASE-REVIEW.md)

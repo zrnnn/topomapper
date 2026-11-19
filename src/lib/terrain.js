@@ -1,4 +1,5 @@
 // Mapzen Terrarium: https://github.com/tilezen/joerd/blob/master/docs/formats.md
+import {batchProgress} from './operation-status.js';
 import {cachedBytes,cacheBytes} from './data-cache.js';
 import {readBounded,downloadDetail} from './data-budget.js';
 export const latitudeY = lat => (1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2;
@@ -54,14 +55,17 @@ export async function loadTiles(bounds, {rows=160, cols=160, fetchTile, progress
   const {size,x0,x1,y0,y1}=frame,tiles=new Map(),jobs=[];
   for(let y=frame.top;y<=frame.bottom;y++)for(let x=frame.left;x<=frame.right;x++)jobs.push({x,y});
   const batch=new AbortController(),signal=batch.signal;
+  const started=performance.now();
   let done=0,cursor=0;
+  const report=detail=>progress({phase:'terrain',title:'Elevation tiles',detail,
+    ...batchProgress(done,jobs.length,performance.now()-started)});
   const getTile=fetchTile || (async (z,x,y)=>{
     const url=tileUrl(z,x,y);
     // Older caches may contain HTTP 200 error pages saved before image decoding.
     const key='terrain-image-v2:'+url;
     let bytes=await cachedBytes(key);
     signal.throwIfAborted();
-    const detail=text=>{if(!signal.aborted)progress({phase:'terrain',percent:8+Math.round(done/jobs.length*47),detail:text});};
+    const detail=text=>{if(!signal.aborted)report(text);};
     const cached=!!bytes;
     if(!cached){
       detail(`Connecting to ${new URL(url).hostname} · terrain tiles`);
@@ -80,7 +84,7 @@ export async function loadTiles(bounds, {rows=160, cols=160, fetchTile, progress
         const pixels=await getTile(zoom,x,y);
         signal.throwIfAborted();
         if(pixels.length!==tileSize*tileSize*4)throw new Error('Invalid terrain tile.');
-        tiles.set(`${x},${y}`,pixels);progress(`Loading terrain ${++done}/${jobs.length}`);
+        tiles.set(`${x},${y}`,pixels);done++;report(`${done}/${jobs.length} terrain tiles ready`);
       }
     }));
   }catch(error){
@@ -115,6 +119,7 @@ export async function loadLookup(bounds, {progress=()=>{}, fetchBatch}={}) {
     const bytes=await readBounded(response,{maxBytes:1024*1024,onProgress:p=>progress({phase:'terrain',detail:downloadDetail(url,p)})});
     return JSON.parse(new TextDecoder().decode(bytes));
   });
+  const started=performance.now();
   for(let i=0;i<locations.length;i+=512) {
     const batch=locations.slice(i,i+512), data=await lookup(batch);
     if(!Array.isArray(data.results) || data.results.length!==batch.length) throw new Error('Incomplete elevation response.');
@@ -122,7 +127,8 @@ export async function loadLookup(bounds, {progress=()=>{}, fetchBatch}={}) {
       if(Math.abs(point.latitude-batch[j].latitude)>1e-4 || Math.abs(point.longitude-batch[j].longitude)>1e-4 || !Number.isFinite(point.latitude) || !Number.isFinite(point.longitude)) throw new Error('Elevation coordinates do not match the requested area.');
       heights.push(point.elevation);
     });
-    progress(`Fallback terrain ${Math.min(i+512,locations.length)}/${locations.length}`);
+    progress({phase:'terrain',title:'Elevation lookup batches',detail:`${heights.length}/${locations.length} samples ready`,
+      ...batchProgress(heights.length/512,locations.length/512,performance.now()-started)});
   }
   return normalizeTerrain(heights,rows,cols,'Open-Elevation fallback · 64 × 64 samples');
 }

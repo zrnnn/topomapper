@@ -31,7 +31,7 @@ export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{}}) 
   }
   formatSelect.onchange=()=>{clearDownload();syncFormat();};
   syncFormat();
-  function setState(kind,title,detail,percent=null){
+  function setState(kind,title,detail,percent=null,etaSeconds=null){
     const prepare=$('prepareExportModel');
     prepare.hidden=!!model;
     prepare.disabled=kind==='loading';
@@ -39,13 +39,13 @@ export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{}}) 
     prepare.textContent=kind==='loading'?title+'…':'Prepare & download '+formatSelect.value.toUpperCase();
     $('cancelExportPreparation').hidden=kind!=='loading';
     $('exportModel').hidden=!model;
-    onStatus({state:kind,title,detail,percent,printable:!!model});$('modelFeedback').dataset.state=kind;$('modelTitle').textContent=title;$('modelStatus').textContent=detail;$('modelPercent').textContent=Number.isFinite(percent)?`${Math.round(percent)}%`:'';$('modelError').hidden=true;if(Number.isFinite(percent)){$('modelProgress').hidden=false;$('modelProgress').value=percent;}else $('modelProgress').hidden=true;}
+    onStatus({state:kind,title,detail,percent,etaSeconds,printable:!!model});$('modelFeedback').dataset.state=kind;$('modelTitle').textContent=title;$('modelStatus').textContent=detail;$('modelPercent').textContent=Number.isFinite(percent)?`${Math.round(percent)}%`:'';$('modelError').hidden=true;if(Number.isFinite(percent)){$('modelProgress').hidden=false;$('modelProgress').value=percent;}else{$('modelProgress').hidden=kind!=='loading';$('modelProgress').removeAttribute('value');}}
   function invalidate(){clearDownload();clearTimeout(previewTimer);revision++;job?.abort();job=null;model=null;$('exportModel').disabled=true;setState('idle','Preview needs an update','Settings changed. Refresh the preview, then prepare the printable model for export.');$('cancelModel').hidden=true;$('retryModel').hidden=true;$('updateModel').disabled=false;$('prepareModel').disabled=false;}
   for(const key of [...numeric,...layers])$('model-'+key).addEventListener('change',()=>{settings[key]=layers.includes(key)?$('model-'+key).checked:Number($('model-'+key).value);settings.preset='custom';invalidate();sync();scheduleQuick();});
   for(const key of numeric)$('model-'+key).addEventListener('input',()=>{const out=$('model-'+key+'-value');if(out)out.textContent=displayValue(key,$('model-'+key).value);invalidate();});
   document.querySelectorAll('[data-model-preset]').forEach(el=>el.onclick=()=>{settings={...settings,...MODEL_PRESETS[el.dataset.modelPreset],preset:el.dataset.modelPreset};if(!buildingsAvailable)settings.buildings=false;invalidate();sync();scheduleQuick();});
   const scheduleQuick=()=>{clearTimeout(previewTimer);previewTimer=setTimeout(()=>{if(!disposed)void build(true);},350);};
-  const status=(text,percent,quick)=>setState('loading',quick?'Updating quick preview':'Preparing printable model',text,percent);
+  const status=(text,percent,quick,title,etaSeconds)=>setState('loading',title||(quick?'Updating quick preview':'Preparing printable model'),text,percent,etaSeconds);
   async function displayModel(next,generation){
     if(!preview){
       const {createModelPreview}=await import('./preview3d.js');
@@ -74,7 +74,7 @@ export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{}}) 
         renderBbox:state.renderBbox,mapSource:state.osmStatus.source,
         osmData:filterSelectedLayers(state.osmData||{}, {loadLayers:{...settings,labels:false}})};
       const next=!quick&&prepared?.key===cacheKey?prepared.model:await runWorker(quick?'model-preview':'model',
-        {state:workerState,settings,display},{signal:controller.signal,timeoutMs:Math.max(1,deadline-Date.now()),progress:p=>status(p.detail,p.percent,quick)});
+        {state:workerState,settings,display},{signal:controller.signal,timeoutMs:Math.max(1,deadline-Date.now()),progress:p=>status(p.detail,p.percent,quick,p.title,p.etaSeconds)});
       if(disposed||generation!==revision)return;
       let displayNotice='';
       if(display){

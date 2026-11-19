@@ -31,6 +31,8 @@ test('Active loading takes priority over ready previews, and context restores af
   const status=createWorkspaceStatus({querySelectorAll:selector=>selector==='.workspace-activity'?[card]:[]});
   try{
     status.update('area',{title:'Downloading terrain',detail:'source.test',percent:12});
+    status.update('area',{title:'Downloading terrain',percent:25,etaSeconds:12});
+    assert.match(nodes.get('[data-activity-value]').textContent,/25%.*15 s left in batch/);
     status.update('model',{state:'success',title:'Quick preview ready'});
     assert.equal(nodes.get('[data-activity-title]').textContent,'Downloading terrain');
     status.update('area',{state:'success',title:'Area ready',percent:100});

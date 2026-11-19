@@ -106,3 +106,12 @@ test('A dense 150,000-vertex footprint fits the print dimension check and simpli
   assert.equal(result.stats.originalPoints,ring.length);
   assert.ok(result.stats.points<=6);
 });
+
+test('A self-crossing city footprint is repaired into closed printable pieces',()=>{
+  const polygon=[[[1,1],[5,5],[1,5],[5,1],[1,1]]];
+  const frame={wMm:100,hMm:100,renderBbox:{sw:{lat:49,lng:11},ne:{lat:49.1,lng:11.1}},
+    terrainData:{rows:2,cols:2,delta:0,h:[0,0,0,0]}};
+  const meshes=buildBuildingMeshes(frame,[{name:'City footprint',height:buildingHeight({}),polygons:[polygon]}]);
+  assert.equal(meshes.length,2);
+  for(const part of meshes)checkSolid(part.mesh);
+});

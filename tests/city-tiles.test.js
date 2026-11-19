@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PbfWriter} from 'pbf';
-import {decodeCityTile} from '../src/lib/city-tiles.js';
+import {decodeCityTile,cityBuildingPlan} from '../src/lib/city-tiles.js';
 import {yLatitude} from '../src/lib/terrain.js';
 import {previewBuffers} from '../src/lib/preview-buffers.js';
 function polygonTile(rings,name='water'){
@@ -70,4 +70,19 @@ test('Gateway failure switches to independent Shortbread tiles, including inland
   assert.equal(calls.length,3);
   assert.match(result.source,/VersaTiles/);
   assert.equal(result.data.waterAreas.length,2);assert.equal(result.data.buildings.length,1);
+});
+
+test('City-size features split into individual printable footprints, preserving holes',()=>{
+  const bytes=polygonTile([[[200,200],[1200,200],[1200,1200],[200,1200]],
+    [[400,400],[400,700],[700,700],[700,400]],[[2800,2800],[3800,2800],[3800,3800],[2800,3800]],
+    [[2500,100],[2501,100],[2501,101],[2500,101]]],'building');
+  const decoded=decodeCityTile(bytes,{x:2,y:1,z:2},{...state,mapFeatures:{buildings:{minArea:.5}}},{cityBuildings:true});
+  assert.equal(decoded.data.buildings.length,2);
+  assert.deepEqual(decoded.data.buildings.map(b=>b.polygons[0].length).sort(),[1,2]);
+  assert.equal(new Set(decoded.data.buildings.map(b=>b.id)).size,2);
+});
+test('City building tile planning bounds Nuremberg, greater Berlin and oversized regions',()=>{
+  assert.equal(cityBuildingPlan({sw:{lat:49.39,lng:10.99},ne:{lat:49.50,lng:11.17}}).tiles.length,25);
+  assert.equal(cityBuildingPlan({sw:{lat:52.34,lng:13.09},ne:{lat:52.68,lng:13.76}}).tiles.length,238);
+  assert.equal(cityBuildingPlan({sw:{lat:35,lng:-10},ne:{lat:60,lng:20}}),null);
 });

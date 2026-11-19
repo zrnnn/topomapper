@@ -13,7 +13,7 @@ export function detailPlan(bounds,width=200,height=140,overview=false) {
   const {km2}=areaPlan(bounds);
   const base=km2<1?256:km2>25?128:160;
   const samples=Math.max(96,Math.min(320,Math.round(base*Math.max(width,height)/200/16)*16));
-  const minArea=overview?1.5:km2<1?.05:.5;
+  const minArea=!overview&&km2<1?.05:.5;
   // A polygon with area A must have perimeter >= sqrt(4*pi*A).
   // This conservative server filter removes only certainly too-small ways;
   // exact footprint area (and relation holes) is still checked after projection.

@@ -19,19 +19,19 @@ export function buildingHeight(tags = {}, fallback = 9) {
 
 const same = (a,b) => Math.hypot(a[0]-b[0],a[1]-b[1]) < 1e-6;
 const area = ring => ring.reduce((sum,p,i)=>{const q=ring[(i+1)%ring.length];return sum+p[0]*q[1]-q[0]*p[1];},0)/2;
-const polygonArea = polygon => Math.max(0,Math.abs(area(polygon[0]||[]))-polygon.slice(1).reduce((sum,ring)=>sum+Math.abs(area(ring)),0));
+export const footprintArea = polygon => Math.max(0,Math.abs(area(polygon[0]||[]))-polygon.slice(1).reduce((sum,ring)=>sum+Math.abs(area(ring)),0));
 
 export function prepareBuildingLod(buildings,{minArea=.5,minDimension=0,tolerance=.06,maxBuildings=2500}={}) {
   const original=(buildings||[]).length, originalPoints=(buildings||[]).reduce((sum,b)=>sum+b.polygons.flat(2).length,0);
   const candidates=(buildings||[]).flatMap(building=>{
     const polygons=building.polygons.filter(polygon=>{
       const ring=polygon[0]||[];
-      if(ring.length<4 || polygonArea(polygon)<minArea)return false;
+      if(ring.length<4 || footprintArea(polygon)<minArea)return false;
       if(!minDimension)return true;
       const {minX,minY,maxX,maxY}=ringBounds(ring);
       return maxX-minX>=minDimension && maxY-minY>=minDimension;
     });
-    const footprint=polygons.reduce((sum,polygon)=>sum+polygonArea(polygon),0);
+    const footprint=polygons.reduce((sum,polygon)=>sum+footprintArea(polygon),0);
     return polygons.length?[{...building,polygons,footprint}]:[];
   }).sort((a,b)=>b.footprint-a.footprint);
   const limited=candidates.slice(0,maxBuildings).map(building=>({...building,polygons:building.polygons.map(polygon=>polygon.map(ring=>{
@@ -41,6 +41,21 @@ export function prepareBuildingLod(buildings,{minArea=.5,minDimension=0,toleranc
   }))}));
   const points=limited.reduce((sum,b)=>sum+b.polygons.flat(2).length,0);
   return {buildings:limited,stats:{original,shown:limited.length,omitted:original-limited.length,originalPoints,points,simplified:Math.max(0,originalPoints-points)}};
+}
+
+// Keep the largest individual footprints that fit. Applying the same ranking
+// after each tile bounds memory even when one tile contains thousands of parts.
+export function limitCityFootprints(records,maxPoints,maxCount=2500){
+  const kept=[];
+  let used=0;
+  records.sort((a,b)=>b.footprint-a.footprint || a.id.localeCompare(b.id));
+  for(const building of records){
+    const points=building.polygons.reduce((sum,p)=>sum+p.reduce((n,r)=>n+r.length,0),0);
+    if(used+points>maxPoints)continue;
+    kept.push(building);used+=points;
+    if(kept.length===maxCount)break;
+  }
+  return kept;
 }
 
 export function coastlineAreas(lines,clipPolygon) {

@@ -18,7 +18,10 @@ export function createWorkspaceStatus(root=document){
       card.querySelector('[data-activity-detail]').textContent=current.detail||'Please wait…';
       const bar=card.querySelector('progress'),known=Number.isFinite(current.percent);
       if(known)bar.value=Math.max(0,Math.min(100,current.percent));else if(current.state==='loading')bar.removeAttribute('value');else bar.value=current.state==='success'?100:0;
-      card.querySelector('[data-activity-value]').textContent=[known?`${Math.round(current.percent)}%`:'',current.state==='loading'?`${Math.floor((Date.now()-current.started)/1000)} s`:''].filter(Boolean).join(' · ');
+      const seconds=Math.floor((Date.now()-current.started)/1000);
+      const eta=current.etaSeconds;
+      const timing=Number.isFinite(eta)?(eta<=5?'~5 s':eta<60?'~'+Math.ceil(eta/5)*5+' s':'~'+Math.ceil(eta/60)+' min')+' left in batch':seconds+' s elapsed';
+      card.querySelector('[data-activity-value]').textContent=[known?`${Math.round(current.percent)}%`:'',current.state==='loading'?timing:''].filter(Boolean).join(' · ');
       bar.setAttribute('aria-label',(current.title||'Current operation')+(current.state==='loading'?(known?' — stage progress':' — progress unknown'):''));
     }
   }

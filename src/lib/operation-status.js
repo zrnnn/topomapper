@@ -13,9 +13,17 @@ export function describeError(error, context='operation') {
   return {kind:'unknown',title:'Something went wrong',message:'The operation did not finish, but your last successful result was preserved.',action:'Retry. If it happens again, reduce the area or detail and note the technical message below.',technical:raw||'No technical details were provided.'};
 }
 
+export function batchProgress(done,total,elapsedMs){
+  if(!(total>0))return {percent:null,etaSeconds:null};
+  return {
+    percent:Math.min(100,Math.floor(100*done/total)),
+    etaSeconds:done>=2 && done<total && elapsedMs>=500 ?
+      Math.ceil(elapsedMs*(total-done)/done/1000):null
+  };
+}
+
 export function terrainProgress(value) {
   if(typeof value==='object'&&value) return value;
-  const text=clean(value), match=text.match(/(\d+)\s*\/\s*(\d+)/);
-  const fallback=/fallback/i.test(text);
-  return {phase:'terrain',detail:text||'Loading elevation data',percent:match?Math.round((fallback?35:8)+(Number(match[1])/Number(match[2]))*(fallback?25:47)):(fallback?34:10)};
+  const text=clean(value);
+  return {phase:'terrain',detail:text||'Loading elevation data'};
 }

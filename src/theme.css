@@ -286,3 +286,14 @@ progress::-moz-progress-bar,.workspace-activity progress::-moz-progress-bar { ba
   line-height: 1.5;
 }
 .status-text.warning { color: var(--earth-clay); }
+
+.workspace-toolbar .workspace-activity[data-activity-state=loading] {
+  padding: 9px 10px;
+  background: var(--surface-inset);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+}
+.workspace-toolbar .workspace-activity[data-activity-state=loading] progress { height: 10px; }
+.workspace-toolbar .workspace-activity-heading { flex-wrap: wrap; gap: 3px 8px; font-size: 13px; }
+.workspace-toolbar .workspace-activity-heading span { color: var(--color-text); font-variant-numeric: tabular-nums; }
+.workspace-toolbar .workspace-activity p { font-size: 11px; }
