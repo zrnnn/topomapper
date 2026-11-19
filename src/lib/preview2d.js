@@ -10,15 +10,21 @@ export function createCanvasPreview(container,{onStart=()=>{},onReady=()=>{},onE
     onStart();
     const svg=markup.replace(/width="[^"]+"/,`width="${width}"`).replace(/height="[^"]+"/,`height="${height}"`);
     const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'})),image=new Image();
+    let decodeTimer;
     try{
-      await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error('The map preview could not be rendered. Try a lower detail level.'));image.src=url;});
+      await new Promise((resolve,reject)=>{
+        decodeTimer=setTimeout(()=>reject(new Error('The 2D preview timed out. Choose Update preview, or disable shaded relief and try again.')),30000);
+        image.onload=resolve;
+        image.onerror=()=>reject(new Error('The map preview could not be rendered. Disable shaded relief or use a smaller frame.'));
+        image.src=url;
+      });
       if(disposed||generation!==revision)return;
       canvas.width=width;canvas.height=height;
       canvas.getContext('2d').drawImage(image,0,0,width,height);
       if(canvas.parentNode!==container)container.replaceChildren(canvas);
       lastKey=key;onReady();
     }catch(error){if(!disposed&&generation===revision)onError(error);}
-    finally{URL.revokeObjectURL(url);}
+    finally{clearTimeout(decodeTimer);image.onload=null;image.onerror=null;URL.revokeObjectURL(url);}
   }
   const observer=new ResizeObserver(()=>{clearTimeout(timer);timer=setTimeout(draw,100);});observer.observe(container);
   return {set(svg){markup=svg;void draw();},dispose(){disposed=true;revision++;clearTimeout(timer);observer.disconnect();}};

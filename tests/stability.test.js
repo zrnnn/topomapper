@@ -99,7 +99,7 @@ test('A long narrow selection uses a coarser terrain zoom within its 64-tile lim
   const calls=[];
   const result=await loadTiles({sw:{lat:47,lng:8},ne:{lat:47.001,lng:12}},{rows:160,cols:160,
     fetchTile:async(z,x,y)=>{calls.push([z,x,y]);return pixels;}});
-  assert.ok(calls.length>0 && calls.length<=64);assert.equal(result.h.length,160*160);assert.equal(result.min,0);
+  assert.ok(calls.length>0 && calls.length<=64);assert.equal(result.cols,160);assert.ok(result.rows>=2 && result.rows<160);assert.equal(result.h.length,result.rows*result.cols);assert.equal(result.min,0);
 });
 
 test('A failed terrain batch starts no new downloads and emits no progress during fallback',async()=>{

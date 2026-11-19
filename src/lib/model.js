@@ -1,4 +1,5 @@
-import {buildTerrainMesh} from './mesh.js';
+import {MAX_PRINT_MM,maxModelWidth} from './area-plan.js';
+import {buildTerrainMesh,meshResolution} from './mesh.js';
 import {buildBuildingMeshes} from './building-mesh.js';
 import {clipBuildings,prepareBuildingLod,separateBuildingParts} from './buildings.js';
 import {createGeometry,ringBounds} from './geometry.js';
@@ -9,7 +10,7 @@ export const MATERIAL_INLAY_MM = 1;
 export const BOTTOM_SKIN_MM = 0.2;
 
 export const MODEL_PRESETS = {
-  overview:{name:'City overview',description:'Whole-city relief with larger buildings. Draft mesh; streets off for faster modeling.',terrain:true,buildings:true,roads:false,water:true,green:false,rivers:false,relief:100,buildingScale:1,resolution:40,minBuildingArea:.5},
+  overview:{name:'City overview',description:'Whole-city relief with larger buildings. Draft mesh; streets off for faster modeling.',terrain:true,buildings:true,roads:false,water:true,green:false,rivers:false,relief:100,buildingScale:1,resolution:40,minBuildingArea:.25},
   landscape:{name:'Landscape model',description:'Relief with buildings, streets and embossed water.',terrain:true,buildings:true,roads:true,water:true,green:false,rivers:false,relief:100,buildingScale:1},
   city:{name:'City block',description:'A flat architectural base with buildings and street context.',terrain:false,buildings:true,roads:true,water:true,green:true,rivers:false,relief:100,buildingScale:2},
   relief:{name:'Terrain study',description:'A clean terrain relief with no architectural overlays.',terrain:true,buildings:false,roads:false,water:false,green:false,rivers:false,relief:100,buildingScale:1}
@@ -29,6 +30,8 @@ function filterMinDimension(records,minDimension=.2) {
   });
 }
 export function modelInput(state, settings) {
+  const maxWidth=maxModelWidth(state.wMm,state.hMm);
+  if(settings.width>maxWidth)throw new Error(`Check width: use a value up to ${maxWidth} mm to fit this frame on a 300 × 300 mm print.`);
   const scale=settings.width/state.wMm;
   const terrainData=settings.terrain ? state.terrainData : {...state.terrainData,h:new Float32Array(state.terrainData.h.length),delta:0};
   const scaled={...state,wMm:settings.width,hMm:state.hMm*scale,terrainData};
@@ -40,7 +43,8 @@ export function modelInput(state, settings) {
     roads:settings.roads?lines(state.osmData?.roadLines):[],rivers:settings.rivers?lines(state.osmData?.waterLines):[]};
 }
 export function validateModelSettings(s) {
-  for(const [key,min,max] of [['width',50,400],['resolution',40,240],['base',1,10],['relief',10,500],['roadWidth',.2,3],['roadRise',.1,3],['areaRise',.1,2],['buildingScale',.1,10],['fallbackHeight',1,100],['minBuildingArea',0,20]]) {
+  if(s.resolution>240 && s.resolution!==600)throw new Error('Check mesh quality: select a listed mesh setting.');
+  for(const [key,min,max] of [['width',50,MAX_PRINT_MM],['resolution',40,600],['base',1,10],['relief',10,500],['roadWidth',.2,3],['roadRise',.1,3],['areaRise',.1,2],['buildingScale',.1,10],['fallbackHeight',1,100],['minBuildingArea',0,20]]) {
     if(!Number.isFinite(s[key])||s[key]<min||s[key]>max) throw new Error(`Check ${key}: use a value between ${min} and ${max}.`);
   }
 }
@@ -60,7 +64,12 @@ export function roadRings(lines,width) {
       const nx=-dy/length*radius,ny=dx/length*radius;
       rings.push([[a[0]-nx,a[1]-ny],[b[0]-nx,b[1]-ny],[b[0]+nx,b[1]+ny],[a[0]+nx,a[1]+ny]]);
     }
-    for(const p of line) rings.push(Array.from({length:8},(_,i)=>[p[0]+radius*Math.cos(i*Math.PI/4),p[1]+radius*Math.sin(i*Math.PI/4)]));
+    // Keep the chord error of round joins below 0.05 mm at every road width.
+    const segments=Math.max(8,Math.ceil(Math.PI/Math.acos(1-.05/radius)));
+    for(const p of line)rings.push(Array.from({length:segments},(_,i)=>{
+      const angle=2*Math.PI*i/segments;
+      return [p[0]+radius*Math.cos(angle),p[1]+radius*Math.sin(angle)];
+    }));
   }
   return rings;
 }
@@ -104,7 +113,8 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
     const terrainMesh=buildTerrainMesh(s,{resolution:settings.resolution,targetHeight:reliefHeight});
     // Existing mesher uses a 2 mm base; move only its top surface to the requested thickness.
     terrainMesh.v.forEach(v=>{if(v[2]>0)v[2]+=settings.base-2;});
-    const terrain=fromMesh(terrainMesh);
+    const rawTerrain=fromMesh(terrainMesh);
+    const terrain=settings.resolution===600?keep(rawTerrain.simplify(.035)):rawTerrain;
     if(terrain.status()!=='NoError') throw new Error('Terrain mesh validation failed. Try a different mesh quality.');
     const raisedTerrain=new Map();
     const overlays = [];
@@ -129,7 +139,7 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
     if(settings.roads)drape(roadRings(input.roads,settings.roadWidth),settings.roadRise,'#536C68','Roads');
     if(settings.buildings) {
       progress({percent:62,detail:`Extruding ${input.buildings.length} building footprints`});
-      const buildings=buildBuildingMeshes(s,input.buildings,{resolution:settings.resolution,targetHeight:reliefHeight,buildingScale:settings.buildingScale,fallbackHeight:settings.fallbackHeight});
+      const buildings=buildBuildingMeshes(s,input.buildings,{resolution:meshResolution(s,settings.resolution),targetHeight:reliefHeight,buildingScale:settings.buildingScale,fallbackHeight:settings.fallbackHeight});
       const buildingSolids = [];
       const started=performance.now();
       for(const {mesh} of buildings) {

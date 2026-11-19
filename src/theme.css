@@ -297,3 +297,11 @@ progress::-moz-progress-bar,.workspace-activity progress::-moz-progress-bar { ba
 .workspace-toolbar .workspace-activity-heading { flex-wrap: wrap; gap: 3px 8px; font-size: 13px; }
 .workspace-toolbar .workspace-activity-heading span { color: var(--color-text); font-variant-numeric: tabular-nums; }
 .workspace-toolbar .workspace-activity p { font-size: 11px; }
+
+.workspace-activity:is([data-activity-state=warning],[data-activity-state=error]) {
+  border-inline-start: 3px solid var(--earth-clay);
+  padding-inline-start: 10px;
+}
+.workspace-activity[data-activity-state=error] { border-color: #df9989; }
+.workspace-activity[data-activity-state=error] strong { color: #f1b6a8; }
+.purpose-card[aria-pressed=true] { outline: 2px solid var(--color-primary); outline-offset: -2px; }

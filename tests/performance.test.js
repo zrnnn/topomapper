@@ -263,11 +263,19 @@ test('Metropolitan building continuation preserves first batch and marks complet
       coverage:second?{...coverage,start:32,done:70}:coverage};
   };
   const options={cityLoader,request:async()=>{throw Error('unexpected query');}};
-  const first=await loadMapLayers(area,options);
-  assert.equal(first.status.loaded,true);assert.match(first.status.error,/32\/70/);
-  assert.deepEqual(first.status.completed,[]);
-  const next=await loadMapLayers(area,{...options,previous:first});
+  const snapshots=[];
+  const next=await loadMapLayers(area,{...options,progress:p=>{if(p.snapshot)snapshots.push(p.snapshot);}});
+  assert.equal(snapshots[0].status.buildingCoverage.done,32);
+  assert.deepEqual(snapshots[0].status.completed,[]);
   assert.deepEqual(next.data.buildings.map(b=>b.id),['a','b']);
   assert.deepEqual(next.status.completed,['buildings']);assert.equal(next.status.error,null);
   assert.equal(next.status.buildingCoverage,null);assert.equal(next.status.tiles,70);
+  const failed=await loadMapLayers(area,{...options,cityLoader:(s,p)=>{
+    if(p.continuation)throw Error('HTTP 429');
+    return cityLoader(s,p);
+  }});
+  assert.match(failed.status.error,/429.*32\/70/);
+  assert.deepEqual(failed.data.buildings.map(b=>b.id),['a']);
+  const resumed=await loadMapLayers(area,{...options,previous:failed});
+  assert.equal(resumed.status.error,null);assert.equal(resumed.data.buildings.length,2);
 });

@@ -1,3 +1,5 @@
+import {meshResolution} from './mesh.js';
+import {maxModelWidth} from './area-plan.js';
 import {defaultModel,MODEL_PRESETS} from './model.js';
 import {filterSelectedLayers,incompleteMapLayers} from './layer-selection.js';
 import {runWorker} from './worker-client.js';
@@ -87,7 +89,9 @@ export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{}}) 
       if(!quick){model=next;prepared={key:cacheKey,model:next};}
       const missing=layers.slice(1).filter(key=>settings[key]&&!incomplete.includes(key)&&!next.counts[key]);
       const omitted=next.buildingStats?.omitted||0, notices=[displayNotice,incomplete.length?'Partial map coverage. The model includes the available geometry.':'',missing.length?'No printable features for: '+missing.join(', '):'',omitted?`${omitted.toLocaleString()} small/dense buildings omitted at ${settings.minBuildingArea} mm² minimum`:'' ].filter(Boolean);
-      setState(notices.length?'warning':'success',quick?(displayNotice?'3D view unavailable':'Quick preview ready'):notices.length?'Model ready with notices':'Printable model ready',`${next.width.toFixed(1)} × ${next.height.toFixed(1)} mm · ${settings.relief}% relief (${next.reliefHeight.toFixed(2)} mm elevation range) · ${next.triangles.toLocaleString()} triangles · ${quick?'display surfaces · open Export to download':'validated fused solid'}. ${Object.entries(next.counts).filter(([key])=>settings[key]).map(([key,n])=>`${n} ${key}`).join(' · ')}${notices.length?'. '+notices.join('. '):''}`);
+      const meshPitch=Math.max(next.width,next.height)/meshResolution({wMm:next.width,hMm:next.height,shape:state.shape},settings.resolution);
+      const reliefLabel=next.reliefHeight>0?`${meshPitch.toFixed(2)} mm export mesh spacing · ${settings.relief}% relief (${next.reliefHeight.toFixed(2)} mm elevation range)`:'flat base';
+      setState(notices.length?'warning':'success',quick?(displayNotice?'3D view unavailable':'Quick preview ready'):notices.length?'Model ready with notices':'Printable model ready',`${next.width.toFixed(1)} × ${next.height.toFixed(1)} mm · ${reliefLabel} · ${next.triangles.toLocaleString()} triangles · ${quick?'display surfaces · open Export to download':'validated fused solid'}. ${Object.entries(next.counts).filter(([key])=>settings[key]).map(([key,n])=>`${n} ${key}`).join(' · ')}${notices.length?'. '+notices.join('. '):''}`);
       $('exportModel').disabled=quick;
       return model;
     } catch(error) {if(generation===revision){const report=describeError(error,'model');setState(report.kind==='cancelled'?'idle':'error',report.title,report.message);$('modelError').hidden=report.kind==='cancelled';$('modelErrorAction').textContent=report.action;$('modelErrorTechnical').textContent=report.technical;$('retryModel').hidden=report.kind==='cancelled';$('retryModel').onclick=()=>build(quick);}}
@@ -121,5 +125,27 @@ export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{}}) 
   }
   $('exportModel').onclick=()=>downloadModel(formatSelect.value);
   sync();
-  return {incompleteLayers:()=>incompleteMapLayers(state.osmStatus,settings),configureArea:({overview,samples,minArea,buildingsAvailable:available=true,loadLayers=null})=>{buildingsAvailable=available;availableLayers=loadLayers;settings=overview?{...settings,...MODEL_PRESETS.overview,preset:'overview'}:{...settings,...(settings.preset==='overview'?MODEL_PRESETS.landscape:{}),preset:'custom',resolution:samples>=240?160:100,minBuildingArea:minArea};if(availableLayers){for(const key of layers)settings[key]=availableLayers[key]!==false;settings.preset='custom';}if(!buildingsAvailable)settings.buildings=false;$('model-buildings').disabled=!buildingsAvailable;$('model-buildings').title=buildingsAvailable?'Raised buildings':'Not requested. Use Layers in the toolbar to load buildings.';invalidate();sync();},open,invalidate,zoom:direction=>preview?.zoom(direction),resetView:()=>preview?.reset(),dispose(){clearDownload();clearTimeout(previewTimer);disposed=true;job?.abort();preview?.dispose();}};
+  function configureArea({overview,samples,minArea,buildingsAvailable:available=true,loadLayers=null}){
+    buildingsAvailable=available;
+    availableLayers=loadLayers;
+    if(overview)settings={...settings,...MODEL_PRESETS.overview,preset:'overview'};
+    else{
+      if(settings.preset==='overview')Object.assign(settings,MODEL_PRESETS.landscape);
+      settings.preset='custom';
+      settings.resolution=samples>=240?160:100;
+    }
+    settings.minBuildingArea=minArea;
+    settings.width=state.wMm;
+    $('model-width').max=maxModelWidth(state.wMm,state.hMm);
+    if(loadLayers){
+      for(const key of layers)settings[key]=loadLayers[key]!==false;
+      if(settings.terrain && !layers.slice(1).some(key=>settings[key]))settings.resolution=600;
+      settings.preset='custom';
+    }
+    if(!buildingsAvailable)settings.buildings=false;
+    $('model-buildings').disabled=!buildingsAvailable;
+    $('model-buildings').title=buildingsAvailable?'Raised buildings':'Use Layers in the toolbar to load buildings.';
+    invalidate();sync();
+  }
+  return {incompleteLayers:()=>incompleteMapLayers(state.osmStatus,settings),configureArea,open,invalidate,zoom:direction=>preview?.zoom(direction),resetView:()=>preview?.reset(),dispose(){clearDownload();clearTimeout(previewTimer);disposed=true;job?.abort();preview?.dispose();}};
 }

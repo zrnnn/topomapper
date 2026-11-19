@@ -14,3 +14,12 @@ test('Budget refuses geometry that cannot be represented safely',()=>{
   const source={buildings:[],roadLines:Array.from({length:100},()=>[[0,0],[1,1]]),waterLines:[],waterAreas:[],greenAreas:[]};
   assert.throws(()=>applyMapPointBudget(source,{maxPoints:50}),/point display budget/);
 });
+
+test('Print-scale filtering retains long thin rivers and removes sub-0.2 mm islands and footprints',()=>{
+  const ring=(w,h)=>[[0,0],[w,0],[w,h],[0,h],[0,0]];
+  const data={buildings:[{polygons:[[ring(.19,3)]]}],roadLines:[[[0,0],[.1,.05]]],waterLines:[[[0,0],[3,0]]],waterAreas:[{polygons:[[ring(10,10),ring(.1,.1)],[ring(.05,1)]]}],greenAreas:[]};
+  const {data:map}=applyMapPointBudget(data,{minSize:.2,minBuildingArea:0});
+  assert.equal(map.buildings.length,0);assert.equal(map.roadLines.length,0);
+  assert.equal(map.waterLines.length,1);assert.equal(map.waterAreas[0].polygons.length,1);
+  assert.equal(map.waterAreas[0].polygons[0].length,1);
+});

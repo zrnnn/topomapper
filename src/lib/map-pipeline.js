@@ -6,7 +6,7 @@ import {MAP_PROVIDERS,requestMapData,isCompleteMapResponse} from './map-service.
 import {mapFailure} from './data-budget.js';
 import {cachedBytes,cacheBytes} from './data-cache.js';
 import {createMapTileSession,loadMapTiles} from './map-tiles.js';
-import {detailPlan} from './area-plan.js';
+import {MIN_DETAIL_MM,printPointBudget,detailPlan} from './area-plan.js';
 import {selectionPolicy} from './selection-policy.js';
 import {limitCityFootprints} from './buildings.js';
 import {applyMapPointBudget,countMapPoints} from './map-lod.js';
@@ -19,6 +19,7 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
   const initialCount=completed.length;
   const errors=[],timings=[],budget={bytes:0,maxBytes:24*1024*1024};
   const policy=selectionPolicy(state.renderBbox,state.outputMode);
+  const maxPoints=printPointBudget(state.wMm,state.hMm,policy.maxMapPoints);
   const sourceCity=state.cityOverview;
   let city=null,buildingTiles=0,coverage=previous?.status.buildingCoverage??null;
   const requested=selectedLayers(state);
@@ -141,8 +142,8 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
   // small labels and green areas. Successful individual queries are reusable.
   if(!city && !neighborhood)stages=individual;
 
-  async function loadStage(stage) {
-    const signal=stageSignal(), stageStart=performance.now();
+  async function loadStage(stage,signal=stageSignal()) {
+    const stageStart=performance.now();
     let buildingTileError;
     try {
       let incoming;
@@ -190,45 +191,55 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
 
   // Bound both simultaneous requests and completed layers waiting for an earlier one.
   const pending=new Map();
-  let next=0;
+  let next=0,buildingSignal;
   for (const stage of stages) {
     while (pending.size<2 && next<stages.length && Date.now()<deadline) {
       const name=stages[next++];
-      pending.set(name,loadStage(name));
+      const signal=stageSignal();
+      if(name==='buildings')buildingSignal=signal;
+      pending.set(name,loadStage(name,signal));
     }
     if (!pending.has(stage)) {
       errors.push('Remaining details skipped at the time or download budget.');
       break;
     }
-    const {incoming,error,source,advisory,tileCount=0,nextCoverage,stageStart}=await pending.get(stage);
+    let work=pending.get(stage);
     pending.delete(stage);
-    try {
-      if (error) throw error;
-      const candidate=emptyMapData();
-      for(const key of Object.keys(candidate))candidate[key]=data[key].concat(incoming[key]||[]);
-      if(tileCount){
-        const base={...data,buildings:[]};
-        const pool=nextCoverage?.start ? candidate.buildings : incoming.buildings;
-        candidate.buildings=limitCityFootprints(pool,policy.maxMapPoints-countMapPoints(base));
+    while(work){
+      const {incoming,error,source,advisory,tileCount=0,nextCoverage,stageStart}=await work;
+      work=null;
+      const lastDone=coverage?.done??0;
+      try {
+        if (error) throw error;
+        const candidate=emptyMapData();
+        for(const key of Object.keys(candidate))candidate[key]=data[key].concat(incoming[key]||[]);
+        if(tileCount){
+          const base={...data,buildings:[]};
+          const pool=nextCoverage?.start ? candidate.buildings : incoming.buildings;
+          candidate.buildings=limitCityFootprints(pool,maxPoints-countMapPoints(base));
+        }
+        const ranks={city:1,town:2,village:3,suburb:4,neighbourhood:5,hamlet:6};
+        candidate.labels=Array.from(new Map(candidate.labels.map(label=>[label.name+':'+label.lat+':'+label.lon,label])).values()).sort((a,b)=>(ranks[a.place]||9)-(ranks[b.place]||9)).slice(0,36);
+        publish(stage,'Simplifying '+labels[stage]+' · checking the combined data budget');
+        const bounded=applyMapPointBudget(candidate,{maxPoints,minBuildingArea:state.mapFeatures.buildings.minArea,maxBuildings:2500,minSize:MIN_DETAIL_MM,fitBuildings:stage==='buildings'});
+        data=bounded.data;points=bounded.stats;source.split(' + ').forEach(name=>sources.add(name));buildingTiles+=tileCount;
+        if(advisory)errors.push(advisory);
+        if(points.omittedForBudget)errors.push(points.omittedForBudget+' smaller or lower-priority buildings omitted to fit the point budget.');
+        if(stage==='buildings')coverage=nextCoverage?.done<nextCoverage?.total?nextCoverage:null;
+        if(stage==='buildings' && coverage){
+          if(coverage.done>lastDone && !buildingSignal.aborted && budget.bytes<budget.maxBytes && Date.now()<deadline){
+            work=loadStage(stage,buildingSignal);
+          }
+        }else completed.push(stage);
+        timings.push({stage,ms:Math.round(performance.now()-stageStart)});
+        progress({snapshot:{data,status:status()},phase:'map',title:labels[stage]+' ready',detail:`${points.points.toLocaleString()} retained points · ${(budget.bytes/1048576).toFixed(1)} MB downloaded`});
+      }catch(error){
+        errors.push(`${labels[stage]}: ${error.message}.`);
+        timings.push({stage,ms:Math.round(performance.now()-stageStart),failed:true});
       }
-      const ranks={city:1,town:2,village:3,suburb:4,neighbourhood:5,hamlet:6};
-      candidate.labels=Array.from(new Map(candidate.labels.map(label=>[label.name+':'+label.lat+':'+label.lon,label])).values()).sort((a,b)=>(ranks[a.place]||9)-(ranks[b.place]||9)).slice(0,36);
-      publish(stage,'Simplifying '+labels[stage]+' · checking the combined data budget');
-      const bounded=applyMapPointBudget(candidate,{maxPoints:policy.maxMapPoints,minBuildingArea:state.mapFeatures.buildings.minArea,maxBuildings:2500,fitBuildings:stage==='buildings'});
-      data=bounded.data;points=bounded.stats;source.split(' + ').forEach(name=>sources.add(name));buildingTiles+=tileCount;
-      if(advisory)errors.push(advisory);
-      if(points.omittedForBudget)errors.push(points.omittedForBudget+' smaller or lower-priority buildings omitted to fit the point budget.');
-      if(stage==='buildings')coverage=nextCoverage?.done<nextCoverage?.total?nextCoverage:null;
-      if(stage==='buildings' && coverage){
-        errors.push(`Buildings cover ${coverage.done}/${coverage.total} tiles. Load more building tiles to extend coverage.`);
-      }else completed.push(stage);
-      timings.push({stage,ms:Math.round(performance.now()-stageStart)});
-      progress({snapshot:{data,status:status()},phase:'map',title:labels[stage]+' ready',detail:`${points.points.toLocaleString()} retained points · ${(budget.bytes/1048576).toFixed(1)} MB downloaded`});
-    }catch(error){
-      errors.push(`${labels[stage]}: ${error.message}.`);
-      timings.push({stage,ms:Math.round(performance.now()-stageStart),failed:true});
     }
   }
+  if(coverage)errors.push(`Buildings cover ${coverage.done}/${coverage.total} tiles. Export this coverage now or choose Load more building tiles to resume.`);
   if(errors.length && tileError)errors.push('Vector tile sources: '+tileError+'.');
   return {data,status:{...status(),durationMs:Math.round(performance.now()-started)}};
 }

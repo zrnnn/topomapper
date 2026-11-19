@@ -36,7 +36,7 @@ async function decodeImage(blob,tileSize=256) {
     return ctx.getImageData(0,0,tileSize,tileSize).data;
   } finally { bitmap.close(); }
 }
-export async function loadTiles(bounds, {rows=160, cols=160, fetchTile, progress=()=>{},tileSize=256,maxZoom=13,source='Mapzen terrain',tileUrl=(z,x,y)=>`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`}={}) {
+export async function loadTiles(bounds, {rows=160, cols=160, fetchTile, progress=()=>{},tileSize=256,maxZoom=15,source='Mapzen terrain',tileUrl=(z,x,y)=>`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`}={}) {
   validateBounds(bounds);
   const {sw,ne}=bounds, north=latitudeY(ne.lat), south=latitudeY(sw.lat);
   const west=(sw.lng+180)/360, east=(ne.lng+180)/360;
@@ -98,6 +98,8 @@ export async function loadTiles(bounds, {rows=160, cols=160, fetchTile, progress
     if(!pixels || pixels[i+3]!==255) throw new Error('Terrain coverage is incomplete in this area.');
     return decodeTerrarium(pixels[i],pixels[i+1],pixels[i+2]);
   };
+  cols=Math.min(cols,Math.max(2,Math.ceil(x1-x0)+1));
+  rows=Math.min(rows,Math.max(2,Math.ceil(y1-y0)+1));
   const heights=new Float32Array(rows*cols);
   for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) {
     const x=x0+(x1-x0)*c/(cols-1), y=y0+(y1-y0)*r/(rows-1);

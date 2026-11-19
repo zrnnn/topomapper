@@ -31,5 +31,5 @@ export function createMapDrawing(heightMm) {
     drawing.addText(at, height, value, {layerName: layer(name, color),
       horizontalAlignment: TextHorizontalAlignment.Center, secondAlignmentPoint: at});
   }
-  return {writePolyline, writeText, serialize: () => drawing.stringify()};
+  return {writePolyline, writeText, hasGeometry:()=>layers.size>0, serialize: () => drawing.stringify()};
 }

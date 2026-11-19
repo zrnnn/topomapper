@@ -84,14 +84,14 @@
             <option value="hex">Hexagon</option>
           </select>
           <div class="input-grid">
-            <div><label class="ui-label" for="dimW">Width (mm)</label><input type="number" id="dimW" value="200"></div>
-            <div><label class="ui-label" for="dimH">Height (mm)</label><input type="number" id="dimH" value="140"></div>
+            <div><label class="ui-label" for="dimW">Width (mm)</label><input type="number" id="dimW" min="50" max="300" value="200"></div>
+            <div><label class="ui-label" for="dimH">Height (mm)</label><input type="number" id="dimH" min="50" max="300" value="140"></div>
           </div>
         </div>
         <div class="group">
           <span class="ui-label">Step 1 - Choose Frame</span>
           <p style="font-size:12px; color:var(--color-text-sec); margin-top:6px; line-height:1.4;">
-            Fine-tune contours, colors, and map layers after the preview loads.
+            Frame a print up to 300 × 300 mm. Next, choose 2D artwork or a 3D model and the layers to load.
           </p>
         </div>
         <div class="group">
@@ -123,14 +123,14 @@
       <div class="purpose-grid"><button id="choose2d" type="button" class="purpose-card" aria-pressed="true"><strong>2D map</strong><span>Paper · image · laser</span></button><button id="choose3d" type="button" class="purpose-card" aria-pressed="false"><strong>3D print</strong><span>3MF · STL · OBJ</span></button></div>
       <p id="areaSummary" class="control-help"></p>
       <h3>Layers to load</h3>
-      <p class="control-help">Load only what you need. Appearance and presets come next.</p>
+      <p class="control-help">Select the layers your print needs. You can adjust their appearance in Preview.</p>
       <div class="load-layer-list">
         {#each LAYER_CHOICES as [key,label,description]}
           <label class="load-layer-row" for={'load-'+key}><span><strong>{label}</strong><small>{description}</small></span><input id={'load-'+key} data-load-layer={key} type="checkbox" role="switch" checked /></label>
         {/each}
       </div>
       <p id="areaPolicyWarning" class="inline-notice" role="status" hidden></p>
-      <p class="control-help">Automatic detail · bounded downloads · cancel at any time.</p>
+      <p class="control-help">Sources and mirrors are selected automatically. Wait for all selected layers for a complete export, or export the available layers from Preview.</p>
     </section>
     <div class="sidebar-footer">
       <a href="https://github.com/zrnnn/topomapper" target="_blank" rel="noopener noreferrer">Topomapper</a>
@@ -212,11 +212,11 @@
         <div class="ui-label">Vector drawing · DXF or SVG</div>
         <button id="btnDXF" class="btn-main">Download DXF</button>
         <button id="btnSVG" class="btn-secondary">Download SVG · sharp vector</button>
-        <p class="control-help">SVG preserves fill colors and exact line widths in millimetres. DXF exports editable layer outlines, including courtyards.</p>
+        <p class="control-help">SVG preserves fill colors and exact line widths in millimetres. DXF preserves vector outlines and courtyards. Use PNG or SVG to keep shaded relief.</p>
       </div>
 
       <div class="group">
-        <div class="ui-label">Poster (PNG High-Res)</div>
+        <div class="ui-label">Print image · PNG</div>
         <label class="ui-label" for="pngResRange" style="margin-top:10px; font-size:10px;">Resolution (Long Edge)</label>
         <div class="cust-row" style="margin-bottom:8px;">
           <input type="range" id="pngResRange" min="500" max="5000" step="100" value="2000">
@@ -354,7 +354,7 @@
                 <div class="cust-row"><label class="ui-label" for="buildingOutline">Outline color</label><input type="color" id="buildingOutline" value="#65796C"></div>
                 <div class="cust-row"><label class="ui-label" for="buildingWidth">Outline width (mm)</label><input type="range" id="buildingWidth" min="0" max="1" step="0.01" value="0.1"><input type="number" id="buildingWidthInput" class="width-input" min="0" max="1" step="0.01" value="0.1" aria-label="Building outline width in millimetres"></div>
                 <div class="cust-row"><label class="ui-label" for="buildingOpacity">Opacity</label><input type="range" id="buildingOpacity" min="0" max="100" step="1" value="100"><span id="buildingOpacityVal" class="control-value">100%</span></div>
-                <div class="cust-row"><label class="ui-label" for="buildingMinArea">Minimum footprint (mm²)</label><input type="range" id="buildingMinArea" min="0" max="5" step="0.1" value="0.5"><span id="buildingMinAreaVal" class="control-value">0.5</span></div>
+                <div class="cust-row"><label class="ui-label" for="buildingMinArea">Minimum footprint (mm²)</label><input type="range" id="buildingMinArea" min="0" max="5" step="0.01" value="0.5"><span id="buildingMinAreaVal" class="control-value">0.5</span></div>
                 <p class="control-help">Tiny footprints are omitted and complex outlines simplified at output scale. This keeps large city maps responsive. Set 0 mm² to retain all small buildings.</p>
               </div>
             </div>
@@ -540,8 +540,8 @@
           <div class="section-heading"><span class="ui-label">Choose a model preset</span><span class="section-hint">Then adjust the layers</span></div>
           <div class="model-preset-grid">{#each Object.entries(MODEL_PRESETS) as [key,preset]}<button class="preset-card" data-model-preset={key} aria-pressed={key==='landscape'}><strong>{preset.name}</strong><small>{preset.description}</small></button>{/each}</div>
           <div class="group input-grid">
-            <div><label class="ui-label" for="model-width">Print width (mm)</label><input id="model-width" type="number" min="50" max="400" value="200"></div>
-            <div><label class="ui-label" for="model-resolution">Mesh quality</label><select id="model-resolution"><option value="40">Draft · 40</option><option value="100">Balanced · 100</option><option value="160">Fine · 160</option><option value="240">Ultra · 240</option></select></div>
+            <div><label class="ui-label" for="model-width">Print width (mm)</label><input id="model-width" type="number" min="50" max="300" value="200"></div>
+            <div><label class="ui-label" for="model-resolution">Mesh quality</label><select id="model-resolution"><option value="40">Draft · 40</option><option value="100">Balanced · 100</option><option value="160">Fine · 160</option><option value="240">Ultra · 240</option><option value="600">Print detail · 0.5 mm target</option></select></div>
           </div>
           <div class="group"><span class="ui-label">Physical layers</span><div class="model-layer-grid">
             {#each [['terrain','Terrain relief'],['buildings','Raised buildings'],['roads','Streets'],['water','Water areas'],['green','Green areas'],['rivers','Rivers']] as [key,label]}<label class="check-row"><input id={'model-'+key} type="checkbox">{label}</label>{/each}
@@ -549,7 +549,7 @@
           <details class="model-advanced"><summary>Advanced model settings</summary>
             {#each [['base','Base thickness (mm)',1,10,.5,2],['relief','Terrain vertical scale (%)',10,500,10,100],['buildingScale','Building height multiplier',.1,10,.1,1],['roadWidth','Street width (mm)',.2,3,.1,.7],['roadRise','Street rise (mm)',.1,2,.1,.5],['areaRise','Area / river rise (mm)',.1,2,.1,.3]] as [key,label,min,max,step,value]}<div class="cust-row"><label class="ui-label" for={'model-'+key}>{label}</label><input id={'model-'+key} type="range" {min} {max} {step} {value}><output id={'model-'+key+'-value'}>{key==='relief'?`${value}%`:value}</output></div>{/each}
             <label class="ui-label" for="model-fallbackHeight">Missing building height (metres)</label><input id="model-fallbackHeight" type="number" min="1" max="100" value="9">
-            <label class="ui-label" for="model-minBuildingArea">Minimum building footprint (mm²)</label><input id="model-minBuildingArea" type="number" min="0" max="20" step="0.1" value="0.8">
+            <label class="ui-label" for="model-minBuildingArea">Minimum building footprint (mm²)</label><input id="model-minBuildingArea" type="number" min="0" max="20" step="0.01" value="0.8">
             <p class="control-help">At 100%, terrain height uses the same physical scale as map width. Use 10–90% to flatten relief or 110–500% to exaggerate it. Buildings use OSM height, then levels × 3 m, then this fallback. Roofs are flat and founded into the terrain; rise is at least 0.4 mm.</p>
           </details>
           <button id="updateModel" class="btn-secondary">Update quick preview</button>

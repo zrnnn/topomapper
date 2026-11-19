@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import init from 'manifold-3d';
 import JSZip from 'jszip';
-import {buildModel,defaultModel,MODEL_PRESETS,terrainReliefHeight,validateModelSettings} from '../src/lib/model.js';
+import {modelInput,buildModel,defaultModel,MODEL_PRESETS,terrainReliefHeight,validateModelSettings} from '../src/lib/model.js';
 import {exportModel} from '../src/lib/model-export.js';
 import {parseAreas,buildingHeight} from '../src/lib/buildings.js';
 const engine=await init();engine.setup();
@@ -115,4 +115,13 @@ test('Exported 3MF inlays stop 1 mm below the local surface and meet the ground 
       lower.delete();for(const solid of [...source.values(),...parts.values()])solid.delete();
     }
   }
+});
+
+test('Print-detail terrain keeps its physical size and a single flat base inside a 300 mm portrait frame',async()=>{
+  const {meshResolution,buildTerrainMesh}=await import('../src/lib/mesh.js');
+  const portrait={...state,shape:'rect',wMm:100,hMm:300};
+  assert.equal(meshResolution(portrait,600),600);
+  const flat=buildTerrainMesh(portrait,{resolution:600,targetHeight:0});
+  closed(flat);assert.ok(flat.t.length<25);
+  assert.throws(()=>modelInput(portrait,{...defaultModel(),width:110}),/fit this frame/);
 });

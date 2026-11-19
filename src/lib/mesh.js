@@ -1,10 +1,47 @@
+import {PRINT_DETAIL_MM} from './area-plan.js';
 import { createGeometry } from './geometry.js';
+const rectangular=shape=>['rect','sq','din_l','din_p'].includes(shape);
+export function meshResolution(state,setting){
+  if(setting!==600)return Math.max(40,Math.min(400,Math.round(setting)||160));
+  const target=Math.ceil(Math.max(state.wMm,state.hMm)/PRINT_DETAIL_MM);
+  return Math.max(40,Math.min(target,rectangular(state.shape)?600:240));
+}
+
+function rectangularTerrain(state,res,scale){
+  const {getZInterpolated,smoothPass}=createGeometry(state);
+  const step=Math.max(state.wMm,state.hMm)/res;
+  const cols=scale?Math.ceil(state.wMm/step)+1:2,rows=scale?Math.ceil(state.hMm/step)+1:2;
+  let grid=new Float32Array(rows*cols);
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)grid[r*cols+c]=getZInterpolated(c/(cols-1),r/(rows-1));
+  for(let i=0;i<2;i++)grid=smoothPass(grid,rows,cols);
+  const v=[],t=[];
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const a=r*cols+c;
+    v.push([state.wMm*c/(cols-1),state.hMm*r/(rows-1),2+grid[a]*scale]);
+    if(c+1<cols && r+1<rows)t.push([a,a+1,a+cols],[a+1,a+cols+1,a+cols]);
+  }
+  // A flat base needs only a rim and a centre. Walk its boundary once.
+  const rim=[];
+  for(let c=0;c<cols;c++)rim.push(c);
+  for(let r=1;r<rows;r++)rim.push(r*cols+cols-1);
+  for(let c=cols-2;c>=0;c--)rim.push((rows-1)*cols+c);
+  for(let r=rows-2;r>0;r--)rim.push(r*cols);
+  const centre=v.push([state.wMm/2,state.hMm/2,0])-1,first=v.length;
+  for(const a of rim)v.push([v[a][0],v[a][1],0]);
+  for(let i=0;i<rim.length;i++){
+    const j=(i+1)%rim.length,a=rim[i],b=rim[j];
+    t.push([a,first+i,first+j],[a,first+j,b],[first+j,first+i,centre]);
+  }
+  return {v,t};
+}
+
 export function buildTerrainMesh(state, {resolution = 160, targetHeight = 10} = {}) {
 if(!state.terrainData || !Number.isFinite(targetHeight) || targetHeight < 0 || targetHeight > 100000) throw new Error('Calculated relief height is outside the supported range.');
 const {getZInterpolated, smoothPass, getClipPolygon, polygonArea, clipPolygon} = createGeometry(state);
 const zScale = state.terrainData.delta > 0 ? targetHeight / state.terrainData.delta : 0;
+if(rectangular(state.shape))return rectangularTerrain(state,meshResolution(state,resolution),zScale);
         const baseThickness = 2.0;
-        const res = Math.max(40, Math.min(400, Math.round(resolution || 160)));
+        const res = Math.max(40, Math.min(400, Math.round(meshResolution(state,resolution) || 160)));
         const tm = { v:[], t:[] };
         const vertexCache = new Map();
         const gridSize = res + 1;

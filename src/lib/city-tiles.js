@@ -1,3 +1,4 @@
+import {MIN_DETAIL_MM} from './area-plan.js';
 import {VectorTile,classifyRings} from '@mapbox/vector-tile';
 import {PbfReader} from 'pbf';
 import {latitudeY,yLatitude,validateBounds} from './terrain.js';
@@ -16,10 +17,10 @@ const tileSources=[
     layers:{water_polygons:'water',ocean:'water',land:'green',water_lines:'rivers',streets:'roads',place_labels:'labels',mountain_peaks:'labels',buildings:'buildings'}}
 ];
 const resumeAt=new Map();
-export function vectorTilePlan(bounds,{maxTiles=16,maxZoom=12,width=200,native=false}={}){
+export function vectorTilePlan(bounds,{maxTiles=16,maxZoom=12,width=200,height=width,native=false}={}){
   validateBounds(bounds);
   const west=(bounds.sw.lng+180)/360,east=(bounds.ne.lng+180)/360,north=latitudeY(bounds.ne.lat),south=latitudeY(bounds.sw.lat);
-  let z=native?maxZoom:Math.min(maxZoom,Math.max(0,Math.ceil(Math.log2(Math.max(1,width/.2)/(4096*Math.max(east-west,south-north))))+2));
+  let z=native?maxZoom:Math.min(maxZoom,Math.max(0,Math.ceil(Math.log2(Math.max(width/(east-west),height/(south-north))/(4096*MIN_DETAIL_MM)))+2));
   while(z>=0){
     const n=2**z;
     const x0=Math.floor(west*n),x1=Math.min(n-1,Math.ceil(east*n)-1);
@@ -125,7 +126,7 @@ async function loadTileSource(source,state,{signal,budget,progress=()=>{},fetchI
     }
   }else{
     const maxZoom=Math.min(neighborhood?14:12,meta.maxzoom??12);
-    plan=vectorTilePlan(state.renderBbox,{width:state.wMm,maxZoom,native:neighborhood});
+    plan=vectorTilePlan(state.renderBbox,{width:state.wMm,height:state.hMm,maxZoom,native:neighborhood});
     if(neighborhood && plan.z<14)throw new Error('Native neighborhood tile detail unavailable');
   }
   for(let attempt=0;attempt<2;attempt++){
@@ -161,7 +162,7 @@ async function loadTileSource(source,state,{signal,budget,progress=()=>{},fetchI
       return {data,coverage,tiles:plan.tiles.length,zoom:plan.z,source:source.name+(cityBuildings?' · simplified city buildings':neighborhood?' · detailed vector tiles':'')};
     }catch(error){
       if(cityBuildings||neighborhood||!(error instanceof DataLimitError)||attempt||signal?.aborted||(budget && budget.bytes>=budget.maxBytes))throw error;
-      plan=vectorTilePlan(state.renderBbox,{width:state.wMm,maxZoom:Math.max(0,plan.z-1)});
+      plan=vectorTilePlan(state.renderBbox,{width:state.wMm,height:state.hMm,maxZoom:Math.max(0,plan.z-1)});
       progress('City detail reduced to fit the data budget');
     }
   }
@@ -244,7 +245,7 @@ export function decodeCityTile(bytes,{x,y,z},state,{neighborhood=false,cityBuild
     }
   }
   if(cityBuildings){
-    const kept=prepareBuildingLod(data.buildings,{minArea,tolerance:.08,maxBuildings:2500});
+    const kept=prepareBuildingLod(data.buildings,{minArea,minDimension:MIN_DETAIL_MM,tolerance:.08,maxBuildings:2500});
     data.buildings=kept.buildings;
     vertices=kept.stats.points;
   }

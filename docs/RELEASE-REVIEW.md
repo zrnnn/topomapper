@@ -1,28 +1,26 @@
-# Topomapper 0.3.5
+# Topomapper 0.4.0
 
-For whole cities, use Automatic with Buildings enabled. Topomapper builds road and building geometry locally and gives tagged landmarks, known heights and tall tile features priority within the printable footprint budget. Dense building layers can drop lower-priority outlines when the combined map reaches its point limit.
+Set the frame size once for a print up to **300 × 300 mm**. It carries through to the 3D model, SVG, and the physical dimensions embedded in the PNG. Choose SVG for editable artwork, DXF for cutting paths and named CAD layers, or 3MF for a multipart print.
 
-For individual landmarks, choose Detailed OpenStreetMap and a 3D selection up to 1 km². Printable ground-level sections with mapped heights can give a building multiple roof levels. Uncovered wings keep their original footprint. Unmapped roofs, façades and elevated structures remain simplified.
+Print detail targets **0.5 mm terrain spacing** on rectangular models. The layer loader keeps a finer **0.2 mm working threshold** for vector geometry and scales point budgets to the output size. Terrain uses the available source pixels on each axis. A source or mesh limit can still produce coarser detail. In city frames, batches of building tiles continue automatically under the same time and download budget. Each completed batch can be exported.
 
-Automatic mode can enrich matching footprints in NYC frames up to 0.5 km² with the city’s published roof heights. One request can read up to 400 city records and has a five-second deadline. Ambiguous matches keep their existing height. A failed city request leaves the building layer available for export. [City building footprints](https://data.cityofnewyork.us/d/5zhs-2jue)
+## Real places tested
 
-## Provider coverage
+| Selection | Download checked |
+| --- | --- |
+| Matterhorn, 300 × 300 mm | Mapzen returned 564 × 564 elevation samples. The smoothed print-detail mesh at 100% relief had a 236.30 mm elevation range, 108,926 triangles and a closed surface. Bambu Studio generated toolpaths at full size. |
+| Greater Berlin, 300 × 250 mm | A roughly 1,718 km² frame loaded all 238 building tiles automatically. It downloaded 8.55 MB, retained 2,500 footprints and exported 2,495 printable building records. One test machine took 4.1 seconds for the data and 10.5 seconds to prepare the printable geometry. Bambu Studio sliced the full-size city model. |
+| Lake Lucerne and the Reuss, 300 × 300 mm | The 3MF held separate base, water, rivers, green areas and road parts. The loader retained 658 road lines, three river lines, 11 water records and 40 green records. The DXF contained primary, secondary, tertiary, residential and service roads on separate layers. |
+| San Francisco Bay, 300 × 300 mm | The selected water and road layers produced 19 water records and 258 road lines. The SVG and 3MF both retained the coastal water. |
 
-The Europe and North America endpoints of the Dresel service answered live browser-origin queries in Nuremberg and Manhattan. Eligible interior frames can use the regional endpoint alongside the existing worldwide fallbacks. The two extracts share one operator. Seven additional global service presets accept a personal API key. Endpoint construction, key clearing and fallback are covered by tests. Authenticated accounts at those seven providers were unavailable for live tests. [Regional service](https://ovp.dresel.systems/) · [OSM provider directory](https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances)
+Geocoding was fixed to the test coordinates. Terrain, footprints, waterways and streets came from live providers. Counts refer to retained records at print scale. Tile pieces can represent sections of the same real feature. Coverage and timings will vary.
 
-## Live model checks
+## Independent file checks
 
-| Selection | Map data received | 3MF result |
-| --- | --- | --- |
-| Cologne Cathedral neighbourhood | 117 building records, including 64 mapped sections, and 30 road lines | Base, Roads and Buildings, 12,128 triangles |
-| Midtown Manhattan | 34 footprint records, three matched city roof heights, and five road lines | Base, Roads and Buildings, with NYC attribution |
-| Tokyo Station neighbourhood | 11 footprint records and 16 road lines from worldwide tiles | Base, Roads and Buildings, 7,318 triangles |
-| Nuremberg city frame | 25 tiles, 1.35 MB decoded, 605 printable buildings | Base and Buildings, 52,324 triangles |
+- The desktop and mobile Chromium workflow passed all six file formats, presets, a disabled water layer, partial coverage, cancellation and retry. Removing water changed both the SVG groups and the exported PNG pixels.
+- PNG print density reproduced the intended 300 mm dimensions. The Matterhorn, Lucerne and San Francisco PNGs agreed with independently rasterized SVGs at more than 99.7% of pixels within 15 levels per color channel.
+- FreeCAD 1.1.4 opened the multilayer, lakeside and coastal DXFs. The independent ezdxf 1.4.5 audit accepted the multilayer fixture without repairs. A shaded-only Matterhorn DXF contained its cutting frame. The interface explains how to add vector geometry or download the shading.
+- All tested 3MF parts had positive enclosed volume and two incident triangles per edge. FreeCAD opened the fused STL as a solid and Assimp read the OBJ. Bambu Studio 2.9.1 sliced the full-size Lucerne model on an H2S profile. After assigning water and rivers to a second filament, its G-code reported extrusion for both spools.
+- 137 automated checks passed, along with the static production build. Timeout, quota and access errors give recovery actions. Browser image decoding and PNG encoding have explicit deadlines. Physical prints were outside this review.
 
-The Nuremberg flat-base test took 0.72 seconds to load footprints on the first run and 0.12 seconds from cache. Preparing its 3MF took 5.37 seconds on the test machine. These timings exclude terrain download and depend on the network, selection and device.
-
-## Regression checks
-
-133 automated checks passed. The production build and Chromium checks cover SVG, DXF, PNG, STL, OBJ and multipart 3MF downloads, partial data, retry, cancellation, mobile layout and clearing a personal key when switching providers. The live city 3MF archives were reopened programmatically. They have not been physically printed as part of this release.
-
-[Previous release review](https://github.com/zrnnn/topomapper/blob/v0.3.4/docs/RELEASE-REVIEW.md)
+[Previous release review](https://github.com/zrnnn/topomapper/blob/v0.3.5/docs/RELEASE-REVIEW.md)

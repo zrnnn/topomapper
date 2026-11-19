@@ -31,8 +31,8 @@ export function createGeometry(state) {
     function getZInterpolated(nx, ny) {
       if(!state.terrainData) return 0;
       const T = state.terrainData;
-      const rFloat = ny * (T.rows-1);
-      const cFloat = nx * (T.cols-1);
+      const rFloat = Math.max(0,Math.min(1,ny)) * (T.rows-1);
+      const cFloat = Math.max(0,Math.min(1,nx)) * (T.cols-1);
       const r0 = Math.floor(rFloat), r1 = Math.min(T.rows-1, r0+1);
       const c0 = Math.floor(cFloat), c1 = Math.min(T.cols-1, c0+1);
       const dr = rFloat - r0, dc = cFloat - c0;

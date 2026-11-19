@@ -21,3 +21,13 @@ test('Provider quota responses are reported as limits with a fallback action',()
   assert.equal(report.kind,'limit');
   assert.match(report.action,/another Overpass endpoint/i);
 });
+
+test('Image encoder watchdog expires without starting a late download',async()=>{
+  const {encodePng}=await import('../src/lib/png-render.js');
+  let callback;
+  await assert.rejects(encodePng({toBlob:cb=>{callback=cb;}},5),/PNG encoding timed out/);
+  callback(new Blob(['late']));
+  assert.match(describeError(Error('PNG encoding timed out'),'export').action,/PNG size/);
+  assert.equal(describeError(Error('Map download exceeds the data budget')).kind,'size');
+  assert.equal(describeError(Error('HTTP 403')).kind,'access');
+});

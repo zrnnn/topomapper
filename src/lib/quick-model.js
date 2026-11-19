@@ -30,9 +30,13 @@ export function buildQuickModel(state,settings){
   };
   for(const [key,color] of [['green','#91AA85'],['water','#6A9EA9']])
     for(const record of input[key])for(const polygon of record.polygons)surface(polygon,settings.areaRise,color);
+  const frame=geometry.getClipPolygon();
   for(const [key,width,rise,color] of [['rivers',settings.roadWidth*.8,settings.areaRise,'#6A9EA9'],['roads',settings.roadWidth,settings.roadRise,'#536C68']])
-    for(const ring of roadRings(input[key],width))surface([ring],rise,color);
-  if(settings.buildings)for(const {mesh:building} of buildBuildingMeshes(s,input.buildings,{resolution:settings.resolution,targetHeight:reliefHeight,buildingScale:settings.buildingScale,fallbackHeight:settings.fallbackHeight})){
+    for(const ring of roadRings(input[key],width)){
+      const clipped=geometry.clipPolygon(ring,frame);
+      if(clipped.length>=3)surface([clipped],rise,color);
+    }
+  if(settings.buildings)for(const {mesh:building} of buildBuildingMeshes(s,input.buildings,{resolution:Math.min(settings.resolution,80),targetHeight:reliefHeight,buildingScale:settings.buildingScale,fallbackHeight:settings.fallbackHeight})){
     for (const v of building.v) {
       if (v[2]>0) v[2]+=settings.base-2;
       else {

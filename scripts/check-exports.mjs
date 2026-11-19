@@ -131,6 +131,28 @@ try {
   assert.ok(lines(edited)>0 && lines(edited)<lines(original),'Export must read the edited contour density');
   const png = await download('#btnPNG','map.png');
   assert.equal(png.readUInt32BE(0),0x89504e47);
+  const density=png.indexOf(Buffer.from('pHYs'));
+  assert.ok(density>0);
+  assert.ok(Math.abs(png.readUInt32BE(16)*1000/png.readUInt32BE(density+4)-200)<.05);
+  assert.ok(Math.abs(png.readUInt32BE(20)*1000/png.readUInt32BE(density+8)-140)<.05);
+  const fullSvg=(await download('#btnSVG','all-layers.svg')).toString();
+  for(const group of ['waterAreas','greenAreas','roads','rivers','buildings'])assert.ok(fullSvg.includes('id="'+group+'"'),group);
+  await step('2d');
+  await page.locator('#waterAreaToggle').evaluate(b=>b.click());
+  await step('export');
+  assert.doesNotMatch((await download('#btnSVG','without-water.svg')).toString(),/id="waterAreas"/);
+  const dry=await download('#btnPNG','without-water.png');
+  const changed=await page.evaluate(async files=>{
+    const pixels=await Promise.all(files.map(async base64=>{
+      const image=await createImageBitmap(await (await fetch('data:image/png;base64,'+base64)).blob());
+      const canvas=new OffscreenCanvas(image.width,image.height),ctx=canvas.getContext('2d');
+      ctx.drawImage(image,0,0);image.close();return ctx.getImageData(0,0,canvas.width,canvas.height).data;
+    }));
+    let n=0;
+    for(let i=0;i<pixels[0].length;i+=4)if([0,1,2].some(c=>pixels[0][i+c]!==pixels[1][i+c]))n++;
+    return n;
+  },[png,dry].map(file=>file.toString('base64')));
+  assert.ok(changed>10,'Water visibility must change pixels in the downloaded PNG');
   for (const preset of ['contours','buildings','shaded']) {
     await step('2d');
     await page.locator(`[data-preset="${preset}"]`).evaluate(button=>button.click());

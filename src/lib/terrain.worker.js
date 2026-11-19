@@ -4,7 +4,7 @@ let enginePromise;
 self.onmessage=async({data:{type,payload}})=>{
   try {
     let result;
-    if(type==='terrain') result=await loadTerrain(payload,{rows:payload.samples||160,cols:payload.samples||160,progress:progress=>self.postMessage({progress})});
+    if(type==='terrain') result=await loadTerrain(payload,{rows:payload.rows??160,cols:payload.cols??160,progress:progress=>self.postMessage({progress})});
     else if(type==='map') {
       const {loadMapLayers}=await import('./map-pipeline.js');
       result=await loadMapLayers(payload.state,{...payload.options,progress:progress=>self.postMessage({progress})});

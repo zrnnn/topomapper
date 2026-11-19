@@ -1,3 +1,17 @@
+export const MAX_PRINT_MM=300;
+export const MIN_DETAIL_MM=0.2;
+export const PRINT_DETAIL_MM=0.5;
+
+export function maxModelWidth(width,height){
+  return Math.floor(MAX_PRINT_MM*Math.min(1,width/height)*100)/100;
+}
+
+export function printPointBudget(width,height,maximum) {
+  // Allow contouring and curved boundaries more than one vertex per feature.
+  const cells=width*height/(PRINT_DETAIL_MM**2);
+  return Math.min(maximum,Math.max(10000,Math.ceil(1.5*cells)));
+}
+
 export function areaPlan(bounds) {
   const {sw,ne}=bounds;
   const km2=Math.abs((ne.lat-sw.lat)*111.32*(ne.lng-sw.lng)*111.32*Math.cos((ne.lat+sw.lat)*Math.PI/360));
@@ -11,12 +25,16 @@ export function splitArea(bounds,sections) {
 
 export function detailPlan(bounds,width=200,height=140,overview=false) {
   const {km2}=areaPlan(bounds);
-  const base=km2<1?256:km2>25?128:160;
-  const samples=Math.max(96,Math.min(320,Math.round(base*Math.max(width,height)/200/16)*16));
-  const minArea=!overview&&km2<1?.05:.5;
+  // Sparse source coverage and city budgets can warrant a coarser terrain
+  // grid than the smallest vector feature. Size each axis independently.
+  const pitch=km2>25?1:PRINT_DETAIL_MM;
+  const count=mm=>1+Math.ceil(Math.min(MAX_PRINT_MM,mm)/pitch);
+  const rows=count(height),cols=count(width),samples=Math.max(rows,cols);
+  const metresPerDetail=MIN_DETAIL_MM*Math.sqrt(km2*1e6/(width*height));
+  const minArea=!overview&&km2<1?.04:PRINT_DETAIL_MM**2;
   // A polygon with area A must have perimeter >= sqrt(4*pi*A).
   // This conservative server filter removes only certainly too-small ways;
   // exact footprint area (and relation holes) is still checked after projection.
   const minPerimeter=overview?Math.floor(Math.sqrt(4*Math.PI*minArea*km2*1e6/(width*height))):0;
-  return {samples,minArea,minPerimeter};
+  return {samples,rows,cols,minArea,minPerimeter,metresPerDetail};
 }

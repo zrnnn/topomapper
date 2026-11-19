@@ -19,3 +19,14 @@ test('Small selections load finer terrain; larger prints request more detail',()
   assert.ok(detailPlan(city,200,140,true).minPerimeter>0);
   assert.ok(detailPlan(city,400,280,true).minPerimeter<detailPlan(city,200,140,true).minPerimeter);
 });
+
+test('Terrain sampling follows both physical axes and vector budgets follow print area',async()=>{
+  const {maxModelWidth,printPointBudget}=await import('../src/lib/area-plan.js');
+  const bbox={sw:{lat:0,lng:0},ne:{lat:.001,lng:.003}};
+  const landscape=detailPlan(bbox,300,50),portrait=detailPlan(bbox,50,300);
+  assert.equal(landscape.cols,601);assert.equal(landscape.rows,101);
+  assert.equal(landscape.cols,portrait.rows);
+  assert.equal(maxModelWidth(100,200),150);
+  assert.ok(printPointBudget(50,50,60000)<printPointBudget(300,300,60000));
+  assert.equal(printPointBudget(300,300,60000),60000);
+});

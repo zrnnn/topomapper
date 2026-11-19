@@ -1,3 +1,4 @@
+import {drawSvgOnCanvas,encodePng,pngPrintSize} from './png-render.js';
 import * as maplibregl from 'maplibre-gl';
 import { createGeometry } from './geometry.js';
 import { normalizeTerrain, latitudeY, validateBounds } from './terrain.js';
@@ -10,7 +11,7 @@ import {initModelWorkflow} from './model-workflow.js';
 import {describeError,terrainProgress} from './operation-status.js';
 import {personalEndpoint} from './map-providers.js';
 import {MAP_PROVIDERS,MAP_TOTAL_TIMEOUT_MS} from './map-service.js';
-import {areaPlan,detailPlan} from './area-plan.js';
+import {MAX_PRINT_MM,areaPlan,detailPlan} from './area-plan.js';
 import {selectionPolicy} from './selection-policy.js';
 import {LAYER_CHOICES,selectedLayers,layerWarning,incompleteMapLayers,mapCoverageNotice} from './layer-selection.js';
 import {roadPoints} from './road-style.js';
@@ -181,7 +182,11 @@ export function initTopomapper() {
       if(status?.state==='loading' && !Number.isFinite(status.percent))exportProgress.removeAttribute('value');
       else exportProgress.value=status?.state==='loading'?status.percent:0;
     }
-    const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const nextFrame=()=>new Promise(resolve=>{
+      // A hidden tab may suspend animation frames while an export is pending.
+      const timer=setTimeout(resolve,150);
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{clearTimeout(timer);resolve();}));
+    });
     const setExportStatus = (phase, label) => {
       if(!exportStatus) return;
       exportStatus.classList.add('active');
@@ -235,9 +240,12 @@ export function initTopomapper() {
       try {
         await nextFrame();
         setExportStatus('render', label);
-        await task(onSave);
+        const notice=await task(onSave);
         setExportStatus('done', label);
-        exportStatusTimer = setTimeout(clearExportStatus, 2200);
+        if(typeof notice==='string' && notice){
+          $('exportDetail').textContent=notice;
+          workspaceStatus.update('export',{state:'warning',title:'Download started with a notice',detail:notice});
+        }else exportStatusTimer = setTimeout(clearExportStatus, 2200);
       } catch(error) {
         const report=describeError(error,'export');
         exportStatus.classList.remove('done'); exportStatus.classList.add('error');
@@ -305,7 +313,7 @@ export function initTopomapper() {
     const clampDimensionMm = (value) => {
       const parsed = parseFloat(value);
       if(Number.isNaN(parsed)) return 200;
-      return clamp(parsed, 50, 1200);
+      return clamp(parsed, 50, MAX_PRINT_MM);
     };
     const formatWidthInput = (value) => {
       const rounded = Math.round(value * 100) / 100;
@@ -573,13 +581,16 @@ export function initTopomapper() {
         });
         state.osmData=result.data;state.osmStatus=result.status;state.osmDataVersion=(state.osmDataVersion||0)+1;
         $('loadMetrics').textContent=`${result.status.source} · ${(result.status.durationMs/1000).toFixed(1)} s map layers · ${(result.status.bytes/1048576).toFixed(2)} MB downloaded · ${result.status.pointStats?.points?.toLocaleString()||0} retained points. ${(result.status.timings||[]).map(t=>t.stage+': '+(t.ms/1000).toFixed(1)+' s'+(t.failed?' (unavailable)':'')).join(' · ')}. Cached requests do not add download bytes.`;
+        if(result.status.pointStats?.tolerance>0.2){
+          $('loadMetrics').textContent+=` Dense geometry simplified to ${result.status.pointStats.tolerance.toFixed(2)} mm. Choose a smaller frame for finer boundaries.`;
+        }
         updateMapDataStatus({announce:true});return !result.status.error;
       }catch(error){
         const stopped=signal?.reason==='export-current'||signal?.reason==='keep-current';
         if(signal?.aborted && !stopped)throw error;
         // Never restore unbounded raw geometry after a rejected layer. The last
         // published snapshot has already passed the combined display budget.
-        state.osmStatus.error=stopped?'Loading stopped at your request.':error.message;
+        state.osmStatus.error=stopped?'Loading stopped at your request.':[error.message,describeError(error,'map').action].join(' ');
         $('loadMetrics').textContent=state.osmStatus.error;
         updateMapDataStatus({announce:true});return false;
       }
@@ -1173,7 +1184,7 @@ export function initTopomapper() {
     };
     $('buildingMinArea').oninput=event=>{
       state.mapFeatures.buildings.minArea=Math.max(0,Math.min(5,Number(event.target.value)||0));
-      $('buildingMinAreaVal').textContent=state.mapFeatures.buildings.minArea.toFixed(1);buildingCache.data=null;markPreviewDirty();
+      $('buildingMinAreaVal').textContent=state.mapFeatures.buildings.minArea.toFixed(2);buildingCache.data=null;markPreviewDirty();
     };
 
     $('waterAreaToggle').onclick = function() {
@@ -1395,7 +1406,7 @@ export function initTopomapper() {
       $('buildingOpacity').value=buildings.opacity;
       $('buildingOpacityVal').textContent=buildings.opacity+'%';
       $('buildingMinArea').value=buildings.minArea;
-      $('buildingMinAreaVal').textContent=buildings.minArea.toFixed(1);
+      $('buildingMinAreaVal').textContent=buildings.minArea.toFixed(2);
 
       $('presetSel').value = state.theme.preset;
       $('bgColorText').value = state.theme.background;
@@ -1512,7 +1523,7 @@ export function initTopomapper() {
       if(disposed) return;
       if(['sq','circle','hex'].includes(state.shape)) { state.hMm = state.wMm; $('dimH').value = state.wMm; }
       if(state.shape === 'din_l') { state.hMm = Math.round(state.wMm / 1.414); $('dimH').value = state.hMm; }
-      if(state.shape === 'din_p') { state.hMm = Math.round(state.wMm * 1.414); $('dimH').value = state.hMm; }
+      if(state.shape === 'din_p') { state.wMm=Math.min(state.wMm,Math.floor(MAX_PRINT_MM/1.414)); $('dimW').value=state.wMm; state.hMm = Math.round(state.wMm * 1.414); $('dimH').value = state.hMm; }
 
       const winW = window.innerWidth, winH = window.innerHeight;
       const sidebar = document.querySelector('.sidebar').getBoundingClientRect();
@@ -1677,7 +1688,7 @@ export function initTopomapper() {
       const layers=reuse?selectedLayers(state):{terrain:true,water:true,green:true,rivers:true,roads:true,labels:true,buildings:policy.buildingsRecommended,minorRoads:policy.minorRoadsRecommended};
       for(const [key] of LAYER_CHOICES)$('load-'+key).checked=layers[key];
       for(const mode of ['2d','3d'])$('choose'+mode).setAttribute('aria-pressed',String(mode===draftMode));
-      $('areaSummary').textContent=`${plan.km2.toFixed(2)} km² · ${state.wMm} × ${state.hMm} mm · adaptive elevation up to ${detail.samples} × ${detail.samples} samples.`;
+      $('areaSummary').textContent=`${plan.km2.toFixed(2)} km² · ${state.wMm} × ${state.hMm} mm · 0.2 mm on this print covers about ${detail.metresPerDetail.toFixed(1)} m on the ground. Elevation target ${detail.cols} × ${detail.rows}.`;
       choosingLayers=true;$('selectionInputs').hidden=true;$('purposeDialog').hidden=false;
       $('generationPanel').hidden=true;$('previousPreview').hidden=true;
       workspaceStatus.update('area',{state:'idle',title:'Choose your layers',detail:'Switch on the data you need, then select Load selected layers. Use Back to adjust the frame.'});
@@ -1733,10 +1744,10 @@ export function initTopomapper() {
         updateVf();
         const bounds = structuredClone(retryBounds||state.bbox);
         validateBounds(bounds);
-        const {samples}=detailPlan(bounds,state.wMm,state.hMm,state.cityOverview);
+        const {rows,cols}=detailPlan(bounds,state.wMm,state.hMm,state.cityOverview);
         const wantsTerrain=selectedLayers(state).terrain;
-        const key = `${bboxKey(bounds.sw, bounds.ne)}:${wantsTerrain?samples:'flat'}`;
-        const terrain = !wantsTerrain?normalizeTerrain([0,0,0,0],2,2,'Flat base · elevation not requested'):terrainCache.get(key) || await runWorker('terrain', {...bounds,samples}, {
+        const key = `${bboxKey(bounds.sw, bounds.ne)}:${wantsTerrain?cols+'x'+rows:'flat'}`;
+        const terrain = !wantsTerrain?normalizeTerrain([0,0,0,0],2,2,'Flat base · elevation not requested'):terrainCache.get(key) || await runWorker('terrain', {...bounds,rows,cols}, {
           signal: controller.signal, timeoutMs:Math.min(100000,deadline-Date.now()-10000),progress: value => { if(!disposed) showGenerationStatus(terrainProgress(value)); }
         });
         if(controller.signal.aborted || disposed) throw new DOMException('Cancelled', 'AbortError');
@@ -1768,13 +1779,21 @@ export function initTopomapper() {
         showGenerationStatus({phase:'render',title:'Preparing preview',detail:outputMode==='3d'?'Opening the 3D workspace…':'Rendering the 2D artwork…'});
         if(outputMode==='2d')renderSVG();
         setStep(exportCurrent?'3':'2');
-        showGenerationStatus({phase:'render',percent:100,state:mapComplete?'success':'warning',title:mapComplete?'Area ready':mapUsable?'Area ready with missing layers':'Terrain ready with missing layers',detail:terrain.source+(mapComplete?' · Map layers loaded.':mapUsable?` · Loaded layers remain available. ${state.osmStatus.error}`:' · Map overlays unavailable; terrain-only work remains available.')});
+        showGenerationStatus({phase:'render',percent:100,state:mapComplete?'success':'warning',title:mapComplete?'Area ready':mapUsable?'Area ready with notices':'Terrain ready with missing layers',detail:terrain.source+(mapComplete?' · Map layers loaded.':mapUsable?` · Loaded layers remain available. ${state.osmStatus.error}`:' · Map overlays unavailable; terrain-only work remains available.')});
         $('retryGeneration').hidden=mapUsable;
         lastFrame={wMm:state.wMm,hMm:state.hMm,shape:state.shape};
         $('terrainSource').textContent = (mapComplete ? [terrain.source,state.osmStatus.source].filter(Boolean).join(' · ') : `${terrain.source} · ${state.osmStatus.error}${mapUsable?' Loaded layers were preserved.':' Use Retry map layers below.'}`)+(state.cityOverview?' · Adaptive city detail. Use Layers in the toolbar to change the requested data.':'');
-        $('terrainSource').classList.toggle('warning',!mapComplete);
+        const missing=incompleteMapLayers(state.osmStatus,selectedLayers(state));
+        if(!mapComplete && missing.length && !state.osmStatus.buildingCoverage && !exportCurrent && !mapSignal.aborted){
+          $('terrainSource').textContent+=' '+describeError(state.osmStatus.error,'map').action;
+        }
+        const terrainPitch=Math.max(state.wMm/(terrain.cols-1),state.hMm/(terrain.rows-1));
+        if(wantsTerrain && terrainPitch>1.05){
+          $('terrainSource').textContent+=` Elevation samples are ${terrainPitch.toFixed(1)} mm apart on this print. Select a smaller geographic area for finer terrain.`;
+        }
+        $('terrainSource').classList.toggle('warning',!mapComplete || (wantsTerrain && terrainPitch>1.05));
         $('retryMapLayers').textContent=state.osmStatus.buildingCoverage?'Load more building tiles':'Retry map layers';
-        $('retryMapLayers').hidden=mapComplete;
+        $('retryMapLayers').hidden=!missing.length;
         if($('modal').classList.contains('open')&&outputMode==='3d')modelWorkflow.open();
       } catch(error) {
         if(!state.terrainData)Object.assign(state, previous);
@@ -1971,7 +1990,7 @@ export function initTopomapper() {
       if(!state.terrainData && !state.osmData) return;
       await runExportFlow('DXF', async (onSave) => {
         const {createMapDrawing} = await import('./dxf.js');
-        const {writePolyline, writeText, serialize} = createMapDrawing(state.hMm);
+        const {writePolyline, writeText, serialize,hasGeometry} = createMapDrawing(state.hMm);
         const clipPoly = getClipPolygon();
         if(polygonArea(clipPoly) < 0) clipPoly.reverse();
         for (const paths of contourGroups()) {
@@ -2004,10 +2023,12 @@ export function initTopomapper() {
             });
           }
         }
+        const frameOnly=!hasGeometry();
         writePolyline('FRAME', ensureClosed(clipPoly), state.contour.color, true);
         const dxf = serialize();
         if(onSave) await onSave();
         save(new Blob([dxf], {type:'application/dxf'}), 'Topomapper.dxf');
+        if(frameOnly)return 'This DXF contains only the frame. Enable contours or a loaded vector layer in 2D Preview. Choose PNG or SVG for shaded terrain.';
       });
     };
 
@@ -2027,18 +2048,6 @@ export function initTopomapper() {
         }
       }
       return Math.max(0, Math.min(boundaries.length - 2, lo));
-    }
-
-    function drawSvgOnCanvas(ctx, svgMarkup, w, h) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve();
-        };
-        img.onerror = () => reject(new Error('SVG could not be rendered. Check the design and retry.'));
-        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgMarkup)));
-      });
     }
 
     function buildHeightMap(w, h) {
@@ -2192,19 +2201,9 @@ export function initTopomapper() {
       }
 
       const overlaySvg = buildSvgMarkup({ includeBackground: false, includeGradient: false, includeFrame: false });
-      try {
-        await drawSvgOnCanvas(ctx, overlaySvg, w, h);
-      } catch (e) {
-        throw new Error('Could not render map overlays. No partial PNG was saved.');
-      }
-      if(onSave) await onSave();
-      await new Promise((resolve, reject) => {
-        cv.toBlob((b) => {
-          if(!b) { reject(new Error('PNG encoding failed. Try a lower resolution.')); return; }
-          save(b, 'Topomapper_Layered.png');
-          resolve();
-        });
-      });
+      await drawSvgOnCanvas(ctx,overlaySvg,w,h);
+      if(onSave)await onSave();
+      save(await pngPrintSize(await encodePng(cv),w,h,state.wMm,state.hMm),'Topomapper_Layered.png');
     }
 
     const exportSvgPng = async (onSave) => {
@@ -2213,30 +2212,15 @@ export function initTopomapper() {
       const w = state.wMm >= state.hMm ? e : Math.round(e / r);
       const h = state.wMm >= state.hMm ? Math.round(e * r) : e;
       const s = buildSvgMarkup({ includeBackground: true, includeGradient: true, includeFrame: false });
-      const img = new Image();
-      const cv = document.createElement('canvas');
-      cv.width = w;
-      cv.height = h;
-      await new Promise((resolve, reject) => {
-        img.onload = () => {
-          const ctx = cv.getContext('2d');
-          ctx.fillStyle = state.theme.background;
-          ctx.fillRect(0, 0, w, h);
-          clipCanvasToShape(ctx, w, h);
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve();
-        };
-        img.onerror = reject;
-        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
-      });
-      if(onSave) await onSave();
-      await new Promise((resolve, reject) => {
-        cv.toBlob((b) => {
-          if(!b) { reject(new Error('PNG encoding failed. Try a lower resolution.')); return; }
-          save(b, 'Topomapper.png');
-          resolve();
-        });
-      });
+      const cv=document.createElement('canvas');
+      cv.width=w;cv.height=h;
+      const ctx=cv.getContext('2d');
+      ctx.fillStyle=state.theme.background;
+      ctx.fillRect(0,0,w,h);
+      clipCanvasToShape(ctx,w,h);
+      await drawSvgOnCanvas(ctx,s,w,h);
+      if(onSave)await onSave();
+      save(await pngPrintSize(await encodePng(cv),w,h,state.wMm,state.hMm),'Topomapper.png');
     };
 
     $('btnPNG').onclick = async () => {
