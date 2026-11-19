@@ -164,9 +164,53 @@
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
           <h2 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-1px;">Map Studio</h2>
-          <div style="font-size:12px; color:var(--color-text-sec); margin-top:4px;">Style your layers. Export with confidence.</div>
+
         </div>
         <button id="closePreview" aria-label="Close preview" style="border:none;background:none;font-size:32px;cursor:pointer;color:var(--color-text-sec);">&times;</button>
+      </div>
+      <div class="step-content" data-step="3">
+        <section class="model-download mode-3d" aria-labelledby="modelDownloadHeading">
+          <h3 id="modelDownloadHeading">Download your 3D map</h3>
+          <label class="ui-label" for="model-format">File format</label>
+          <select id="model-format" aria-describedby="modelFormatHelp"><option value="3mf">3MF · multicolor print</option><option value="stl">STL · single mesh</option><option value="obj">OBJ · 3D editing</option></select>
+          <p class="control-help" id="modelFormatHelp"></p>
+          <button id="prepareExportModel" class="btn-main">Prepare &amp; download 3MF</button>
+          <button id="cancelExportPreparation" class="btn-secondary" hidden>Cancel preparation</button>
+          <button id="exportModel" class="btn-main" hidden disabled>Download 3MF</button>
+          <a id="modelFileLink" hidden download>Download again</a>
+        </section>
+        <div class="export-status" id="exportStatus">
+          <div class="export-status-head">
+            <span class="export-status-title">Export Status</span>
+            <span class="export-status-label" id="exportStatusLabel" role="status">Choose a format</span>
+          </div>
+          <p class="control-help" id="exportDetail"></p>
+          <div class="export-timeline">
+            <div class="export-step" data-export-step="prepare"><span class="export-dot"></span><span>Prepare</span></div>
+            <div class="export-step" data-export-step="render"><span class="export-dot"></span><span>Create file</span></div>
+            <div class="export-step" data-export-step="save"><span class="export-dot"></span><span>Download</span></div>
+          </div>
+          <progress id="exportProgress" max="100" value="0" aria-label="Export progress"></progress>
+          <div id="exportError" class="error-report" hidden role="alert"><strong id="exportErrorTitle"></strong><span id="exportErrorMessage"></span><span id="exportErrorAction" class="error-action"></span><details><summary>Technical details</summary><code id="exportErrorTechnical"></code></details><button id="retryExport" class="btn-secondary" type="button">Retry export</button></div>
+        </div>
+        <div class="mode-2d">
+      <div class="group">
+        <div class="ui-label">Vector drawing · DXF or SVG</div>
+        <button id="btnDXF" class="btn-main">Download DXF</button>
+        <button id="btnSVG" class="btn-secondary">Download SVG · sharp vector</button>
+        <p class="control-help">SVG preserves fill colors and exact line widths in millimetres. DXF exports editable layer outlines, including courtyards.</p>
+      </div>
+
+      <div class="group">
+        <div class="ui-label">Poster (PNG High-Res)</div>
+        <label class="ui-label" for="pngResRange" style="margin-top:10px; font-size:10px;">Resolution (Long Edge)</label>
+        <div class="cust-row" style="margin-bottom:8px;">
+          <input type="range" id="pngResRange" min="500" max="5000" step="100" value="2000">
+          <span id="pngResVal" style="font-size:12px; font-weight:700; width:60px;">2000px</span>
+        </div>
+        <button id="btnPNG" class="btn-main" style="color:#F5F7FB;">Download PNG</button>
+      </div>
+      </div>
       </div>
       <div id="modelFeedback" class="model-feedback operation-panel mode-3d" data-state="idle"><div class="operation-head"><span class="operation-icon" aria-hidden="true">3D</span><div><strong id="modelTitle">3D model</strong><p id="modelStatus" role="status" aria-live="polite">Choose settings, then update the model.</p></div><span id="modelPercent" class="operation-percent"></span></div><progress id="modelProgress" max="100" hidden aria-label="3D model progress"></progress><div id="modelError" class="error-report" hidden role="alert"><span id="modelErrorAction" class="error-action"></span><details><summary>Technical details</summary><code id="modelErrorTechnical"></code></details></div><button id="retryModel" class="btn-secondary" hidden>Retry model</button><button id="cancelModel" class="btn-secondary" hidden>Cancel model generation</button></div>
       <div id="terrainSource" class="status-text"></div>
@@ -496,49 +540,11 @@
           </details>
           <button id="updateModel" class="btn-secondary">Update quick preview</button>
           <button id="prepareModel" class="btn-main">Prepare printable model</button>
-          <p class="control-help">Quick preview uses separate surfaces and a lighter terrain mesh. Prepare the printable model to fuse and validate the selected layers before downloading.</p>
+          <p class="control-help">Open Export to choose a format and download. To inspect the printable mesh first, use Prepare printable model.</p>
         </div>
       </div>
 
-      <div class="step-content" data-step="3">
-        <div class="export-status" id="exportStatus">
-          <div class="export-status-head">
-            <span class="export-status-title">Export Status</span>
-            <span class="export-status-label" id="exportStatusLabel">Idle</span>
-          </div>
-          <div class="export-timeline">
-            <div class="export-step" data-export-step="prepare"><span class="export-dot"></span><span>Prepare</span></div>
-            <div class="export-step" data-export-step="render"><span class="export-dot"></span><span>Render</span></div>
-            <div class="export-step" data-export-step="save"><span class="export-dot"></span><span>Save</span></div>
-          </div>
-          <progress id="exportProgress" max="100" value="0" aria-label="Export progress"></progress>
-          <div id="exportError" class="error-report" hidden role="alert"><strong id="exportErrorTitle"></strong><span id="exportErrorMessage"></span><span id="exportErrorAction" class="error-action"></span><details><summary>Technical details</summary><code id="exportErrorTechnical"></code></details><button id="retryExport" class="btn-secondary" type="button">Retry export</button></div>
-        </div>
-        <div class="group mode-3d">
-          <span class="ui-label">Export the previewed model</span>
-          <p class="control-help">3MF keeps map layers aligned as named parts. Color inlays follow the terrain to a depth of 1 mm, leaving at least 0.2 mm of ground underneath. Choose a filament for each part in your slicer. STL and OBJ contain the fused surface. All formats use millimetres.</p>
-          <label class="ui-label" for="model-format">File format</label><select id="model-format"><option value="3mf">3MF · colored map parts</option><option value="stl">STL · universal print mesh</option><option value="obj">OBJ · general 3D mesh</option></select>
-          <button id="exportModel" class="btn-main" disabled>Download model</button><p class="control-help">Inspect the result in your slicer before printing. Ultra quality and dense cities can take longer; use a small area first.</p>
-        </div>
-        <div class="mode-2d">
-      <div class="group">
-        <div class="ui-label">Laser / Vector (DXF)</div>
-        <button id="btnDXF" class="btn-main">Download DXF</button>
-        <button id="btnSVG" class="btn-secondary">Download SVG · sharp vector</button>
-        <p class="control-help">SVG preserves fill colors and exact line widths in millimetres. DXF exports editable layer outlines, including courtyards.</p>
-      </div>
 
-      <div class="group">
-        <div class="ui-label">Poster (PNG High-Res)</div>
-        <label class="ui-label" for="pngResRange" style="margin-top:10px; font-size:10px;">Resolution (Long Edge)</label>
-        <div class="cust-row" style="margin-bottom:8px;">
-          <input type="range" id="pngResRange" min="500" max="5000" step="100" value="2000">
-          <span id="pngResVal" style="font-size:12px; font-weight:700; width:60px;">2000px</span>
-        </div>
-        <button id="btnPNG" class="btn-main" style="color:#F5F7FB;">Save PNG</button>
-      </div>
-      </div>
-      </div>
     </div>
   </div>
 </div>

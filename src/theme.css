@@ -263,3 +263,16 @@ progress::-moz-progress-bar,.workspace-activity progress::-moz-progress-bar { ba
   .workspace-toolbar .workspace-activity { padding:7px 4px 2px; margin-top:5px; }
   .preview-stage { flex-basis:47%; gap:8px; }
 }
+
+.model-download {
+  padding: 16px;
+  border: 1px solid var(--color-primary);
+  border-radius: 14px;
+  background: var(--color-panel, #272d25);
+}
+#modelFileLink:not([hidden]) { display: block; margin-top: 12px; color: var(--color-primary-strong); text-align: center; text-underline-offset: 3px; }
+.model-download h3 { margin: 0 0 14px; color: var(--color-text); }
+.model-download select, .model-download button { width: 100%; }
+.model-download .control-help { margin: 8px 0 14px; }
+#exportDetail { margin: 0; }
+.export-status-head { flex-wrap: wrap; gap: 6px; }

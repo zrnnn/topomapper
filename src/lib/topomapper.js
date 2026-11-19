@@ -149,11 +149,22 @@ export function initTopomapper() {
     const exportPhaseOrder = ['prepare', 'render', 'save'];
     const exportPhaseLabels = {
       prepare: 'Preparing',
-      render: 'Rendering',
-      save: 'Saving',
-      done: 'Complete'
+      render: 'Creating file',
+      save: 'Starting download',
+      done: 'Download started'
     };
     let exportStatusTimer = null;
+    let modelStatus=null;
+    function showExportReadiness(){
+      if(exportBusy || exportStatus.classList.contains('active'))return;
+      const status=outputMode==='3d'?modelStatus:null;
+      const showModelStatus=status && (status.state==='loading'||status.state==='error'||status.title==='Cancelled');
+      exportStatusLabel.textContent=showModelStatus?status.title:
+        outputMode==='3d'?(status?.printable?'Ready to download':'Ready to prepare'):'Choose a format';
+      $('exportDetail').textContent=showModelStatus?status.detail:
+        outputMode==='3d'?(status?.printable?'The printable mesh is ready. Choose a format to download it.':'Your download starts automatically after the printable mesh is ready.'):'Choose an export below to start the download.';
+      exportProgress.value=status?.state==='loading'?(status.percent??0):0;
+    }
     const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const setExportStatus = (phase, label) => {
       if(!exportStatus) return;
@@ -163,6 +174,7 @@ export function initTopomapper() {
       exportError.hidden = true;
       const labelText = exportPhaseLabels[phase] ?? 'Working';
       exportStatusLabel.innerText = label ? `${label} · ${labelText}` : labelText;
+      $('exportDetail').textContent=phase==='done'?'Check your browser’s downloads.':phase==='save'?'Sending the file to your browser…':phase==='render'?'Creating the file…':'Checking the export settings…';
       const currentIndex = exportPhaseOrder.indexOf(phase);
       exportProgress.value = phase==='prepare'?12:phase==='render'?55:phase==='save'?88:phase==='done'?100:0;
       workspaceStatus.update('export',{state:phase==='done'?'success':'loading',title:phase==='done'?'Export ready':`${labelText} ${label||'export'}`,detail:phase==='done'?'Your file has been sent to the browser download.':phase==='save'?'Encoding complete · preparing the file download…':phase==='render'?'Generating export geometry / artwork at the selected quality…':'Checking output settings and preparing export data…',percent:phase==='done'?100:null});
@@ -186,7 +198,7 @@ export function initTopomapper() {
       }
       exportStatus.classList.remove('active', 'done', 'error');
       exportError.hidden = true;
-      exportStatusLabel.innerText = 'Idle';
+      showExportReadiness();
       exportStatusSteps.forEach(step => step.classList.remove('is-active', 'is-done'));
     };
     const runExportFlow = async (label, task) => {
@@ -215,6 +227,7 @@ export function initTopomapper() {
         exportStatus.classList.remove('done'); exportStatus.classList.add('error');
         exportStatusLabel.textContent = `${label} · ${report.title}`;
         workspaceStatus.update('export',{state:'error',title:report.title,detail:report.message});
+        $('exportDetail').textContent=report.message;
         exportProgress.value=0; exportError.hidden=false;
         $('exportErrorTitle').textContent=report.title;
         $('exportErrorMessage').textContent=report.message;
@@ -767,6 +780,7 @@ export function initTopomapper() {
     const stepButtons = document.querySelectorAll('[data-step-target]');
     const stepContents = document.querySelectorAll('.step-content');
     const setStep = (step) => {
+      if(step==='3' && workspaceStep!==step && !exportBusy)clearExportStatus();
       workspaceStep=step;
       stepButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.stepTarget === step));
       stepContents.forEach(section => section.classList.toggle('active', section.dataset.step === step));
@@ -1588,7 +1602,7 @@ export function initTopomapper() {
     $('cancelGeneration').onclick = () => activeJob?.abort();
     $('cancelPreviewLoad').onclick=()=>activeJob?.abort();
     let outputMode='2d',lastRequestedMode='2d';
-    const modelWorkflow=initModelWorkflow(state,{save,runExportFlow,signal:lifetime.signal,onStatus:update=>{modelBusy=update.state==='loading';workspaceStatus.update('model',update);syncWorkspaceNavigation();}});
+    const modelWorkflow=initModelWorkflow(state,{runExportFlow,signal:lifetime.signal,onStatus:update=>{modelStatus=update;modelBusy=update.state==='loading';if(workspaceStep==='3')showExportReadiness();workspaceStatus.update('model',update);syncWorkspaceNavigation();}});
     let previewScale=1, cameraZoom=1,previewPan={x:0,y:0};
     const canvasPreview=createCanvasPreview($('previewArea'),{onStart:()=>{if(outputMode==='2d')workspaceStatus.update('preview',{title:'Generating 2D preview',detail:'Rasterizing map layers at up to twice the preview resolution…'});},onReady:()=>{syncPreviewZoom();if(outputMode==='2d')workspaceStatus.update('preview',{state:'success',title:'2D preview ready',detail:'Drag to move, scroll to zoom, or continue to Export.',percent:100});},onError:error=>{workspaceStatus.update('preview',{state:'error',title:'Preview failed',detail:error.message});$('previewLoadStatus').hidden=false;$('previewLoadStatus').textContent=error.message;}});
     const syncPreviewZoom=()=>{

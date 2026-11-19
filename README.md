@@ -2,7 +2,11 @@
 
 Create printable 2D maps and 3D landscape models from places around the world, directly in your browser.
 
-[Open Topomapper](https://zrnnn.github.io/topomapper/) · [Release 0.3.1](https://github.com/zrnnn/topomapper/releases/tag/v0.3.1)
+[Open Topomapper](https://zrnnn.github.io/topomapper/) · [Release 0.3.2](https://github.com/zrnnn/topomapper/releases/tag/v0.3.2)
+
+## What changed in 0.3.2?
+
+From a 3D preview, open **Export**, choose **3MF**, **STL** or **OBJ**, then select **Prepare & download**. Topomapper builds the printable mesh and starts the download in one action. If you already prepared the mesh in Preview, choose **Download** to save it immediately. The Export panel explains each format and shows preparation progress or a recovery message.
 
 ## What changed in 0.3.1?
 
@@ -24,7 +28,7 @@ See the [current release checks](docs/RELEASE-REVIEW.md) and the [0.3.0 compatib
 
 The centered workflow bar lets you return to **Select area**, switch between **2D preview** and **3D preview** using the loaded area, or open **Export**. Unavailable steps are visibly disabled; hover over one to see why. Returning to area selection preserves the existing preview until you generate another area.
 
-One central toolbar combines workflow steps, zoom controls and live progress. Its **Layers** button returns to the inline data-selection panel; **Tools** groups 2D undo, redo and automatic-preview controls. The status section shows the current task and elapsed time, with a detail line for provider connections, real downloaded bytes, cached data, mirror attempts, geometry generation and file preparation. Percentages indicate processing stages, not an estimated time remaining. Downloads show an unknown total when the provider does not supply a reliable decoded byte count. Printable 3D downloads still require **Prepare printable model**.
+One central toolbar combines workflow steps, zoom controls and live progress. Its **Layers** button returns to the inline data-selection panel; **Tools** groups 2D undo, redo and automatic-preview controls. The status section shows the current task and elapsed time, with a detail line for provider connections, real downloaded bytes, cached data, mirror attempts, geometry generation and file preparation. Percentages indicate processing stages, not an estimated time remaining. Downloads show an unknown total when the provider does not supply a reliable decoded byte count.
 
 ## What can I make?
 
@@ -109,7 +113,7 @@ Set print width and mesh quality, then select terrain, buildings, streets, water
 
 A **quick preview** appears automatically and updates after you change settings. It uses separate surfaces and a lighter terrain mesh, avoiding expensive solid fusion while editing. Drag to orbit, scroll or use **− / +** to zoom, and choose **Reset view** to restore the camera.
 
-Choose **Prepare printable model** when you are ready. This runs full mesh preparation, fuses the selected layers and validates the solid. Download becomes available only after preparation succeeds. Quick-preview geometry cannot be exported accidentally. Changes invalidate the prepared result; preparing unchanged settings can reuse the cached solid.
+For a multicolor print, open **Export**, choose **3MF** and click **Prepare & download 3MF**. Leave Export open while the model builds. When preparation succeeds, your browser receives the file. If the download prompt does not appear, click **Download 3MF again** to save the finished file directly. To inspect the printable mesh first, use **Prepare printable model** in **3D preview**. Then open **Export** and click **Download 3MF**. You can download another format from the same prepared model. Changing model settings requires fresh preparation.
 
 ![Illustrated 3D printing workflow](docs/images/03-print.svg)
 

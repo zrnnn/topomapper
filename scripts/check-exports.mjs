@@ -15,6 +15,8 @@ try {
   const context = await browser.newContext({viewport:{width:1440,height:960},acceptDownloads:true});
   const page = await context.newPage();
   const errors = [];
+  const downloads = [];
+  page.on('download', file => downloads.push(file.suggestedFilename()));
   page.on('pageerror', error => errors.push(error.message));
   const tile = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
@@ -74,7 +76,11 @@ try {
     await page.waitForFunction(()=>!document.querySelector('#exportModel').disabled || !document.querySelector('#modelError').hidden,null,{timeout:90000});
   }
   await step('3d');
-  await preparePrintable();
+  await page.waitForFunction(()=>document.querySelector('#modelTitle').textContent.includes('Quick preview ready'));
+  await step('export');
+  await click('#prepareExportModel');
+  await page.locator('#modelError').waitFor({state:'visible'});
+  assert.equal(downloads.length,0,'A model with missing requested data must not download');
   assert.ok(await page.locator('#exportModel').isDisabled());
   assert.match(await page.locator('#modelErrorTechnical').textContent(),/unavailable for water\./);
   await step('2d');
@@ -86,7 +92,7 @@ try {
   assert.equal(retryQueries.length,1,'Retry should fetch only the failed water layer');
   assert.match(retryQueries[0],/coastline/);
   async function download(selector, name) {
-    const pending = page.waitForEvent('download');
+    const pending = page.waitForEvent('download',{timeout:90000});
     await click(selector);
     await (await pending).saveAs(join(directory,name));
     const file = await readFile(join(directory,name));
@@ -121,20 +127,36 @@ try {
     if (preset==='shaded') assert.equal(image.shading,true);
   }
   await step('3d');
-  await preparePrintable();
-  assert.equal(await page.locator('#exportModel').isDisabled(),false,await page.locator('#modelErrorTechnical').textContent());
+  await page.waitForFunction(()=>document.querySelector('#modelTitle').textContent.includes('Quick preview ready'));
   await step('export');
+  assert.ok(await page.locator('#prepareExportModel').isVisible());
+  assert.equal(await page.locator('#exportStatusLabel').textContent(),'Ready to prepare');
+  const previousDownloads=downloads.length;
+  await page.locator('#prepareExportModel').evaluate(button=>{
+    button.click();
+    const cancel=document.querySelector('#cancelExportPreparation');
+    if(cancel.hidden)throw new Error('Cancel action missing during preparation');
+    cancel.click();
+  });
+  await page.waitForFunction(()=>document.querySelector('#modelTitle').textContent==='Cancelled');
+  assert.equal(downloads.length,previousDownloads);
+  assert.ok(await page.locator('#prepareExportModel').isEnabled());
   for (const format of ['3mf','stl','obj']) {
     await page.selectOption('#model-format',format);
-    const file = await download('#exportModel','map.'+format);
+    const action=format==='3mf'?'#prepareExportModel':'#exportModel';
+    assert.equal(await page.locator(action).textContent(),(format==='3mf'?'Prepare & download ':'Download ')+format.toUpperCase());
+    const file = await download(action,'map.'+format);
     if (format==='stl') assert.equal(file.length,84+50*file.readUInt32LE(80));
     if (format==='obj') assert.match(file.toString(),/^f \d+ \d+ \d+$/m);
     if (format==='3mf') {
+      const second=await download('#modelFileLink','download-again.3mf');
+      assert.ok(file.equals(second),'The download link should reuse the generated file');
       const zip = await JSZip.loadAsync(file);
       const names = await zip.file('Metadata/model_settings.config').async('string');
       for (const name of ['Terrain','Green areas','Water','Rivers','Roads','Buildings']) assert.ok(names.includes(`value="${name}"`));
     }
   }
+  assert.equal(downloads.length-previousDownloads,4);
   await click('#closePreview');
   await page.setViewportSize({width:390,height:844});
   await click('#btnGen');
@@ -153,6 +175,9 @@ try {
   assert.equal(await page.locator('#exportModel').isDisabled(),false,await page.locator('#modelErrorTechnical').textContent());
   await step('export');
   await page.selectOption('#model-format','3mf');
+  assert.ok(await page.locator('#exportModel').isVisible());
+  assert.equal(await page.locator('#exportStatusLabel').textContent(),'Ready to download');
+  assert.ok(await page.locator('.model-download').evaluate(card=>card.getBoundingClientRect().right<=innerWidth));
   const single=await JSZip.loadAsync(await download('#exportModel','terrain-only.3mf'));
   const parts=await single.file('Metadata/model_settings.config').async('string');
   assert.match(parts,/value="Terrain"/);

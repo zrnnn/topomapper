@@ -1,14 +1,17 @@
-# Topomapper 0.3.1
+# Topomapper 0.3.2
 
-Multicolor 3MF parts now follow the local terrain surface with up to 1 mm of inlay. A thin base keeps at least 0.2 mm of ground material underneath. Roads, buildings and other raised features keep their height above ground.
+Open **Export** from a 3D preview, choose a file format and select **Prepare & download**. The panel shows what the app is doing and starts the download when the printable mesh is ready. If your browser misses the automatic download, **Download again** saves the same finished file without preparing it a second time.
 
-Automatic map loading can use VersaTiles when OpenFreeMap fails. Selections that exceed the full-detail tile limit can use lower-resolution overlays. Long, narrow frames reduce elevation tile resolution to stay within 64 tiles per provider. The loader preserves usable layers after partial failures and can recover from malformed responses and damaged cache entries.
+For multicolor printing, choose **3MF**. For a single fused mesh, choose **STL** or **OBJ**. You can still inspect the printable mesh in **3D preview** before opening Export.
 
 ## Verification
 
-- All 121 automated tests passed, including inlay depth on slopes, a 150,000-vertex footprint, interrupted road geometry and download limits.
-- Chromium exercised timeout and gateway failures, retried the missing water layer and downloaded SVG, DXF, PNG, STL, OBJ and 3MF. A mobile viewport also exported a terrain-only 3MF.
-- Inkscape 1.4.2 rendered the contour, building and shaded SVG samples. ezdxf 1.4.5 audited both DXF samples with zero errors and zero repairs.
-- Bambu Studio sliced the multicolor sample using two assigned filaments. The verification covered the digital toolpaths.
+- All 121 automated checks passed and the static production site built successfully.
+- Desktop Chromium downloaded a layered 3MF directly from a quick preview. The archive included terrain, roads, buildings, rivers, water and green areas. Downloading again produced identical bytes.
+- Cancelling mesh preparation returned control to the user. A missing water layer produced an inline error. Both scenarios produced zero downloads. Retrying the water request preserved the loaded layers.
+- A mobile Chromium viewport downloaded a terrain-only 3MF after preparing the model in Preview. The file contained only the terrain part.
+- The same browser run downloaded STL, OBJ, DXF, PNG and three SVG presets. Editing contour density with automatic preview off changed the downloaded DXF.
 
-[Previous release review](https://github.com/zrnnn/topomapper/blob/v0.3.0/docs/RELEASE-REVIEW.md)
+Browser checks use fixed geographic data and simulated provider failures so results are repeatable. They exercise the production website and its real file downloads.
+
+[Previous release review](https://github.com/zrnnn/topomapper/blob/v0.3.1/docs/RELEASE-REVIEW.md)
