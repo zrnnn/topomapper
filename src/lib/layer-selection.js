@@ -42,5 +42,5 @@ export function layerWarning(bounds,mode,layers){
   if(layers.buildings&&!policy.buildingsRecommended)heavy.push('buildings');
   if(layers.roads&&layers.minorRoads&&!policy.minorRoadsRecommended)heavy.push('smaller streets');
   if(!heavy.length&&!policy.overviewRecommended)return '';
-  return `${policy.km2.toFixed(1)} km² selected. ${heavy.length?`Loading ${heavy.join(' and ')} over this area can be very slow or exhaust browser memory. `:''}${layers.buildings&&policy.overviewRecommended?'City maps keep the largest footprints at print scale, up to 2,500. ':''}Loading can take up to 5 minutes and may time out; download and geometry limits still apply. Turn off unneeded layers to reduce the load.`;
+  return `${policy.km2.toFixed(1)} km² selected. ${heavy.length?`Loading ${heavy.join(' and ')} over this area can be very slow or exhaust browser memory. `:''}${layers.buildings&&policy.overviewRecommended?'City maps prioritize mapped landmarks and larger printable footprints, up to 2,500. ':''}Loading can take up to 5 minutes and may time out; download and geometry limits still apply. Turn off unneeded layers to reduce the load.`;
 }

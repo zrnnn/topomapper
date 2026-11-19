@@ -1,3 +1,4 @@
+import {footprintBounds,footprintIndex} from './footprint-index.js';
 import polygonClipping from 'polygon-clipping';
 import {simplifyPolyline,ringBounds} from './geometry.js';
 
@@ -21,6 +22,20 @@ const same = (a,b) => Math.hypot(a[0]-b[0],a[1]-b[1]) < 1e-6;
 const area = ring => ring.reduce((sum,p,i)=>{const q=ring[(i+1)%ring.length];return sum+p[0]*q[1]-q[0]*p[1];},0)/2;
 export const footprintArea = polygon => Math.max(0,Math.abs(area(polygon[0]||[]))-polygon.slice(1).reduce((sum,ring)=>sum+Math.abs(area(ring)),0));
 
+export function isLandmark(tags) {
+  return Boolean(tags.wikidata || (tags.heritage && tags.heritage !== 'no') ||
+    (tags.historic && tags.historic !== 'no') ||
+    ['cathedral','castle','monument','stadium'].includes(tags.building));
+}
+
+function buildingRank(record) {
+  if(record.landmark)return 3;
+  if(record.part || record.height?.estimated===false)return 2;
+  return record.height?.source==='levels' || (record.height?.source==='tile' && record.height.metres>=50)?1:0;
+}
+const compareBuildings=(a,b)=>buildingRank(b)-buildingRank(a) || b.footprint-a.footprint ||
+  String(a.id??'').localeCompare(String(b.id??''));
+
 export function prepareBuildingLod(buildings,{minArea=.5,minDimension=0,tolerance=.06,maxBuildings=2500}={}) {
   const original=(buildings||[]).length, originalPoints=(buildings||[]).reduce((sum,b)=>sum+b.polygons.flat(2).length,0);
   const candidates=(buildings||[]).flatMap(building=>{
@@ -33,7 +48,7 @@ export function prepareBuildingLod(buildings,{minArea=.5,minDimension=0,toleranc
     });
     const footprint=polygons.reduce((sum,polygon)=>sum+footprintArea(polygon),0);
     return polygons.length?[{...building,polygons,footprint}]:[];
-  }).sort((a,b)=>b.footprint-a.footprint);
+  }).sort(compareBuildings);
   const limited=candidates.slice(0,maxBuildings).map(building=>({...building,polygons:building.polygons.map(polygon=>polygon.map(ring=>{
     if(ring.length<=5||tolerance<=0)return ring;
     const open=ring.slice(0,-1), simplified=simplifyPolyline(open,tolerance);
@@ -43,12 +58,12 @@ export function prepareBuildingLod(buildings,{minArea=.5,minDimension=0,toleranc
   return {buildings:limited,stats:{original,shown:limited.length,omitted:original-limited.length,originalPoints,points,simplified:Math.max(0,originalPoints-points)}};
 }
 
-// Keep the largest individual footprints that fit. Applying the same ranking
+// Keep the highest-priority printable footprints that fit. Applying the same ranking
 // after each tile bounds memory even when one tile contains thousands of parts.
 export function limitCityFootprints(records,maxPoints,maxCount=2500){
   const kept=[];
   let used=0;
-  records.sort((a,b)=>b.footprint-a.footprint || a.id.localeCompare(b.id));
+  records.sort(compareBuildings);
   for(const building of records){
     const points=building.polygons.reduce((sum,p)=>sum+p.reduce((n,r)=>n+r.length,0),0);
     if(used+points>maxPoints)continue;
@@ -56,6 +71,25 @@ export function limitCityFootprints(records,maxPoints,maxCount=2500){
     if(kept.length===maxCount)break;
   }
   return kept;
+}
+
+// Carve only retained, printable parts. Tiny or omitted parts leave their
+// parent outline intact. Courtyards and uncovered wings remain in the result.
+export function separateBuildingParts(buildings,width,height) {
+  const parts=buildings.filter(b=>b.part);
+  if(!parts.length)return buildings;
+  const nearby=footprintIndex(parts,width,height);
+  return buildings.flatMap(building=>{
+    if(building.part)return [building];
+    const cuts=[];
+    for(const part of nearby(footprintBounds(building))){
+      const shared=polygonClipping.intersection(building.polygons,part.polygons);
+      if(shared.reduce((sum,p)=>sum+footprintArea(p),0)>=part.footprint*.98)cuts.push(part.polygons);
+    }
+    if(!cuts.length)return [building];
+    const polygons=polygonClipping.difference(building.polygons,...cuts);
+    return polygons.length?[{...building,polygons}]:[];
+  });
 }
 
 export function coastlineAreas(lines,clipPolygon) {
@@ -146,7 +180,7 @@ export function parseBuildings(elements, project) {
     const id=`${element.type}/${element.id}`;
     if(seen.has(id) || !polygons.length) return;
     seen.add(id);
-    result.push({id,polygons,height:buildingHeight(element.tags),name:String(element.tags?.name || 'Building')});
+    result.push({id,polygons,height:buildingHeight(element.tags),landmark:isLandmark(element.tags),name:String(element.tags?.name || 'Building')});
   };
   // Relations first: suppress duplicate outer ways only when a valid relation is retained.
   for(const element of elements) {

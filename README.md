@@ -2,7 +2,15 @@
 
 Create printable 2D maps and 3D landscape models from places around the world, directly in your browser.
 
-[Open Topomapper](https://zrnnn.github.io/topomapper/) · [Release 0.3.4](https://github.com/zrnnn/topomapper/releases/tag/v0.3.4)
+[Open Topomapper](https://zrnnn.github.io/topomapper/) · [Release 0.3.5](https://github.com/zrnnn/topomapper/releases/tag/v0.3.5)
+
+## What changed in 0.3.5?
+
+For whole cities, choose **Automatic**. Topomapper builds streets locally from road lines and buildings from footprints. Within the print-size and point limits it gives priority to tagged landmarks, buildings with mapped heights, and tall features in generalized tiles. Ordinary footprints use a tile height, a floor-count estimate, or your **Fallback height** setting. Source detail varies by city.
+
+For a landmark or city block up to **1 km²**, choose **Frame & Dimensions → Map detail source → Detailed OpenStreetMap**, then **3D printing → Buildings**. Where contributors mapped ground-level building sections with individual heights, wings and towers can print at different heights. Roofs are reconstructed as flat tops. In Automatic mode, New York City selections up to **0.5 km²** can also use official city roof heights for closely matching footprints. Other buildings retain their existing height. [NYC building footprints](https://data.cityofnewyork.us/d/5zhs-2jue)
+
+Public regional mirrors now serve eligible European and North American frames. Under **Frame & Dimensions → Optional Overpass provider**, you can also choose a worldwide service and enter your own key. The key is used for the selected service in the current page. Changing the provider or closing the page clears that key.
 
 ## What changed in 0.3.4?
 
@@ -101,7 +109,7 @@ Zoom the preview with the mouse wheel or **− / + / Fit**, and drag the preview
 
 ### Large building datasets
 
-**Minimum footprint (mm²)** removes buildings that would be too small in the final output. A 1 × 1 mm footprint has an area of 1 mm². Complex outlines are simplified, and dense selections retain up to 2,500 of the largest buildings. The interface reports omissions.
+**Minimum footprint (mm²)** removes buildings that would be too small in the final output. A 1 × 1 mm footprint has an area of 1 mm². Complex outlines are simplified, and dense selections retain up to 2,500 printable footprints, ranked by landmark tags, height information and footprint area. The interface reports omissions.
 
 A threshold of 0 disables the small-footprint filter, but the count limit and outline simplification still apply. Neighbouring buildings are not merged into city blocks.
 
@@ -168,7 +176,7 @@ Search terms are sent to public Nominatim. Detailed map bounds are sent to Overp
 
 The browser may retain bounded caches of the selected geography for repeat visits. The app also loads basemap tiles from OpenTopoMap and fonts from Google Fonts. These providers receive normal browser requests. The app has no account system or application backend. Public services have no availability guarantee.
 
-Map fallback uses the three currently documented public, no-key operators with global OpenStreetMap coverage: Private.coffee (formerly Kumi), FOSSGIS Overpass, and VK Maps. Private.coffee is the initial default; successful request timings then rank the non-Russian public providers, with VK Maps (`maps.mail.ru`) always last. Rankings use a rolling average within the active map worker, without extra quota-consuming probes; they are not a worldwide speed guarantee. A custom endpoint always takes priority. Provider names appear during loading. When another mirror is available, a detail request that receives no headers for 12 seconds can move on. A response already transferring has the normal 45-second request deadline. If a tile transfer stalls for 12 seconds, Automatic mode tries the next tile service before falling back to detailed Overpass queries. Rate-limited providers are temporarily skipped; the app honors numeric or date-form Retry-After headers with at least a 30-second cooldown. Advanced users can put a self-hosted or API-key Overpass-compatible HTTPS endpoint first in the fallback pool under **Frame & Dimensions**. [Provider coverage and usage policies](https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances).
+Map fallback uses the three currently documented public, no-key operators with global OpenStreetMap coverage: Private.coffee (formerly Kumi), FOSSGIS Overpass, and VK Maps. Within supported parts of Europe and North America, the regional Dresel endpoint can handle the first query. Other frames start at Private.coffee. Successful request timings rank the non-Russian public providers, with VK Maps (`maps.mail.ru`) always last. Rankings use a rolling average within the active map worker, without extra quota-consuming probes; they are not a worldwide speed guarantee. A custom endpoint always takes priority. Provider names appear during loading. When another mirror is available, a detail request that receives no headers for 12 seconds can move on. A response already transferring has the normal 45-second request deadline. If a tile transfer stalls for 12 seconds, Automatic mode tries the next tile service before falling back to detailed Overpass queries. Rate-limited providers are temporarily skipped; the app honors numeric or date-form Retry-After headers with at least a 30-second cooldown. Advanced users can put a self-hosted or API-key Overpass-compatible HTTPS endpoint first in the fallback pool under **Frame & Dimensions**. [Provider coverage and usage policies](https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances).
 
 Worldwide coverage is subject to available source data. This Web Mercator application supports selections between 85°S and 85°N and does not support date-line-crossing frames. Changing an API server does not create missing building geometry or improve the source elevation resolution. Terrain tries Mapzen, then [Mapterhorn's 512-pixel Terrarium tiles](https://mapterhorn.com/data-access/), then Open-Elevation. Mapterhorn uses globally available zoom levels up to 12; its regional higher-zoom archives are not required.
 
@@ -176,7 +184,7 @@ City geometry uses [OpenFreeMap](https://openfreemap.org/) and © [OpenMapTiles]
 
 ### Other provider options
 
-The public provider list was reviewed on 20 September 2026. Kumi and Private.coffee are the same operator, not independent mirrors. Regional servers are not worldwide fallbacks. Key-based Overpass-compatible services from [Geofabrik](https://www.geofabrik.de/), [FairwayMapper](https://www.fairwaymapper.com/) and other operators listed in the [OSM provider directory](https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances) can be used through the advanced custom HTTPS endpoint if your plan permits this use and supports browser CORS. No keys are bundled. Do not publish private keys in the repository; a static browser app cannot conceal a client-side key.
+Topomapper uses the Europe and North America extracts from one regional operator. Routing checks the entire frame against conservative interior windows. Other locations use the worldwide pool. The optional global provider menu supports NextGIS, FairwayMapper, Geofabrik, Tracestrack, Overspan, Mapsource and Overpass.ch. Each requires your own account or key and is subject to the provider’s quota and browser-access policy. A custom HTTPS endpoint is also supported. Kumi is the former name of Private.coffee. [Regional operator](https://ovp.dresel.systems/) · [OSM provider directory](https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances)
 
 [Maptoolkit](https://www.maptoolkit.org/) was not added: its free service excludes print materials and data extraction, which conflicts with this tool's exports. Public-service capacity is finite; adding aliases or parallel retries does not remove usage limits.
 

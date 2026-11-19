@@ -3,16 +3,19 @@ import {latitudeY} from './terrain.js';
 import {createGeometry} from './geometry.js';
 import {roadRecord} from './road-style.js';
 import {MAP_QUERY_TIMEOUT_SECONDS} from './map-service.js';
+import {areaPlan} from './area-plan.js';
 import {selectedLayers} from './layer-selection.js';
     export const buildOverpassQuery = (state,bbox,buildingPerimeter,stage) => {
       const layers=selectedLayers(state);
+      const parts=layers.buildings && state.outputMode==='3d' && !state.cityOverview &&
+        areaPlan(state.renderBbox).km2<=1;
       const statements={
         water:layers.water?`way["natural"="water"](${bbox});way["natural"~"bay|coastline"](${bbox});way["water"~"lake|reservoir|pond|basin|lagoon|sea|ocean"](${bbox});way["landuse"~"reservoir|basin"](${bbox});way["waterway"="riverbank"](${bbox});relation["natural"="water"](${bbox});relation["natural"="bay"](${bbox});relation["water"~"lake|reservoir|pond|basin|lagoon|sea|ocean"](${bbox});relation["landuse"~"reservoir|basin"](${bbox});relation["waterway"="riverbank"](${bbox});`:'',
         green:layers.green?`way["landuse"~"forest|grass|meadow|recreation_ground"](${bbox});way["leisure"~"park|garden"](${bbox});way["natural"~"wood|grassland"](${bbox});relation["landuse"~"forest|grass|meadow|recreation_ground"](${bbox});relation["leisure"~"park|garden"](${bbox});relation["natural"~"wood|grassland"](${bbox});`:'',
         labels:layers.labels?`node["place"~"city|town|village|suburb|hamlet|neighbourhood"](${bbox});node["natural"="peak"]["name"](${bbox});`:'',
         rivers:`way["waterway"~"river|stream|canal"](${bbox});`,
         roads:`way["highway"~"${layers.minorRoads?'motorway|trunk|primary|secondary|tertiary|residential|unclassified|service':'motorway|trunk|primary|secondary|tertiary'}"](${bbox});relation["highway"~"${layers.minorRoads?'motorway|trunk|primary|secondary|tertiary|residential|unclassified|service':'motorway|trunk|primary|secondary|tertiary'}"](${bbox});`,
-        buildings:layers.buildings?`way["building"]["building"!="no"](${bbox})${state.cityOverview?`(if:length()>=${buildingPerimeter})`:''};${state.cityOverview?'':`relation["building"]["building"!="no"](${bbox});`}`:''
+        buildings:layers.buildings?`way["building"]["building"!="no"](${bbox})${state.cityOverview?`(if:length()>=${buildingPerimeter})`:''};${state.cityOverview?'':`relation["building"]["building"!="no"](${bbox});`}${parts?`way["building:part"]["building:part"!="no"](${bbox});relation["building:part"]["building:part"!="no"](${bbox});`:''}`:''
       };
       statements.areas=statements.water+statements.green+statements.labels;
       if(!layers.rivers)statements.rivers='';
@@ -30,7 +33,21 @@ export function mapProjection(state){
 }
 export function parseMapStage(elements,state,stage){
   const data=emptyMapData(),project=mapProjection(state);
-  if (!stage || stage==='buildings') data.buildings=parseBuildings(elements,project);
+  if (!stage || stage==='buildings') {
+    data.buildings=parseBuildings(elements,project);
+    if(state.outputMode==='3d' && !state.cityOverview && areaPlan(state.renderBbox).km2<=1){
+      // Elevated decks and roofs require overhang geometry. Only reconstruct
+      // grounded sections whose source provides a usable top height.
+      const parts=elements.filter(({tags:t})=>t?.['building:part'] && t['building:part']!=='no' &&
+        Number(t['building:min_level']??0)===0 &&
+        (!t.min_height || /^0(?:\.0+)?(?:\s*m)?$/.test(String(t.min_height))) &&
+        t['building:part']!=='roof').map(el=>({...el,tags:{...el.tags,building:el.tags.building||'yes'}}));
+      const sections=parseBuildings(parts,project).filter(b=>b.height.source!=='fallback');
+      const partIds=new Set(sections.map(b=>b.id));
+      const outlineIds=new Set(data.buildings.map(b=>b.id));
+      data.buildings=data.buildings.filter(b=>!partIds.has(b.id)).concat(sections.map(b=>({...b,part:true,outline:outlineIds.has(b.id)})));
+    }
+  }
   if (stage==='buildings') return data;
   const water=t=>t.natural==='water'||t.natural==='bay'||t.waterway==='riverbank'||['sea','ocean','lake','reservoir','pond','basin','lagoon'].includes(t.water)||['reservoir','basin'].includes(t.landuse);
   const green=t=>['forest','grass','meadow','recreation_ground'].includes(t.landuse)||['park','garden'].includes(t.leisure)||['wood','grassland'].includes(t.natural);

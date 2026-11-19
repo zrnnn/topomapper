@@ -10,7 +10,11 @@ const FIRST_RESPONSE_MS=12000;
 // A user-supplied endpoint stays first; the .ru service is always a last resort.
 export function rankProviders(endpoints){
   return [...endpoints].sort((a,b)=>{
-    const tier=url=>!MAP_PROVIDERS.includes(url)?0:new URL(url).hostname.endsWith('.ru')?2:1;
+    const tier=url=>{
+      const host=new URL(url).hostname;
+      if(!MAP_PROVIDERS.includes(url) && host!=='ovp.dresel.systems')return 0;
+      return host.endsWith('.ru')?2:1;
+    };
     return tier(a)-tier(b)||Number(providerQueue.has(a))-Number(providerQueue.has(b))||(speeds.get(a)??Infinity)-(speeds.get(b)??Infinity);
   });
 }

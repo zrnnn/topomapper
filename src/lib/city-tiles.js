@@ -6,7 +6,7 @@ import {cachedBytes,cacheBytes} from './data-cache.js';
 import {emptyMapData,mapProjection} from './map-parser.js';
 import {roadRecord} from './road-style.js';
 import {createGeometry} from './geometry.js';
-import {buildingHeight,clipBuildings,prepareBuildingLod,footprintArea,limitCityFootprints} from './buildings.js';
+import {isLandmark,buildingHeight,clipBuildings,prepareBuildingLod,footprintArea,limitCityFootprints} from './buildings.js';
 import {selectedLayers} from './layer-selection.js';
 
 const tileSources=[
@@ -166,6 +166,14 @@ async function loadTileSource(source,state,{signal,budget,progress=()=>{},fetchI
     }
   }
 }
+function tileBuilding(properties) {
+  const mapped=buildingHeight(properties);
+  const render=buildingHeight({height:properties.render_height});
+  const height=mapped.source!=='fallback'?mapped:render.source==='fallback'?mapped:
+    {...render,estimated:true,source:'tile'};
+  return {name:String(properties.name||'Building'),landmark:isLandmark(properties),height,
+    hide3d:[true,1,'true'].includes(properties.hide_3d)};
+}
 export function decodeCityTile(bytes,{x,y,z},state,{neighborhood=false,cityBuildings=false,source=tileSources[0]}={}){
   const tile=new VectorTile(new PbfReader(bytes)),data=emptyMapData(),project=mapProjection(state),geometry=createGeometry(state);
   const n=2**z;
@@ -189,14 +197,12 @@ export function decodeCityTile(bytes,{x,y,z},state,{neighborhood=false,cityBuild
         // multipolygon. Rank actual footprints; keep each courtyard with its shell.
         if(feature.type!==3)continue;
         const sx=tileWidth/layer.extent,sy=tileHeight/layer.extent;
-        const height=buildingHeight({height:p.render_height??p.height});
+        const attributes=tileBuilding(p);
         let part=0;
         for(const rings of classifyRings(feature.loadGeometry())){
           const polygon=rings.map(ring=>ring.map(pt=>[tileRing[0][0]+pt.x*sx,tileRing[0][1]+pt.y*sy]));
           if(footprintArea(polygon)<minArea)continue;
-          const record={id:`${z}/${x}/${y}/${i}/${part++}`,polygons:[polygon],name:'Building',
-            hide3d:p.hide_3d===true||p.hide_3d===1||p.hide_3d==='true',
-            height:{...height,estimated:true,source:height.source==='fallback'?'fallback':'tile'}};
+          const record={id:`${z}/${x}/${y}/${i}/${part++}`,polygons:[polygon],...attributes};
           data.buildings.push(...clipBuildings([record],clip));
         }
         continue;
@@ -221,12 +227,7 @@ export function decodeCityTile(bytes,{x,y,z},state,{neighborhood=false,cityBuild
         const record={id:`${z}/${x}/${y}/${name}/${i}`,polygons};
         // Remove tile buffer overlaps while retaining holes. Neighboring tile
         // pieces meet at their true border, avoiding doubled transparent fills.
-        if (category==='buildings') {
-          record.hide3d=p.hide_3d===true || p.hide_3d===1 || p.hide_3d==='true';
-          const height=buildingHeight({height:p.render_height??p.height});
-          record.height={...height,estimated:true,source:height.source==='fallback'?'fallback':'tile'};
-          record.name='Building';
-        }
+        if(category==='buildings')Object.assign(record,tileBuilding(p));
         const clipped=clipBuildings([record],clip);
         const key=category==='buildings'?'buildings':category==='water'?'waterAreas':'greenAreas';
         data[key].push(...clipped);

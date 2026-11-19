@@ -1,22 +1,28 @@
-# Topomapper 0.3.4
+# Topomapper 0.3.5
 
-Select a city, choose 3D printing and enable **Buildings**. Automatic detail can use generalized building tiles at the zoom supported by the provider. Individual footprints are ranked at the selected print size. The city preset uses a 0.5 mm² footprint threshold and retains up to 2,500. The 3D printability filter also checks the 0.2 mm minimum feature dimension.
+For whole cities, use Automatic with Buildings enabled. Topomapper builds road and building geometry locally and gives tagged landmarks, known heights and tall tile features priority within the printable footprint budget. Dense building layers can drop lower-priority outlines when the combined map reaches its point limit.
 
-City building frames requiring 65–512 tiles load from the center outward in batches of 32. **Load more building tiles** extends coverage. The current coverage is available for export after each successful batch. Larger selections use the filtered Overpass fallback. The toolbar shows a larger progress bar and a throughput-based estimate for the current tile batch when enough work has completed.
+For individual landmarks, choose Detailed OpenStreetMap and a 3D selection up to 1 km². Printable ground-level sections with mapped heights can give a building multiple roof levels. Uncovered wings keep their original footprint. Unmapped roofs, façades and elevated structures remain simplified.
 
-## Live city checks
+Automatic mode can enrich matching footprints in NYC frames up to 0.5 km² with the city’s published roof heights. One request can read up to 400 city records and has a five-second deadline. Ambiguous matches keep their existing height. A failed city request leaves the building layer available for export. [City building footprints](https://data.cityofnewyork.us/d/5zhs-2jue)
 
-| Selection | Verified result |
-| --- | --- |
-| Nuremberg, 279 km² browser frame | Chromium downloaded a 200 × 140 mm 3MF using Mapzen elevation and OpenFreeMap footprints. The model contained named Terrain and Buildings parts, 984 printable footprints and 74,946 triangles. |
-| Greater Berlin, roughly 1,718 km² | The single-query providers returned rate-limit or gateway responses. The tile route covered 238 tiles in eight batches and read 8.55 MB of decoded data. The 200 mm flat-base 3MF contained 134 printable footprints. Loading the building batches took 3.7 seconds in the test environment, excluding user interaction and model preparation. |
-| Berlin, 979 km² browser frame | The coverage indicator advanced from 32/140 to 64/140 after one click. Chromium downloaded a partial flat-base 3MF with 314 printable footprints. |
+## Provider coverage
 
-The footprint counts describe features retained at print scale. Provider coverage, building heights, source generalization, network speed and chosen print dimensions affect the result.
+The Europe and North America endpoints of the Dresel service answered live browser-origin queries in Nuremberg and Manhattan. Eligible interior frames can use the regional endpoint alongside the existing worldwide fallbacks. The two extracts share one operator. Seven additional global service presets accept a personal API key. Endpoint construction, key clearing and fallback are covered by tests. Authenticated accounts at those seven providers were unavailable for live tests. [Regional service](https://ovp.dresel.systems/) · [OSM provider directory](https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances)
+
+## Live model checks
+
+| Selection | Map data received | 3MF result |
+| --- | --- | --- |
+| Cologne Cathedral neighbourhood | 117 building records, including 64 mapped sections, and 30 road lines | Base, Roads and Buildings, 12,128 triangles |
+| Midtown Manhattan | 34 footprint records, three matched city roof heights, and five road lines | Base, Roads and Buildings, with NYC attribution |
+| Tokyo Station neighbourhood | 11 footprint records and 16 road lines from worldwide tiles | Base, Roads and Buildings, 7,318 triangles |
+| Nuremberg city frame | 25 tiles, 1.35 MB decoded, 605 printable buildings | Base and Buildings, 52,324 triangles |
+
+The Nuremberg flat-base test took 0.72 seconds to load footprints on the first run and 0.12 seconds from cache. Preparing its 3MF took 5.37 seconds on the test machine. These timings exclude terrain download and depend on the network, selection and device.
 
 ## Regression checks
 
-- 127 automated tests, including grouped city footprints, courtyards, a self-crossing building outline, partial coverage and tile-batch estimates.
-- Production build and Chromium coverage of the six download formats, partial maps, cancellation, retry and mobile layout.
+133 automated checks passed. The production build and Chromium checks cover SVG, DXF, PNG, STL, OBJ and multipart 3MF downloads, partial data, retry, cancellation, mobile layout and clearing a personal key when switching providers. The live city 3MF archives were reopened programmatically. They have not been physically printed as part of this release.
 
-[Previous release review](https://github.com/zrnnn/topomapper/blob/v0.3.3/docs/RELEASE-REVIEW.md)
+[Previous release review](https://github.com/zrnnn/topomapper/blob/v0.3.4/docs/RELEASE-REVIEW.md)

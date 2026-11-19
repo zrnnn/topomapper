@@ -64,6 +64,14 @@ try {
   const click = selector => page.locator(selector).click();
   const ready = () => page.waitForFunction(()=>document.querySelector('#modal').classList.contains('open') && !document.querySelector('#btnGen').disabled);
   const step = target => click(`#modal [data-workspace-step="${target}"]`);
+  await click('#advancedControls > summary');
+  await page.selectOption('#overpassProvider','NextGIS');
+  await page.fill('#overpassKey','test-only');
+  await page.selectOption('#overpassProvider','Geofabrik');
+  assert.equal(await page.inputValue('#overpassKey'),'');
+  await page.selectOption('#overpassProvider','');
+  assert.equal(await page.locator('#overpassKey').count(),0);
+  await click('#advancedControls > summary');
   await click('#btnGen');
   for (const box of await page.locator('#purposeDialog input[type=checkbox]:enabled').all()) await box.check();
   await click('#btnGen');

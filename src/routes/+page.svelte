@@ -6,6 +6,8 @@
   import WorkflowChrome from '$lib/WorkflowChrome.svelte';
   import {LAYER_CHOICES} from '$lib/layer-selection.js';
 
+  import {keyedProviders} from '$lib/map-providers.js';
+  let overpassProvider='';
   onMount(() => {
     let cancelled = false;
     let cleanup;
@@ -95,10 +97,21 @@
         <div class="group">
           <label class="ui-label" for="mapDetailSource">Map detail source</label>
           <select id="mapDetailSource"><option value="auto">Automatic · fast vector tiles</option><option value="raw">Detailed OpenStreetMap · Overpass</option></select>
-          <p class="control-help">Vector tiles use generalized shapes and estimated building heights. Choose Overpass for source footprints and mapped height tags.</p>
-          <label class="ui-label" for="customOverpassEndpoint">Optional map-data endpoint</label>
-          <input id="customOverpassEndpoint" type="url" inputmode="url" placeholder="https://your-overpass.example/api/interpreter">
-          <p class="control-help">Advanced fallback for a self-hosted or API-key Overpass-compatible endpoint. HTTPS only; the three public worldwide providers remain automatic fallbacks.</p>
+          <p class="control-help">Automatic is best for cities. For towers and wings with separately mapped heights, select Detailed OpenStreetMap and a 3D frame up to 1 km².</p>
+          <label class="ui-label" for="overpassProvider">Optional Overpass provider</label>
+          <select id="overpassProvider" bind:value={overpassProvider}>
+            <option value="">Public services or custom URL</option>
+            {#each keyedProviders as [name]}<option value={name}>{name} · personal key</option>{/each}
+          </select>
+          {#if overpassProvider}
+            <label class="ui-label" for="overpassKey">{overpassProvider} API key</label>
+            {#key overpassProvider}<input id="overpassKey" type="password" autocomplete="off" placeholder="Enter your personal key">{/key}
+            <p class="control-help">With a key, detailed map requests start at {overpassProvider}. Leave it blank to use the public services.</p>
+          {:else}
+            <label class="ui-label" for="customOverpassEndpoint">Custom HTTPS endpoint</label>
+            <input id="customOverpassEndpoint" type="url" inputmode="url" placeholder="Optional">
+            <p class="control-help">Public services work without a key. A custom endpoint receives detailed map requests first.</p>
+          {/if}
         </div>
       </div>
     </details>

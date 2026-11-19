@@ -1,5 +1,5 @@
 import {simplifyPolyline} from './geometry.js';
-import {prepareBuildingLod} from './buildings.js';
+import {prepareBuildingLod,limitCityFootprints} from './buildings.js';
 import {roadPoints} from './road-style.js';
 
 const linePoints=data=>['roadLines','waterLines'].reduce((sum,key)=>sum+(data[key]||[]).reduce((n,line)=>n+roadPoints(line).length,0),0);
@@ -29,11 +29,18 @@ const simplifyData=(data,tolerance,minBuildingArea,maxBuildings)=>{
   return result;
 };
 
-export function applyMapPointBudget(data,{maxPoints=80000,minBuildingArea=1.5,maxBuildings=2500}={}) {
+export function applyMapPointBudget(data,{maxPoints=80000,minBuildingArea=1.5,maxBuildings=2500,fitBuildings=false}={}) {
   const originalPoints=countMapPoints(data);
   let result=data,tolerance=.04;
   while(tolerance<=1.28){result=simplifyData(data,tolerance,minBuildingArea,maxBuildings);if(countMapPoints(result)<=maxPoints)break;tolerance*=2;}
+  let omittedForBudget=0;
+  if(fitBuildings && countMapPoints(result)>maxPoints){
+    const available=maxPoints-areaPoints(result)-linePoints(result);
+    const buildings=limitCityFootprints(result.buildings,available,maxBuildings);
+    omittedForBudget=result.buildings.length-buildings.length;
+    result={...result,buildings};
+  }
   const points=countMapPoints(result);
   if(points>maxPoints)throw new Error(`Map geometry exceeds the ${maxPoints.toLocaleString()} point display budget. Use city overview or select a smaller area.`);
-  return {data:result,stats:{originalPoints,points,tolerance}};
+  return {data:result,stats:{originalPoints,points,tolerance,omittedForBudget}};
 }

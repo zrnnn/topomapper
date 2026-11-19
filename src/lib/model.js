@@ -1,6 +1,6 @@
 import {buildTerrainMesh} from './mesh.js';
 import {buildBuildingMeshes} from './building-mesh.js';
-import {clipBuildings,prepareBuildingLod} from './buildings.js';
+import {clipBuildings,prepareBuildingLod,separateBuildingParts} from './buildings.js';
 import {createGeometry,ringBounds} from './geometry.js';
 import {batchProgress} from './operation-status.js';
 import {roadPoints} from './road-style.js';
@@ -35,7 +35,7 @@ export function modelInput(state, settings) {
   const geometry=createGeometry(scaled),shape=geometry.getClipPolygon();
   const lines=records=>(records||[]).flatMap(line=>geometry.clipPolylineToPolygon(roadPoints(line).map(([x,y])=>[x*scale,y*scale]),shape).map(points=>Array.isArray(line)?points:{...line,points}));
   const buildingLod=prepareBuildingLod(settings.buildings?clipBuildings(scaleRecords(state.osmData?.buildings?.filter(b=>!b.hide3d),scale),shape):[],{minArea:settings.minBuildingArea,minDimension:.2,tolerance:.08,maxBuildings:2500});
-  return {state:scaled,buildings:buildingLod.buildings,buildingStats:buildingLod.stats,
+  return {state:scaled,buildings:separateBuildingParts(buildingLod.buildings,scaled.wMm,scaled.hMm),buildingStats:buildingLod.stats,
     water:settings.water?filterMinDimension(clipBuildings(scaleRecords(state.osmData?.waterAreas,scale),shape)):[],green:settings.green?filterMinDimension(clipBuildings(scaleRecords(state.osmData?.greenAreas,scale),shape)):[],
     roads:settings.roads?lines(state.osmData?.roadLines):[],rivers:settings.rivers?lines(state.osmData?.waterLines):[]};
 }
@@ -181,6 +181,7 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
     if (overlays.length) {
       credits.push('Map data © OpenStreetMap contributors (https://www.openstreetmap.org/copyright)');
       if (state.mapSource?.includes('OpenFreeMap')) credits.push('OpenMapTiles / OpenFreeMap');
+      if(input.buildings.some(b=>b.height?.source==='nyc-roof'))credits.push('NYC Open Data / NYC Office of Technology and Innovation building footprints');
       if (state.mapSource?.includes('VersaTiles')) credits.push('VersaTiles / Shortbread');
     }
     const result={mesh,parts,credits:credits.filter(Boolean).join(' · '),counts,buildingStats:input.buildingStats,width:s.wMm,height:s.hMm,reliefHeight,triangles:mesh.t.length,volume,settings:{...settings}};

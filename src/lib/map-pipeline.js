@@ -1,3 +1,5 @@
+import {addNYCHeights,useNYCHeights,NYC_SOURCE} from './nyc-buildings.js';
+import {regionalEndpoint} from './map-providers.js';
 import {batchProgress} from './operation-status.js';
 import {emptyMapData,buildOverpassQuery,parseMapStage} from './map-parser.js';
 import {MAP_PROVIDERS,requestMapData,isCompleteMapResponse} from './map-service.js';
@@ -11,7 +13,7 @@ import {applyMapPointBudget,countMapPoints} from './map-lod.js';
 import {loadCityTiles,vectorTilePlan,cityBuildingPlan} from './city-tiles.js';
 import {requestedStages,filterSelectedLayers,selectedLayers,incompleteMapLayers} from './layer-selection.js';
 
-export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,progress=()=>{},request=requestMapData,cityLoader=loadCityTiles,previous=null}={}){
+export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,progress=()=>{},request=requestMapData,cityLoader=loadCityTiles,roofLoader=addNYCHeights,previous=null}={}){
   let data=previous?.data??emptyMapData(),points=previous?.status.pointStats??null;
   const completed=[...(previous?.status.completed??[])];
   const initialCount=completed.length;
@@ -50,6 +52,13 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
   function queryFor(stage,{sw,ne}) {
     return buildOverpassQuery(state,[sw.lat,sw.lng,ne.lat,ne.lng].join(','),perimeter,stage);
   }
+  const publicPool=(endpoints||MAP_PROVIDERS).every(endpoint=>MAP_PROVIDERS.includes(endpoint));
+  const regional=regionalEndpoint(bounds);
+  // Keep any personal service first and keep the VK endpoint last.
+  if(regional && (!endpoints || endpoints.some(e=>MAP_PROVIDERS.includes(e)))){
+    const pool=endpoints||MAP_PROVIDERS;
+    endpoints=[...pool.filter(e=>!MAP_PROVIDERS.includes(e)),regional,...pool.filter(e=>MAP_PROVIDERS.includes(e))];
+  }
   const cacheKey=query=>'osm-v2:'+JSON.stringify(endpoints)+':'+query;
   async function loadQuery(query,signal,report,options={}) {
     const key=cacheKey(query),cached=await cachedBytes(key);
@@ -77,7 +86,6 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
     }
   }
   const stageSignal=()=>AbortSignal.timeout(Math.max(1,Math.min(100000,deadline-Date.now())));
-  const publicPool=(endpoints||MAP_PROVIDERS).every(endpoint=>MAP_PROVIDERS.includes(endpoint));
   const autoTiles=publicPool && !state.rawMapDetail;
   const needNative=!sourceCity || selected.buildings || (selected.minorRoads && selected.roads);
   const native=autoTiles && stages.length>0 && needNative &&
@@ -162,7 +170,18 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
         publish(stage,'Preparing '+labels[stage]);
         incoming=parseMapStage(elements,state,stage);
       }
-      return {incoming:filterSelectedLayers(incoming,state),source,stageStart};
+      let advisory;
+      if(stage==='buildings' && autoTiles && useNYCHeights(state) && budget.maxBytes-budget.bytes>=1500000 && Date.now()<deadline){
+        try{
+          publish(stage,'Checking city roof heights for matching footprints');
+          const roofs=await roofLoader(state,incoming.buildings,{budget,signal:AbortSignal.any([signal,AbortSignal.timeout(5000)]),progress:detail=>publish(stage,detail)});
+          incoming.buildings=roofs.buildings;
+          if(roofs.count)source+=' + '+NYC_SOURCE;
+        }catch(error){
+          advisory='City roof heights unavailable ('+(error.name==='TimeoutError'?'time limit reached':error.message)+'). Existing building heights were kept.';
+        }
+      }
+      return {incoming:filterSelectedLayers(incoming,state),source,stageStart,advisory};
     } catch(error) {
       const message=signal.aborted?'stage time limit reached':error.message;
       return {error:new Error([buildingTileError,message].filter(Boolean).join(' · ')),stageStart};
@@ -181,7 +200,7 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
       errors.push('Remaining details skipped at the time or download budget.');
       break;
     }
-    const {incoming,error,source,tileCount=0,nextCoverage,stageStart}=await pending.get(stage);
+    const {incoming,error,source,advisory,tileCount=0,nextCoverage,stageStart}=await pending.get(stage);
     pending.delete(stage);
     try {
       if (error) throw error;
@@ -195,8 +214,10 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
       const ranks={city:1,town:2,village:3,suburb:4,neighbourhood:5,hamlet:6};
       candidate.labels=Array.from(new Map(candidate.labels.map(label=>[label.name+':'+label.lat+':'+label.lon,label])).values()).sort((a,b)=>(ranks[a.place]||9)-(ranks[b.place]||9)).slice(0,36);
       publish(stage,'Simplifying '+labels[stage]+' · checking the combined data budget');
-      const bounded=applyMapPointBudget(candidate,{maxPoints:policy.maxMapPoints,minBuildingArea:state.mapFeatures.buildings.minArea,maxBuildings:2500});
-      data=bounded.data;points=bounded.stats;sources.add(source);buildingTiles+=tileCount;
+      const bounded=applyMapPointBudget(candidate,{maxPoints:policy.maxMapPoints,minBuildingArea:state.mapFeatures.buildings.minArea,maxBuildings:2500,fitBuildings:stage==='buildings'});
+      data=bounded.data;points=bounded.stats;source.split(' + ').forEach(name=>sources.add(name));buildingTiles+=tileCount;
+      if(advisory)errors.push(advisory);
+      if(points.omittedForBudget)errors.push(points.omittedForBudget+' smaller or lower-priority buildings omitted to fit the point budget.');
       if(stage==='buildings')coverage=nextCoverage?.done<nextCoverage?.total?nextCoverage:null;
       if(stage==='buildings' && coverage){
         errors.push(`Buildings cover ${coverage.done}/${coverage.total} tiles. Load more building tiles to extend coverage.`);

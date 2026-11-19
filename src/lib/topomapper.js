@@ -8,6 +8,7 @@ import { DESIGN_PRESETS, applyDesignPreset } from './presets.js';
 
 import {initModelWorkflow} from './model-workflow.js';
 import {describeError,terrainProgress} from './operation-status.js';
+import {personalEndpoint} from './map-providers.js';
 import {MAP_PROVIDERS,MAP_TOTAL_TIMEOUT_MS} from './map-service.js';
 import {areaPlan,detailPlan} from './area-plan.js';
 import {selectionPolicy} from './selection-policy.js';
@@ -97,7 +98,8 @@ export function initTopomapper() {
       return `${sw.lat.toFixed(6)},${sw.lng.toFixed(6)}:${ne.lat.toFixed(6)},${ne.lng.toFixed(6)}`;
     };
     const getMapEndpoints = () => {
-      const custom=$('customOverpassEndpoint')?.value?.trim();
+      const provider=$('overpassProvider').value;
+      const custom=provider?personalEndpoint(provider,$('overpassKey').value):$('customOverpassEndpoint')?.value?.trim();
       if(!custom)return MAP_PROVIDERS;
       try{
         const url=new URL(custom);
@@ -1806,7 +1808,7 @@ export function initTopomapper() {
     function visibleBuildings() {
       const style=state.mapFeatures.buildings,key=[state.wMm,state.hMm,state.shape,style.minArea,style.maxCount].join(':');
       if(buildingCache.data!==state.osmData||buildingCache.key!==key) {
-        const prepared=prepareBuildingLod(clipBuildings(state.osmData?.buildings||[],getClipPolygon()),{minArea:style.minArea,tolerance:.06,maxBuildings:style.maxCount});
+        const prepared=prepareBuildingLod(clipBuildings((state.osmData?.buildings||[]).filter(b=>!b.part || b.outline),getClipPolygon()),{minArea:style.minArea,tolerance:.06,maxBuildings:style.maxCount});
         buildingCache={data:state.osmData,key,...prepared};
       }
       return buildingCache.buildings;
