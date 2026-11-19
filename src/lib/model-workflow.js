@@ -1,4 +1,5 @@
 import {defaultModel,MODEL_PRESETS} from './model.js';
+import {filterSelectedLayers,incompleteMapLayers} from './layer-selection.js';
 import {runWorker} from './worker-client.js';
 import {describeError} from './operation-status.js';
 
@@ -45,27 +46,48 @@ export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{}}) 
   document.querySelectorAll('[data-model-preset]').forEach(el=>el.onclick=()=>{settings={...settings,...MODEL_PRESETS[el.dataset.modelPreset],preset:el.dataset.modelPreset};if(!buildingsAvailable)settings.buildings=false;invalidate();sync();scheduleQuick();});
   const scheduleQuick=()=>{clearTimeout(previewTimer);previewTimer=setTimeout(()=>{if(!disposed)void build(true);},350);};
   const status=(text,percent,quick)=>setState('loading',quick?'Updating quick preview':'Preparing printable model',text,percent);
-  async function build(quick=false,deadline=Date.now()+180000) {
+  async function displayModel(next,generation){
+    if(!preview){
+      const {createModelPreview}=await import('./preview3d.js');
+      if(disposed || generation!==revision)return;
+      preview=createModelPreview($('preview3d'));
+    }
+    preview.set(next);
+    previewRevision=generation;
+  }
+  function open(deadline){
+    if(previewRevision===revision || job)return;
+    if(!model){void build(true,deadline);return;}
+    const generation=revision;
+    void displayModel(model,generation).catch(()=>{
+      if(!disposed && generation===revision)setState('warning','Printable model ready','The 3D view could not be drawn. Your printable file is ready in Export.');
+    });
+  }
+  async function build(quick=false,deadline=Date.now()+180000,display=true) {
     invalidate();const generation=revision,controller=new AbortController();job=controller;
     $('updateModel').disabled=true;$('prepareModel').disabled=true;$('cancelModel').hidden=false;$('retryModel').hidden=true;status(quick?'Drawing terrain and selected layers…':'Preparing the solid-modeling engine…',2,quick);
     try {
       for(const key of numeric)settings[key]=Number($('model-'+key).value);
-      if(!quick&&!state.osmStatus.loaded&&layers.slice(1).some(key=>settings[key]))throw new Error('Map overlays are unavailable. Use Retry map layers, or choose Terrain study to build a terrain-only model.');
-      if(!quick&&state.osmStatus.completed){
-        const completed=new Set(state.osmStatus.completed);
-        if(completed.has('areas')){completed.add('water');completed.add('green');}
-        const missing=layers.slice(1).filter(key=>settings[key]&&!completed.has(key));
-        if(missing.length)throw new Error('Map overlays are unavailable for '+missing.join(', ')+'. Retry those layers or disable them before preparing the printable model.');
-      }
+      const incomplete=incompleteMapLayers(state.osmStatus,settings);
       const cacheKey=JSON.stringify([state.terrainVersion,state.osmDataVersion,settings]);
-      const next=!quick&&prepared?.key===cacheKey?prepared.model:await runWorker(quick?'model-preview':'model',{state:{wMm:state.wMm,hMm:state.hMm,shape:state.shape,terrainData:state.terrainData,renderBbox:state.renderBbox,mapSource:state.osmStatus.source,osmData:state.osmData},settings},{signal:controller.signal,timeoutMs:Math.max(1,deadline-Date.now()),progress:p=>status(p.detail,p.percent,quick)});
+      const workerState={wMm:state.wMm,hMm:state.hMm,shape:state.shape,terrainData:state.terrainData,
+        renderBbox:state.renderBbox,mapSource:state.osmStatus.source,
+        osmData:filterSelectedLayers(state.osmData||{}, {loadLayers:{...settings,labels:false}})};
+      const next=!quick&&prepared?.key===cacheKey?prepared.model:await runWorker(quick?'model-preview':'model',
+        {state:workerState,settings,display},{signal:controller.signal,timeoutMs:Math.max(1,deadline-Date.now()),progress:p=>status(p.detail,p.percent,quick)});
       if(disposed||generation!==revision)return;
-      if(!preview){const {createModelPreview}=await import('./preview3d.js');if(disposed||generation!==revision)return;preview=createModelPreview($('preview3d'));}
-      preview.set(next);previewRevision=revision;
+      let displayNotice='';
+      if(display){
+        try{await displayModel(next,generation);}
+        catch{
+          displayNotice=quick?'The 3D view could not be drawn. Open Export to prepare a printable file.':'The 3D view could not be drawn. The printable file is available in Export.';
+        }
+      }
+      if(disposed||generation!==revision)return;
       if(!quick){model=next;prepared={key:cacheKey,model:next};}
-      const missing=layers.slice(1).filter(key=>settings[key]&&!next.counts[key]);
-      const omitted=next.buildingStats?.omitted||0, notices=[missing.length?'No mapped features for: '+missing.join(', '):'',omitted?`${omitted.toLocaleString()} small/dense buildings omitted at ${settings.minBuildingArea} mm² minimum`:'' ].filter(Boolean);
-      setState(notices.length?'warning':'success',quick?'Quick preview ready':notices.length?'Model ready with notices':'Printable model ready',`${next.width.toFixed(1)} × ${next.height.toFixed(1)} mm · ${settings.relief}% relief (${next.reliefHeight.toFixed(2)} mm elevation range) · ${next.triangles.toLocaleString()} triangles · ${quick?'display surfaces · open Export to download':'validated fused solid'}. ${Object.entries(next.counts).filter(([key])=>settings[key]).map(([key,n])=>`${n} ${key}`).join(' · ')}${notices.length?'. '+notices.join('. '):''}`);
+      const missing=layers.slice(1).filter(key=>settings[key]&&!incomplete.includes(key)&&!next.counts[key]);
+      const omitted=next.buildingStats?.omitted||0, notices=[displayNotice,incomplete.length?'Partial map coverage. The model includes the available geometry.':'',missing.length?'No printable features for: '+missing.join(', '):'',omitted?`${omitted.toLocaleString()} small/dense buildings omitted at ${settings.minBuildingArea} mm² minimum`:'' ].filter(Boolean);
+      setState(notices.length?'warning':'success',quick?(displayNotice?'3D view unavailable':'Quick preview ready'):notices.length?'Model ready with notices':'Printable model ready',`${next.width.toFixed(1)} × ${next.height.toFixed(1)} mm · ${settings.relief}% relief (${next.reliefHeight.toFixed(2)} mm elevation range) · ${next.triangles.toLocaleString()} triangles · ${quick?'display surfaces · open Export to download':'validated fused solid'}. ${Object.entries(next.counts).filter(([key])=>settings[key]).map(([key,n])=>`${n} ${key}`).join(' · ')}${notices.length?'. '+notices.join('. '):''}`);
       $('exportModel').disabled=quick;
       return model;
     } catch(error) {if(generation===revision){const report=describeError(error,'model');setState(report.kind==='cancelled'?'idle':'error',report.title,report.message);$('modelError').hidden=report.kind==='cancelled';$('modelErrorAction').textContent=report.action;$('modelErrorTechnical').textContent=report.technical;$('retryModel').hidden=report.kind==='cancelled';$('retryModel').onclick=()=>build(quick);}}
@@ -76,7 +98,7 @@ export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{}}) 
   $('prepareExportModel').onclick=async()=>{
     if(job)return;
     const format=formatSelect.value;
-    const printable=await build(false);
+    const printable=await build(false,undefined,false);
     const exportOpen=$('modal').classList.contains('open') && $('prepareExportModel').closest('.step-content').classList.contains('active');
     if(printable && printable===model && exportOpen)await downloadModel(format);
   };
@@ -99,5 +121,5 @@ export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{}}) 
   }
   $('exportModel').onclick=()=>downloadModel(formatSelect.value);
   sync();
-  return {configureArea:({overview,samples,minArea,buildingsAvailable:available=true,loadLayers=null})=>{buildingsAvailable=available;availableLayers=loadLayers;settings=overview?{...settings,...MODEL_PRESETS.overview,preset:'overview'}:{...settings,...(settings.preset==='overview'?MODEL_PRESETS.landscape:{}),preset:'custom',resolution:samples>=240?160:100,minBuildingArea:minArea};if(availableLayers){for(const key of layers)settings[key]=availableLayers[key]!==false;settings.preset='custom';}if(!buildingsAvailable)settings.buildings=false;$('model-buildings').disabled=!buildingsAvailable;$('model-buildings').title=buildingsAvailable?'Raised buildings':'Not requested. Use Layers in the toolbar to load buildings.';invalidate();sync();},open:(deadline)=>{if(previewRevision!==revision&&!job)void build(true,deadline);},invalidate,zoom:direction=>preview?.zoom(direction),resetView:()=>preview?.reset(),dispose(){clearDownload();clearTimeout(previewTimer);disposed=true;job?.abort();preview?.dispose();}};
+  return {incompleteLayers:()=>incompleteMapLayers(state.osmStatus,settings),configureArea:({overview,samples,minArea,buildingsAvailable:available=true,loadLayers=null})=>{buildingsAvailable=available;availableLayers=loadLayers;settings=overview?{...settings,...MODEL_PRESETS.overview,preset:'overview'}:{...settings,...(settings.preset==='overview'?MODEL_PRESETS.landscape:{}),preset:'custom',resolution:samples>=240?160:100,minBuildingArea:minArea};if(availableLayers){for(const key of layers)settings[key]=availableLayers[key]!==false;settings.preset='custom';}if(!buildingsAvailable)settings.buildings=false;$('model-buildings').disabled=!buildingsAvailable;$('model-buildings').title=buildingsAvailable?'Raised buildings':'Not requested. Use Layers in the toolbar to load buildings.';invalidate();sync();},open,invalidate,zoom:direction=>preview?.zoom(direction),resetView:()=>preview?.reset(),dispose(){clearDownload();clearTimeout(previewTimer);disposed=true;job?.abort();preview?.dispose();}};
 }

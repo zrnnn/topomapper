@@ -7,23 +7,33 @@ import {detailPlan} from './area-plan.js';
 import {selectionPolicy} from './selection-policy.js';
 import {applyMapPointBudget} from './map-lod.js';
 import {loadCityTiles,vectorTilePlan} from './city-tiles.js';
-import {requestedStages,filterSelectedLayers,selectedLayers} from './layer-selection.js';
+import {requestedStages,filterSelectedLayers,selectedLayers,incompleteMapLayers} from './layer-selection.js';
 
-export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,progress=()=>{},request=requestMapData,cityLoader=loadCityTiles}={}){
-  let data=emptyMapData(),points=null;
-  const errors=[],completed=[],timings=[],budget={bytes:0,maxBytes:24*1024*1024};
+export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,progress=()=>{},request=requestMapData,cityLoader=loadCityTiles,previous=null}={}){
+  let data=previous?.data??emptyMapData(),points=previous?.status.pointStats??null;
+  const completed=[...(previous?.status.completed??[])];
+  const initialCount=completed.length;
+  const errors=[],timings=[],budget={bytes:0,maxBytes:24*1024*1024};
   const policy=selectionPolicy(state.renderBbox,state.outputMode);
   const sourceCity=state.cityOverview;
   let city=null;
+  const requested=selectedLayers(state);
+  const requestedGroups=requestedStages(state);
+  if(previous){
+    const pending=new Set(incompleteMapLayers(previous.status,requested));
+    const remaining={...requested};
+    for(const key of ['water','green','labels','roads','rivers','buildings'])remaining[key]=pending.has(key);
+    state={...state,loadLayers:remaining};
+  }
   const selected=selectedLayers(state);
   const labels={water:'water areas',green:'green areas',labels:'place names',areas:[selected.water?'water areas':'',selected.green?'green areas':'',selected.labels?'place names':''].filter(Boolean).join(', '),rivers:'rivers',roads:'roads',buildings:'buildings'};
   let stages=requestedStages(state);
   const individual=stages.flatMap(stage=>stage==='areas'?['water','green','labels'].filter(layer=>selected[layer]):[stage]);
   let tileError=null;
-  const sources=new Set();
+  const sources=new Set(initialCount && previous.status.source ? previous.status.source.split(' + ') : []);
   const started=performance.now();
-  const status=()=>({loaded:!stages.length||completed.length>0,error:errors.join(' ')||null,completed:[...completed],requested:stages,tiles:city?.tiles||0,pointStats:points,source:!stages.length?'No map layers requested':[...sources].join(' + ')||'OpenStreetMap / Overpass',bytes:budget.bytes,timings:[...timings]});
-  const publish=(stage,detail)=>progress({phase:'map',percent:62+Math.round(completed.length/stages.length*28),title:'Loading '+labels[stage],detail});
+  const status=()=>({loaded:!stages.length||completed.length>0,error:errors.join(' ')||null,completed:[...completed],requested:previous?requestedGroups:stages,tiles:(city?.tiles||0)+(previous?.status.tiles||0),pointStats:points,source:[...sources].join(' + ')||(!stages.length?'No map layers requested':'OpenStreetMap / Overpass'),bytes:budget.bytes,timings:[...timings]});
+  const publish=(stage,detail)=>progress({phase:'map',percent:62+Math.round((completed.length-initialCount)/stages.length*28),title:'Loading '+labels[stage],detail});
   const bounds=state.renderBbox;
   const perimeter=detailPlan(bounds,state.wMm,state.hMm,state.cityOverview).minPerimeter;
   function queryFor(stage,{sw,ne}) {
@@ -161,7 +171,7 @@ export async function loadMapLayers(state,{deadline=Date.now()+270000,endpoints,
       const bounded=applyMapPointBudget(candidate,{maxPoints:policy.maxMapPoints,minBuildingArea:state.mapFeatures.buildings.minArea,maxBuildings:2500});
       data=bounded.data;points=bounded.stats;completed.push(stage);sources.add(source);
       timings.push({stage,ms:Math.round(performance.now()-stageStart)});
-      progress({snapshot:{data,status:status()},phase:'map',percent:62+Math.round(completed.length/stages.length*28),title:labels[stage]+' ready',detail:`${points.points.toLocaleString()} retained points · ${(budget.bytes/1048576).toFixed(1)} MB downloaded`});
+      progress({snapshot:{data,status:status()},phase:'map',percent:62+Math.round((completed.length-initialCount)/stages.length*28),title:labels[stage]+' ready',detail:`${points.points.toLocaleString()} retained points · ${(budget.bytes/1048576).toFixed(1)} MB downloaded`});
     }catch(error){
       errors.push(`${labels[stage]}: ${error.message}.`);
       timings.push({stage,ms:Math.round(performance.now()-stageStart),failed:true});

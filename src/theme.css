@@ -276,3 +276,13 @@ progress::-moz-progress-bar,.workspace-activity progress::-moz-progress-bar { ba
 .model-download .control-help { margin: 8px 0 14px; }
 #exportDetail { margin: 0; }
 .export-status-head { flex-wrap: wrap; gap: 6px; }
+
+.coverage-warning {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-inline-start: 3px solid var(--earth-clay);
+  background: var(--surface-inset);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+.status-text.warning { color: var(--earth-clay); }

@@ -13,6 +13,7 @@ const browser = await chromium.launch({executablePath:process.env.CHROME_BIN,
   args:['--enable-unsafe-swiftshader']});
 try {
   const context = await browser.newContext({viewport:{width:1440,height:960},acceptDownloads:true});
+  context.setDefaultTimeout(30000);
   const page = await context.newPage();
   const errors = [];
   const downloads = [];
@@ -78,11 +79,19 @@ try {
   await step('3d');
   await page.waitForFunction(()=>document.querySelector('#modelTitle').textContent.includes('Quick preview ready'));
   await step('export');
-  await click('#prepareExportModel');
-  await page.locator('#modelError').waitFor({state:'visible'});
-  assert.equal(downloads.length,0,'A model with missing requested data must not download');
-  assert.ok(await page.locator('#exportModel').isDisabled());
-  assert.match(await page.locator('#modelErrorTechnical').textContent(),/unavailable for water\./);
+  const warning=page.locator('#exportCoverageWarning');
+  assert.match(await warning.innerText(),/Incomplete map coverage for water areas\./);
+  const partial=await JSZip.loadAsync(await download('#prepareExportModel','partial.3mf'));
+  const partialParts=await partial.file('Metadata/model_settings.config').async('string');
+  for(const name of ['Terrain','Green areas','Rivers','Roads','Buildings'])assert.ok(partialParts.includes('value="'+name+'"'));
+  assert.doesNotMatch(partialParts,/value="Water"/);
+  assert.ok(await warning.isVisible());
+  assert.ok(await page.locator('#modelError').isHidden());
+  await step('2d');
+  await step('export');
+  assert.match(await warning.innerText(),/water areas/);
+  const partialSvg=await download('#btnSVG','partial.svg');
+  assert.match(partialSvg.toString(),/<svg/);
   await step('2d');
   waterAvailable=true;
   await click('#retryMapLayers');
@@ -100,6 +109,7 @@ try {
     return file;
   }
   await step('export');
+  assert.ok(await warning.isHidden(),'Retry should clear the incomplete coverage warning');
   const original = await download('#btnDXF','map.dxf');
   await step('2d');
   await page.locator('#refreshPreview').evaluate(button=>button.click());
@@ -183,6 +193,85 @@ try {
   assert.match(parts,/value="Terrain"/);
   assert.doesNotMatch(parts,/value="(?:Water|Rivers|Green areas|Roads|Buildings)"/);
   assert.equal(retryQueries.length,queryCount);
+  // A fresh page has no successful query cache. Hold the roads request until
+  // the user elects to export only the terrain already on screen.
+  const slowContext=await browser.newContext({viewport:{width:390,height:844},acceptDownloads:true});
+  slowContext.setDefaultTimeout(30000);
+  const slow=await slowContext.newPage();
+  slow.on('pageerror',error=>errors.push(error.message));
+  await slow.addInitScript(()=>{
+    const getContext=HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext=function(type,...args){
+      if(type.startsWith('webgl') && this.dataset.engine?.startsWith('three.js'))return null;
+      return getContext.call(this,type,...args);
+    };
+  });
+  let stoppedByUser=false;
+  let roadRequest;
+  const pendingRoad=new Promise(resolve=>{roadRequest=resolve;});
+  let releaseRoad;
+  const hold=new Promise(resolve=>{releaseRoad=resolve;});
+  await slowContext.route('**/*',async route=>{
+    const req=route.request(),target=new URL(req.url());
+    if(target.origin===new URL(url).origin)return route.continue();
+    if(req.method()==='POST'){
+      if(stoppedByUser)return route.fulfill({status:429,body:'rate limit exceeded'});
+      roadRequest();await hold;return route.abort().catch(()=>{});
+    }
+    if(target.pathname.endsWith('.png'))return route.fulfill({contentType:'image/png',body:Buffer.from(tile,'base64')});
+    return route.abort();
+  });
+  try{
+    await slow.goto(url,{waitUntil:'networkidle'});
+    await slow.locator('#btnGen').click();
+    await slow.locator('#choose3d').click();
+    for(const box of await slow.locator('#purposeDialog input[type=checkbox]').all())if(await box.isEnabled())await box.uncheck();
+    await slow.locator('#load-terrain').check();
+    await slow.locator('#load-roads').check();
+    await slow.locator('#btnGen').click();
+    await slow.locator('#cancelPreviewLoad').waitFor({state:'visible'});
+    await Promise.race([pendingRoad,slow.waitForTimeout(10000).then(()=>{throw Error('Road request never started');})]);
+    await slow.locator('#cancelPreviewLoad').click();
+    await slow.locator('#prepareExportModel').waitFor({state:'visible'});
+    assert.match(await slow.locator('#exportCoverageWarning').innerText(),/coverage for roads\./);
+    assert.ok(await slow.locator('#retryMapLayers').isVisible());
+    const stopFile=slow.waitForEvent('download',{timeout:90000});
+    await slow.locator('#prepareExportModel').click();
+    const path=join(directory,'stopped.3mf');
+    await (await stopFile).saveAs(path);
+    const stopped=await JSZip.loadAsync(await readFile(path));
+    const names=await stopped.file('Metadata/model_settings.config').async('string');
+    assert.match(names,/value="Terrain"/);
+    assert.doesNotMatch(names,/value="Roads"/);
+    stoppedByUser=true;
+    releaseRoad();
+    await slow.locator('#retryMapLayers').click();
+    await slow.waitForFunction(()=>!document.querySelector('#btnGen').disabled && !document.querySelector('#retryMapLayers').hidden);
+    await slow.locator('#modal [data-workspace-step="export"]').click();
+    assert.match(await slow.locator('#terrainSource').innerText(),/429|rate limit/i);
+    assert.match(await slow.locator('#exportCoverageWarning').innerText(),/coverage for roads/);
+    await slow.selectOption('#model-format','stl');
+    const limitedFile=slow.waitForEvent('download',{timeout:90000});
+    await slow.locator('#prepareExportModel').click();
+    const stlPath=join(directory,'rate-limited.stl');
+    await (await limitedFile).saveAs(stlPath);
+    const mesh=await readFile(stlPath);
+    assert.ok(mesh.readUInt32LE(80)>0);
+    assert.equal(mesh.length,84+50*mesh.readUInt32LE(80));
+    await slow.locator('#modal [data-workspace-step="3d"]').click();
+    await slow.locator('#model-width').fill('1');
+    await slow.locator('#model-width').press('Tab');
+    await slow.locator('#modelError').waitFor({state:'visible'});
+    await slow.locator('#modal [data-workspace-step="export"]').click();
+    let invalidDownloads=0;
+    slow.on('download',()=>invalidDownloads++);
+    await slow.locator('#prepareExportModel').click();
+    await slow.locator('#modelError').waitFor({state:'visible'});
+    assert.match(await slow.locator('#modelErrorTechnical').textContent(),/Check width/);
+    assert.ok(await slow.locator('#exportModel').isDisabled());
+    assert.ok(await slow.locator('#modelFileLink').isHidden());
+    assert.equal(invalidDownloads,0);
+  }finally{releaseRoad();await slowContext.close();}
   assert.deepEqual(errors,[]);
   console.log('Verified SVG, DXF, PNG, 3MF, STL and OBJ downloads in',directory);
 } finally {

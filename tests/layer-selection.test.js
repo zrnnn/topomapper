@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {LAYER_CHOICES,requestedStages,layerWarning,filterSelectedLayers} from '../src/lib/layer-selection.js';
+import {LAYER_CHOICES,requestedStages,layerWarning,filterSelectedLayers,incompleteMapLayers,mapCoverageNotice} from '../src/lib/layer-selection.js';
 import {buildOverpassQuery,emptyMapData} from '../src/lib/map-parser.js';
 import {loadMapLayers} from '../src/lib/map-pipeline.js';
 import {loadTiles,loadTerrain,normalizeTerrain} from '../src/lib/terrain.js';
@@ -52,4 +52,30 @@ test('Provider ranking keeps .ru last even after it succeeds; custom endpoint st
   await requestMapData('fixture',{endpoints:[ru],fetchImpl:async()=>({ok:true,json:async()=>({elements:[]})})});
   const ranked=rankProviders([ru,MAP_PROVIDERS[1],'https://custom.example/api/interpreter',MAP_PROVIDERS[0]]);
   assert.equal(ranked[0],'https://custom.example/api/interpreter');assert.equal(ranked.at(-1),ru);
+});
+
+test('Export coverage follows completed requests, including empty and grouped layers',()=>{
+  const choices={terrain:true,roads:true,minorRoads:true,water:true,green:true};
+  assert.deepEqual(incompleteMapLayers({loaded:true,completed:['areas','roads']},choices),[]);
+  assert.deepEqual(incompleteMapLayers({loaded:true,completed:['green','roads']},choices),['water']);
+  assert.deepEqual(incompleteMapLayers({loaded:true,completed:[]},{terrain:true}),[]);
+  assert.deepEqual(incompleteMapLayers({loaded:false},choices),['water','green','roads']);
+  assert.equal(mapCoverageNotice([]),'');
+  assert.match(mapCoverageNotice(['water','green']),/water areas, green areas/);
+});
+
+test('Retry preserves previously loaded geometry when a remaining provider fails again',async()=>{
+  const data=emptyMapData();
+  data.roadLines.push({points:[[0,0],[5,5]],scale:1});
+  const previous={data,status:{completed:['roads'],source:'OpenMapTiles / OpenFreeMap',loaded:true,error:'Water timed out'}};
+  const requests=[];
+  const result=await loadMapLayers({...state,rawMapDetail:true,loadLayers:{...off,water:true,roads:true}},{
+    previous,endpoints:['https://retry.invalid/interpreter'],request:async query=>{requests.push(query);throw Error('HTTP 429');}
+  });
+  assert.equal(requests.length,1);
+  assert.doesNotMatch(requests[0],/highway/);
+  assert.deepEqual(result.data.roadLines,data.roadLines);
+  assert.deepEqual(result.status.completed,['roads']);
+  assert.match(result.status.error,/429/);
+  assert.equal(result.status.source,previous.status.source);
 });

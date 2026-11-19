@@ -169,6 +169,7 @@
         <button id="closePreview" aria-label="Close preview" style="border:none;background:none;font-size:32px;cursor:pointer;color:var(--color-text-sec);">&times;</button>
       </div>
       <div class="step-content" data-step="3">
+        <p id="exportCoverageWarning" class="coverage-warning" role="status" hidden></p>
         <section class="model-download mode-3d" aria-labelledby="modelDownloadHeading">
           <h3 id="modelDownloadHeading">Download your 3D map</h3>
           <label class="ui-label" for="model-format">File format</label>
@@ -215,7 +216,7 @@
       <div id="modelFeedback" class="model-feedback operation-panel mode-3d" data-state="idle"><div class="operation-head"><span class="operation-icon" aria-hidden="true">3D</span><div><strong id="modelTitle">3D model</strong><p id="modelStatus" role="status" aria-live="polite">Choose settings, then update the model.</p></div><span id="modelPercent" class="operation-percent"></span></div><progress id="modelProgress" max="100" hidden aria-label="3D model progress"></progress><div id="modelError" class="error-report" hidden role="alert"><span id="modelErrorAction" class="error-action"></span><details><summary>Technical details</summary><code id="modelErrorTechnical"></code></details></div><button id="retryModel" class="btn-secondary" hidden>Retry model</button><button id="cancelModel" class="btn-secondary" hidden>Cancel model generation</button></div>
       <div id="terrainSource" class="status-text"></div>
       <p id="previewLoadStatus" class="control-help" role="status" hidden></p>
-      <button id="cancelPreviewLoad" class="btn-secondary" hidden>Stop loading more detail</button>
+      <button id="cancelPreviewLoad" class="btn-secondary" hidden>Use loaded layers &amp; open Export</button>
       <details class="source-details"><summary>Loading details</summary><p id="loadMetrics" class="status-text">Waiting for area data.</p><span class="status-text">Vector tile sources include OpenFreeMap / OpenMapTiles and VersaTiles / Shortbread. Map data © OpenStreetMap contributors.</span></details>
       <button id="retryMapLayers" class="btn-secondary" type="button" hidden>Retry map layers</button>
       <details class="source-details"><summary>Data sources & credits</summary><div class="status-text">Data: <a href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener noreferrer">Mapzen terrain source credits</a> · <a href="https://mapterhorn.com/attribution/" target="_blank" rel="noopener noreferrer">Mapterhorn terrain credits</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>. Keep source credits with published exports.</div></details>

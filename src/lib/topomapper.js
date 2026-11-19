@@ -11,7 +11,7 @@ import {describeError,terrainProgress} from './operation-status.js';
 import {MAP_PROVIDERS,MAP_TOTAL_TIMEOUT_MS} from './map-service.js';
 import {areaPlan,detailPlan} from './area-plan.js';
 import {selectionPolicy} from './selection-policy.js';
-import {LAYER_CHOICES,selectedLayers,layerWarning} from './layer-selection.js';
+import {LAYER_CHOICES,selectedLayers,layerWarning,incompleteMapLayers,mapCoverageNotice} from './layer-selection.js';
 import {roadPoints} from './road-style.js';
 import {createCanvasPreview} from './preview2d.js';
 import {createWorkspaceStatus} from './workspace-status.js';
@@ -155,6 +155,17 @@ export function initTopomapper() {
     };
     let exportStatusTimer = null;
     let modelStatus=null;
+    function updateExportCoverage(){
+      const active=selectedLayers(state);
+      const features=state.mapFeatures;
+      const visible={water:features.waterAreas.enabled,green:features.greenAreas.enabled,rivers:features.rivers.enabled,
+        roads:features.roads.enabled,buildings:features.buildings.enabled,labels:features.labels.enabled};
+      const missing=outputMode==='3d'?modelWorkflow.incompleteLayers():
+        incompleteMapLayers(state.osmStatus,Object.fromEntries(Object.entries(visible).filter(([key,value])=>value && active[key])));
+      const notice=$('exportCoverageWarning');
+      notice.textContent=mapCoverageNotice(missing);
+      notice.hidden=!missing.length;
+    }
     function showExportReadiness(){
       if(exportBusy || exportStatus.classList.contains('active'))return;
       const status=outputMode==='3d'?modelStatus:null;
@@ -542,12 +553,10 @@ export function initTopomapper() {
       return closePath ? `${d} Z` : d;
     }
 
-    async function fetchMapFeatures(sw,ne,signal,deadline) {
-      state.osmStatus={loaded:false,error:null,tiles:1,ignored:false};
-      state.osmData={buildings:[],waterAreas:[],greenAreas:[],waterLines:[],roadLines:[],labels:[]};
+    async function fetchMapFeatures(sw,ne,signal,deadline,previous) {
       const snapshot={rawMapDetail:$('mapDetailSource').value==='raw',wMm:state.wMm,hMm:state.hMm,shape:state.shape,renderBbox:{sw,ne},cityOverview:state.cityOverview,includeBuildings:state.includeBuildings,includeMinorRoads:state.includeMinorRoads,loadLayers:state.loadLayers,mapFeatures:state.mapFeatures,outputMode};
       try{
-        const result=await runWorker('map',{state:snapshot,options:{deadline:deadline-15000,endpoints:getMapEndpoints()}},{
+        const result=await runWorker('map',{state:snapshot,options:{deadline:deadline-15000,endpoints:getMapEndpoints(),previous}},{
           signal,timeoutMs:Math.max(1,deadline-Date.now()-12000),progress:update=>{
             if(update.snapshot){
               state.osmData=update.snapshot.data;state.osmStatus=update.snapshot.status;
@@ -561,10 +570,12 @@ export function initTopomapper() {
         $('loadMetrics').textContent=`${result.status.source} · ${(result.status.durationMs/1000).toFixed(1)} s map layers · ${(result.status.bytes/1048576).toFixed(2)} MB downloaded · ${result.status.pointStats?.points?.toLocaleString()||0} retained points. ${(result.status.timings||[]).map(t=>t.stage+': '+(t.ms/1000).toFixed(1)+' s'+(t.failed?' (unavailable)':'')).join(' · ')}. Cached requests do not add download bytes.`;
         updateMapDataStatus({announce:true});return !result.status.error;
       }catch(error){
-        if(signal?.aborted)throw error;
+        const stopped=signal?.reason==='export-current'||signal?.reason==='keep-current';
+        if(signal?.aborted && !stopped)throw error;
         // Never restore unbounded raw geometry after a rejected layer. The last
         // published snapshot has already passed the combined display budget.
-        state.osmStatus.error=error.message;
+        state.osmStatus.error=stopped?'Loading stopped at your request.':error.message;
+        $('loadMetrics').textContent=state.osmStatus.error;
         updateMapDataStatus({announce:true});return false;
       }
     }
@@ -782,6 +793,7 @@ export function initTopomapper() {
     const setStep = (step) => {
       if(step==='3' && workspaceStep!==step && !exportBusy)clearExportStatus();
       workspaceStep=step;
+      if(step==='3')updateExportCoverage();
       stepButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.stepTarget === step));
       stepContents.forEach(section => section.classList.toggle('active', section.dataset.step === step));
       syncWorkspaceNavigation();
@@ -1592,15 +1604,16 @@ export function initTopomapper() {
       document.querySelector('.viewport').inert = true;
       $('modal').dataset.mode=outputMode;
       if(outputMode==='3d')workspaceStatus.clear('preview');
-      if(outputMode==='3d')modelWorkflow.open(deadline);
+      if(outputMode==='3d' && workspaceStep!=='3')modelWorkflow.open(deadline);
       workspaceStatus.focus(outputMode==='3d'?'model':'preview');
       syncPreviewZoom();
       $('closePreview').focus();
       syncWorkspaceNavigation();
     };
     $('previousPreview').onclick = () => { if(state.terrainData) openPreview(); };
-    $('cancelGeneration').onclick = () => activeJob?.abort();
-    $('cancelPreviewLoad').onclick=()=>activeJob?.abort();
+    let overlayController=null;
+    $('cancelGeneration').onclick = () => overlayController?overlayController.abort('keep-current'):activeJob?.abort();
+    $('cancelPreviewLoad').onclick=()=>overlayController?.abort('export-current');
     let outputMode='2d',lastRequestedMode='2d';
     const modelWorkflow=initModelWorkflow(state,{runExportFlow,signal:lifetime.signal,onStatus:update=>{modelStatus=update;modelBusy=update.state==='loading';if(workspaceStep==='3')showExportReadiness();workspaceStatus.update('model',update);syncWorkspaceNavigation();}});
     let previewScale=1, cameraZoom=1,previewPan={x:0,y:0};
@@ -1691,7 +1704,7 @@ export function initTopomapper() {
     };
     $('changeOutput').onclick=()=>chooseOutput(true);
     $('retryGeneration').onclick=()=>void generateArea(lastRequestedMode);
-    async function generateArea(mode,retryBounds=null) {
+    async function generateArea(mode,retryBounds=null,retryLayers=false) {
       if(activeJob || exportBusy || disposed) return;
       lastRequestedMode=mode;
       outputMode=mode;
@@ -1707,7 +1720,7 @@ export function initTopomapper() {
       const enabled = interactions.map(control => control.isEnabled());
       interactions.forEach(control => control.disable());
       $('cancelGeneration').hidden = false;
-      $('cancelPreviewLoad').hidden=false;
+      $('cancelPreviewLoad').hidden=true;
       $('generationProgress').hidden=false;
       showGenerationStatus({phase:'terrain',percent:3,title:'Loading elevation',detail:'Connecting to the primary terrain source…'});
       $('suggestionBox').style.display='none';
@@ -1725,29 +1738,38 @@ export function initTopomapper() {
         cachePut(terrainCache, key, terrain);
         state.renderBbox = bounds;
         state.terrainData = terrain;
+        $('terrainSource').classList.remove('warning');
+        $('retryMapLayers').hidden=true;
+        $('loadMetrics').textContent='Loading map details…';
         $('terrainSource').textContent=terrain.source;
         state.terrainVersion++;
         state.pngPreviewCache = {key:null,dataUrl:null};
-        state.osmData={buildings:[],waterAreas:[],greenAreas:[],waterLines:[],roadLines:[],labels:[]};
-        state.osmStatus={loaded:false,error:null};state.osmDataVersion=(state.osmDataVersion||0)+1;
+        const savedLayers=retryLayers?{data:previous.osmData,status:previous.osmStatus}:null;
+        state.osmData=savedLayers?.data??{buildings:[],waterAreas:[],greenAreas:[],waterLines:[],roadLines:[],labels:[]};
+        state.osmStatus={...savedLayers?.status,loaded:!!savedLayers?.status.loaded,error:null,completed:savedLayers?.status.completed??[]};
+        state.osmDataVersion=(state.osmDataVersion||0)+1;
         lastFrame={wMm:state.wMm,hMm:state.hMm,shape:state.shape};
         modelWorkflow.invalidate();setStep('2');openPreview(deadline);
         showGenerationStatus({phase:'map',percent:62,title:'Loading map layers',detail:'Terrain is ready. Loading only your selected map layers…'});
-        const mapComplete = await fetchMapFeatures(bounds.sw, bounds.ne, controller.signal,deadline);
+        overlayController=new AbortController();
+        $('cancelPreviewLoad').hidden=false;
+        const mapSignal=AbortSignal.any([controller.signal,overlayController.signal]);
+        const mapComplete = await fetchMapFeatures(bounds.sw, bounds.ne, mapSignal,deadline,savedLayers);
+        const exportCurrent=overlayController.signal.reason==='export-current';
         if(controller.signal.aborted || disposed) throw new DOMException('Cancelled', 'AbortError');
         const mapUsable=state.osmStatus.loaded;
         state.osmStatus.ignored = !mapUsable;
         outputMode=mode;modelWorkflow.invalidate();
         showGenerationStatus({phase:'render',percent:94,title:'Preparing preview',detail:outputMode==='3d'?'Opening the 3D workspace…':'Rendering the 2D artwork…'});
         if(outputMode==='2d')renderSVG();
-        setStep('2');
+        setStep(exportCurrent?'3':'2');
         showGenerationStatus({phase:'render',percent:100,state:mapComplete?'success':'warning',title:mapComplete?'Area ready':mapUsable?'Area ready with missing layers':'Terrain ready with missing layers',detail:terrain.source+(mapComplete?' · Map layers loaded.':mapUsable?` · Loaded layers remain available. ${state.osmStatus.error}`:' · Map overlays unavailable; terrain-only work remains available.')});
         $('retryGeneration').hidden=mapUsable;
         lastFrame={wMm:state.wMm,hMm:state.hMm,shape:state.shape};
         $('terrainSource').textContent = (mapComplete ? [terrain.source,state.osmStatus.source].filter(Boolean).join(' · ') : `${terrain.source} · ${state.osmStatus.error}${mapUsable?' Loaded layers were preserved.':' Use Retry map layers below.'}`)+(state.cityOverview?' · Adaptive city detail. Use Layers in the toolbar to change the requested data.':'');
-        $('terrainSource').classList.toggle('error',!mapComplete);
+        $('terrainSource').classList.toggle('warning',!mapComplete);
         $('retryMapLayers').hidden=mapComplete;
-        if($('modal').classList.contains('open')&&outputMode==='3d')modelWorkflow.open(deadline);
+        if($('modal').classList.contains('open')&&outputMode==='3d')modelWorkflow.open();
       } catch(error) {
         if(!state.terrainData)Object.assign(state, previous);
         state.terrainVersion++;
@@ -1757,6 +1779,7 @@ export function initTopomapper() {
           showGenerationError(error);
         }
       } finally {
+        overlayController=null;
         activeJob = null;
         if(!disposed) {
           controls.forEach((el,i) => el.disabled = disabled[i]);
@@ -2238,12 +2261,12 @@ export function initTopomapper() {
       if(target==='area'){closePreview();finishLayerChoice();return;}
       if(!state.terrainData||activeJob||modelBusy)return;
       if(choosingLayers)finishLayerChoice();
-      if(target==='export'){openPreview();setStep('3');}
+      if(target==='export'){setStep('3');openPreview();}
       else {outputMode=target;previewScale=1;cameraZoom=1;previewPan={x:0,y:0};setStep('2');openPreview();}
       syncWorkspaceNavigation();
     },{signal:lifetime.signal}));
     syncWorkspaceNavigation();
-    $('retryMapLayers').onclick=()=>{const bounds=structuredClone(state.renderBbox);closePreview();void generateArea(outputMode,bounds);};
+    $('retryMapLayers').onclick=()=>{const bounds=structuredClone(state.renderBbox);closePreview();void generateArea(outputMode,bounds,true);};
     document.addEventListener('keydown', event => {
       if(choosingLayers)return;
       if(!$('modal').classList.contains('open')) return;

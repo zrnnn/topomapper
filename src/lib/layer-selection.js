@@ -23,6 +23,20 @@ export function filterSelectedLayers(data,state){
   const layers=selectedLayers(state),keys={waterAreas:'water',greenAreas:'green',waterLines:'rivers',roadLines:'roads',buildings:'buildings',labels:'labels'};
   return Object.fromEntries(Object.entries(keys).map(([key,layer])=>[key,layers[layer]?(data[key]||[]):[]]));
 }
+// A successful empty response is complete. Feature counts alone cannot tell
+// us whether a lake is absent or whether its provider never answered.
+export function incompleteMapLayers(status, selection){
+  const completed=new Set(status.completed);
+  if(completed.has('areas'))for(const key of ['water','green','labels'])completed.add(key);
+  if(!status.completed && status.loaded && !status.error)return [];
+  return LAYER_CHOICES.filter(([key])=>key!=='terrain' && key!=='minorRoads' &&
+    selection[key] && !completed.has(key)).map(([key])=>key);
+}
+export function mapCoverageNotice(missing){
+  if(!missing.length)return '';
+  const names=LAYER_CHOICES.filter(([key])=>missing.includes(key)).map(([,name])=>name.toLowerCase());
+  return 'Incomplete map coverage for '+names.join(', ')+'. You can download the available layers now or use Retry map layers for another attempt.';
+}
 export function layerWarning(bounds,mode,layers){
   const policy=selectionPolicy(bounds,mode),heavy=[];
   if(layers.buildings&&!policy.buildingsRecommended)heavy.push('buildings');

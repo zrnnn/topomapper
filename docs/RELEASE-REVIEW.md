@@ -1,17 +1,15 @@
-# Topomapper 0.3.2
+# Topomapper 0.3.3
 
-Open **Export** from a 3D preview, choose a file format and select **Prepare & download**. The panel shows what the app is doing and starts the download when the printable mesh is ready. If your browser misses the automatic download, **Download again** saves the same finished file without preparing it a second time.
+A missing map layer now produces an inline coverage warning. You can download a 3D model with the terrain and features that loaded, or use **Retry map layers** to request the missing details. The same warning appears for affected visible layers in 2D exports.
 
-For multicolor printing, choose **3MF**. For a single fused mesh, choose **STL** or **OBJ**. You can still inspect the printable mesh in **3D preview** before opening Export.
+While overlays are loading, choose **Use loaded layers & open Export** to stop waiting and use the latest completed layers. A retry keeps their geometry, including successful empty layers. Direct 3D downloads skip the extra display buffers for drawing the printable mesh. The printable geometry still goes through the solid and material-volume checks.
 
 ## Verification
 
-- All 121 automated checks passed and the static production site built successfully.
-- Desktop Chromium downloaded a layered 3MF directly from a quick preview. The archive included terrain, roads, buildings, rivers, water and green areas. Downloading again produced identical bytes.
-- Cancelling mesh preparation returned control to the user. A missing water layer produced an inline error. Both scenarios produced zero downloads. Retrying the water request preserved the loaded layers.
-- A mobile Chromium viewport downloaded a terrain-only 3MF after preparing the model in Preview. The file contained only the terrain part.
-- The same browser run downloaded STL, OBJ, DXF, PNG and three SVG presets. Editing contour density with automatic preview off changed the downloaded DXF.
+- All 123 automated checks passed. They include grouped and empty layers, retrying with a provider that continues to fail, and mesh validation.
+- Desktop Chromium downloaded a 3MF after a simulated water timeout. Inspection found terrain, green areas, rivers, roads and buildings. A retry fetched only water, cleared the warning and restored the water part in the next download.
+- A mobile-sized Chromium window stopped a stalled roads request and downloaded a terrain-only 3MF. When the retry hit a simulated provider rate limit, the source summary reported the limit and a terrain STL still downloaded. These checks also exercised a 3D viewer without a graphics context.
+- An invalid print width produced an error and zero downloads. Cancelling printable model preparation also produced zero downloads.
+- Browser checks exercised SVG, DXF, PNG, 3MF, STL and OBJ with fixed map responses.
 
-Browser checks use fixed geographic data and simulated provider failures so results are repeatable. They exercise the production website and its real file downloads.
-
-[Previous release review](https://github.com/zrnnn/topomapper/blob/v0.3.1/docs/RELEASE-REVIEW.md)
+[Previous release review](https://github.com/zrnnn/topomapper/blob/v0.3.2/docs/RELEASE-REVIEW.md)

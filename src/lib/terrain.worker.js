@@ -23,7 +23,7 @@ self.onmessage=async({data:{type,payload}})=>{
     }
     else throw new Error('Unknown operation.');
     const transfers=[];
-    if(type==='model-preview'||type==='model'){
+    if(type==='model-preview'||(type==='model' && payload.display!==false)){
       const {previewBuffers}=await import('./preview-buffers.js');
       result.display=previewBuffers(result.mesh);
       transfers.push(result.display.positions.buffer,result.display.colors.buffer);
