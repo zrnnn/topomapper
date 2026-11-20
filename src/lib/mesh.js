@@ -7,17 +7,43 @@ export function meshResolution(state,setting){
   return Math.max(40,Math.min(target,rectangular(state.shape)?600:240));
 }
 
-function rectangularTerrain(state,res,scale){
+export function createTerrainSurface(state,{resolution=160,targetHeight=10,base=2}={}){
+  if(!state.terrainData || !Number.isFinite(targetHeight) || targetHeight<0 || targetHeight>100000){
+    throw new Error('Calculated relief height is outside the supported range.');
+  }
   const {getZInterpolated,smoothPass}=createGeometry(state);
+  const scale=state.terrainData.delta>0?targetHeight/state.terrainData.delta:0;
+  const res=meshResolution(state,resolution);
   const step=Math.max(state.wMm,state.hMm)/res;
-  const cols=scale?Math.ceil(state.wMm/step)+1:2,rows=scale?Math.ceil(state.hMm/step)+1:2;
+  const isRectangle=rectangular(state.shape);
+  const cols=isRectangle?(scale?Math.ceil(state.wMm/step)+1:2):res+1;
+  const rows=isRectangle?(scale?Math.ceil(state.hMm/step)+1:2):res+1;
+  const stepX=state.wMm/(cols-1),stepY=state.hMm/(rows-1);
   let grid=new Float32Array(rows*cols);
-  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)grid[r*cols+c]=getZInterpolated(c/(cols-1),r/(rows-1));
-  for(let i=0;i<2;i++)grid=smoothPass(grid,rows,cols);
+  if(scale){
+    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)grid[r*cols+c]=getZInterpolated(c/(cols-1),r/(rows-1));
+    for(let i=0;i<2;i++)grid=smoothPass(grid,rows,cols);
+  }
+  const heightAt=(x,y)=>{
+    const gx=Math.max(0,Math.min(cols-1,x/stepX));
+    const gy=Math.max(0,Math.min(rows-1,y/stepY));
+    const c=Math.min(cols-2,Math.floor(gx)),r=Math.min(rows-2,Math.floor(gy));
+    const u=gx-c,v=gy-r,i=r*cols+c;
+    // Interpolate the same diagonal and planes that the surface is meshed with.
+    const relief=u+v<=1
+      ? grid[i]*(1-u-v)+grid[i+1]*u+grid[i+cols]*v
+      : grid[i+cols+1]*(u+v-1)+grid[i+cols]*(1-u)+grid[i+1]*(1-v);
+    return base+relief*scale;
+  };
+  return {rows,cols,stepX,stepY,heightAt};
+}
+
+function rectangularTerrain(surface){
+  const {rows,cols,stepX,stepY,heightAt}=surface;
   const v=[],t=[];
   for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
     const a=r*cols+c;
-    v.push([state.wMm*c/(cols-1),state.hMm*r/(rows-1),2+grid[a]*scale]);
+    v.push([stepX*c,stepY*r,heightAt(stepX*c,stepY*r)]);
     if(c+1<cols && r+1<rows)t.push([a,a+1,a+cols],[a+1,a+cols+1,a+cols]);
   }
   // A flat base needs only a rim and a centre. Walk its boundary once.
@@ -26,35 +52,22 @@ function rectangularTerrain(state,res,scale){
   for(let r=1;r<rows;r++)rim.push(r*cols+cols-1);
   for(let c=cols-2;c>=0;c--)rim.push((rows-1)*cols+c);
   for(let r=rows-2;r>0;r--)rim.push(r*cols);
-  const centre=v.push([state.wMm/2,state.hMm/2,0])-1,first=v.length;
+  const centre=v.push([stepX*(cols-1)/2,stepY*(rows-1)/2,0])-1,first=v.length;
   for(const a of rim)v.push([v[a][0],v[a][1],0]);
   for(let i=0;i<rim.length;i++){
     const j=(i+1)%rim.length,a=rim[i],b=rim[j];
     t.push([a,first+i,first+j],[a,first+j,b],[first+j,first+i,centre]);
   }
-  return {v,t};
+  return {v,t,surface};
 }
 
-export function buildTerrainMesh(state, {resolution = 160, targetHeight = 10} = {}) {
-if(!state.terrainData || !Number.isFinite(targetHeight) || targetHeight < 0 || targetHeight > 100000) throw new Error('Calculated relief height is outside the supported range.');
-const {getZInterpolated, smoothPass, getClipPolygon, polygonArea, clipPolygon} = createGeometry(state);
-const zScale = state.terrainData.delta > 0 ? targetHeight / state.terrainData.delta : 0;
-if(rectangular(state.shape))return rectangularTerrain(state,meshResolution(state,resolution),zScale);
-        const baseThickness = 2.0;
-        const res = Math.max(40, Math.min(400, Math.round(meshResolution(state,resolution) || 160)));
-        const tm = { v:[], t:[] };
+export function buildTerrainMesh(state, options={}){
+  const surface=createTerrainSurface(state,options);
+  if(rectangular(state.shape))return rectangularTerrain(surface);
+        const {getClipPolygon, polygonArea, clipPolygon} = createGeometry(state);
+        const res=surface.cols-1;
+        const tm = { v:[], t:[], surface };
         const vertexCache = new Map();
-        const gridSize = res + 1;
-        let heightGrid = new Float32Array(gridSize * gridSize);
-        for(let r=0; r<=res; r++) {
-          for(let c=0; c<=res; c++) {
-            heightGrid[r * gridSize + c] = getZInterpolated(c / res, r / res);
-          }
-        }
-        const meshSmoothPasses = 2;
-        for(let i=0; i<meshSmoothPasses; i++) {
-          heightGrid = smoothPass(heightGrid, gridSize, gridSize);
-        }
         const polygonAreaClosed = (poly) => {
           let sum = 0;
           for(let i=0; i<poly.length; i++) {
@@ -63,25 +76,6 @@ if(rectangular(state.shape))return rectangularTerrain(state,meshResolution(state
             sum += a[0] * b[1] - b[0] * a[1];
           }
           return sum / 2;
-        };
-        const sampleHeight = (xMm, yMm) => {
-          const nx = Math.max(0, Math.min(1, xMm / state.wMm));
-          const ny = Math.max(0, Math.min(1, yMm / state.hMm));
-          const gx = nx * res;
-          const gy = ny * res;
-          const c0 = Math.max(0, Math.min(res, Math.floor(gx)));
-          const r0 = Math.max(0, Math.min(res, Math.floor(gy)));
-          const c1 = Math.min(res, c0 + 1);
-          const r1 = Math.min(res, r0 + 1);
-          const tx = gx - c0;
-          const ty = gy - r0;
-          const h00 = heightGrid[r0 * gridSize + c0];
-          const h01 = heightGrid[r0 * gridSize + c1];
-          const h10 = heightGrid[r1 * gridSize + c0];
-          const h11 = heightGrid[r1 * gridSize + c1];
-          const top = h00 * (1 - tx) + h01 * tx;
-          const bottom = h10 * (1 - tx) + h11 * tx;
-          return top * (1 - ty) + bottom * ty;
         };
         const vertexKey = (v) => `${v[0].toFixed(3)},${v[1].toFixed(3)},${v[2].toFixed(3)}`;
         const getVertexIndex = (v) => {
@@ -107,9 +101,9 @@ if(rectangular(state.shape))return rectangularTerrain(state,meshResolution(state
           tm.t.push([ia, ib, ic]);
         };
         const addTopTri = (p0, p1, p2) => {
-          const v0 = [p0[0], p0[1], baseThickness + sampleHeight(p0[0], p0[1]) * zScale];
-          const v1 = [p1[0], p1[1], baseThickness + sampleHeight(p1[0], p1[1]) * zScale];
-          const v2 = [p2[0], p2[1], baseThickness + sampleHeight(p2[0], p2[1]) * zScale];
+          const v0 = [p0[0], p0[1], surface.heightAt(p0[0], p0[1])];
+          const v1 = [p1[0], p1[1], surface.heightAt(p1[0], p1[1])];
+          const v2 = [p2[0], p2[1], surface.heightAt(p2[0], p2[1])];
           addTri(v0, v1, v2);
         };
         const addBottomTri = (p0, p1, p2) => {

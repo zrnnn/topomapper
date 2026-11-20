@@ -1,5 +1,5 @@
 import {MAX_PRINT_MM,maxModelWidth} from './area-plan.js';
-import {buildTerrainMesh,meshResolution} from './mesh.js';
+import {buildTerrainMesh} from './mesh.js';
 import {buildBuildingMeshes} from './building-mesh.js';
 import {clipBuildings,prepareBuildingLod,separateBuildingParts} from './buildings.js';
 import {createGeometry,ringBounds} from './geometry.js';
@@ -12,7 +12,7 @@ export const BOTTOM_SKIN_MM = 0.2;
 export const MODEL_PRESETS = {
   overview:{name:'City overview',description:'Whole-city relief with larger buildings. Draft mesh; streets off for faster modeling.',terrain:true,buildings:true,roads:false,water:true,green:false,rivers:false,relief:100,buildingScale:1,resolution:40,minBuildingArea:.25},
   landscape:{name:'Landscape model',description:'Relief with buildings, streets and embossed water.',terrain:true,buildings:true,roads:true,water:true,green:false,rivers:false,relief:100,buildingScale:1},
-  city:{name:'City block',description:'A flat architectural base with buildings and street context.',terrain:false,buildings:true,roads:true,water:true,green:true,rivers:false,relief:100,buildingScale:2},
+  city:{name:'City block',description:'A flat architectural base with buildings and street context.',terrain:false,buildings:true,roads:true,water:true,green:true,rivers:false,relief:100,buildingScale:1},
   relief:{name:'Terrain study',description:'A clean terrain relief with no architectural overlays.',terrain:true,buildings:false,roads:false,water:false,green:false,rivers:false,relief:100,buildingScale:1}
 };
 export const defaultModel = () => ({...MODEL_PRESETS.landscape,preset:'landscape',width:200,resolution:100,base:2,roadWidth:0.7,roadRise:0.5,areaRise:0.3,fallbackHeight:9,minBuildingArea:.8,format:'3mf'});
@@ -110,9 +110,7 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
   const counts={buildings:settings.buildings?input.buildings.length:0,roads:settings.roads?input.roads.length:0,water:settings.water?input.water.length:0,green:settings.green?input.green.length:0,rivers:settings.rivers?input.rivers.length:0};
   try {
     progress({percent:8,detail:'Meshing terrain and base'});
-    const terrainMesh=buildTerrainMesh(s,{resolution:settings.resolution,targetHeight:reliefHeight});
-    // Existing mesher uses a 2 mm base; move only its top surface to the requested thickness.
-    terrainMesh.v.forEach(v=>{if(v[2]>0)v[2]+=settings.base-2;});
+    const terrainMesh=buildTerrainMesh(s,{resolution:settings.resolution,targetHeight:reliefHeight,base:settings.base});
     const rawTerrain=fromMesh(terrainMesh);
     const terrain=settings.resolution===600?keep(rawTerrain.simplify(.035)):rawTerrain;
     if(terrain.status()!=='NoError') throw new Error('Terrain mesh validation failed. Try a different mesh quality.');
@@ -139,11 +137,10 @@ export async function buildModel(engine, state, settings, progress=()=>{}) {
     if(settings.roads)drape(roadRings(input.roads,settings.roadWidth),settings.roadRise,'#536C68','Roads');
     if(settings.buildings) {
       progress({percent:62,detail:`Extruding ${input.buildings.length} building footprints`});
-      const buildings=buildBuildingMeshes(s,input.buildings,{resolution:meshResolution(s,settings.resolution),targetHeight:reliefHeight,buildingScale:settings.buildingScale,fallbackHeight:settings.fallbackHeight});
+      const buildings=buildBuildingMeshes(s,input.buildings,{surface:terrainMesh.surface,buildingScale:settings.buildingScale,fallbackHeight:settings.fallbackHeight});
       const buildingSolids = [];
       const started=performance.now();
       for(const {mesh} of buildings) {
-        mesh.v.forEach(v=>{if(v[2]>0)v[2]+=settings.base-2;});
         const solid=fromMesh(mesh);
         if(solid.status()!=='NoError')throw new Error('A building mesh is invalid. Try a smaller area or turn buildings off.');
         buildingSolids.push(solid);

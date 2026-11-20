@@ -17,8 +17,8 @@ export function buildQuickModel(state,settings){
     for(const v of part.v)mesh.v.push([v[0],s.hMm-v[1],v[2]]);
     for(const tri of part.t){mesh.t.push(tri.map(i=>i+offset).reverse());mesh.colors.push(color);}
   };
-  const terrain=buildTerrainMesh(s,{resolution:Math.min(settings.resolution,80),targetHeight:reliefHeight});
-  terrain.v.forEach(v=>{if(v[2]>0)v[2]+=settings.base-2;});add(terrain,'#D4D6C8');
+  const terrain=buildTerrainMesh(s,{resolution:Math.min(settings.resolution,80),targetHeight:reliefHeight,base:settings.base});
+  add(terrain,'#D4D6C8');
   const surface=(polygon,rise,color)=>{
     const clean=polygon.map(ring=>{
       const first=ring[0],last=ring.at(-1);
@@ -36,13 +36,12 @@ export function buildQuickModel(state,settings){
       const clipped=geometry.clipPolygon(ring,frame);
       if(clipped.length>=3)surface([clipped],rise,color);
     }
-  if(settings.buildings)for(const {mesh:building} of buildBuildingMeshes(s,input.buildings,{resolution:Math.min(settings.resolution,80),targetHeight:reliefHeight,buildingScale:settings.buildingScale,fallbackHeight:settings.fallbackHeight})){
-    for (const v of building.v) {
-      if (v[2]>0) v[2]+=settings.base-2;
-      else {
-        const surfaceZ=settings.base+(s.terrainData.delta?geometry.getZInterpolated(v[0]/s.wMm,v[1]/s.hMm)*reliefHeight/s.terrainData.delta:0);
-        v[2]=Math.max(BOTTOM_SKIN_MM,surfaceZ-MATERIAL_INLAY_MM);
-      }
+  if(settings.buildings)for(const {mesh:building} of buildBuildingMeshes(s,input.buildings,{surface:terrain.surface,buildingScale:settings.buildingScale,fallbackHeight:settings.fallbackHeight})){
+    const roof=building.v.at(-1)[2];
+    for(const v of building.v){
+      if(v[2]>0)continue;
+      const ground=terrain.surface.heightAt(v[0],v[1]);
+      v[2]=Math.min(roof-.001,Math.max(BOTTOM_SKIN_MM,ground-MATERIAL_INLAY_MM));
     }
     add(building,'#DDA95E');
   }

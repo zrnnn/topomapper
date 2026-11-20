@@ -2,7 +2,11 @@
 
 Create printable 2D maps and 3D landscape models from places around the world, directly in your browser.
 
-[Open Topomapper](https://zrnnn.github.io/topomapper/) · [Release 0.4.1](https://github.com/zrnnn/topomapper/releases/tag/v0.4.1)
+[Open Topomapper](https://zrnnn.github.io/topomapper/) · [Release 0.4.2](https://github.com/zrnnn/topomapper/releases/tag/v0.4.2)
+
+## What changed in 0.4.2?
+
+3D buildings use the lowest modeled ground along their footprint. Nearby slopes no longer lift a roof. The preview and exported mesh use the same placement rule, and the building-height multiplier works without an added minimum rise. City block starts at the same 1× height scale as the other 3D presets. The 3MF writes explicit surface colors and filament slots for the named map parts. Water areas and rivers share the same blue filament slot.
 
 ## What changed in 0.4.1?
 
@@ -155,7 +159,7 @@ For a multicolor print, open **Export**, choose **3MF** and click **Prepare & do
 | STL | Geometry only; choose millimetres when importing |
 | OBJ | Geometry only; confirm scale in the receiving application |
 
-In Bambu Studio, import the 3MF and expand **Topomapper** in the **Objects** list. Add your filament colors, assign each part its filament, then slice and inspect the preview by filament. Colored features extend up to **1 mm vertically into the local terrain surface**. The depth follows hills and valleys. At least 0.2 mm of ground material covers the underside. Several parts can share a spool. The 3MF carries no printer profile. STL and OBJ use one fused surface. Water and green areas are raised surfaces, not automatically carved channels. Buildings use mapped height, then floor count × 3 metres, then your fallback height. Roofs are flat. Terrain vertical scale and building exaggeration have separate controls; the model status reports the resulting elevation range in millimetres.
+In Bambu Studio, import the 3MF and expand **Topomapper** in the **Objects** list. Use the color import dialog to match the map palette to the loaded filaments. You can also assign each named part a filament, then slice and inspect the preview by filament. Colored features extend up to **1 mm vertically into the local terrain surface**. The depth follows hills and valleys. At least 0.2 mm of ground material covers the underside. Several parts can share a spool. The 3MF carries no printer profile. STL and OBJ use one fused surface. Water and green areas are raised surfaces, not automatically carved channels. Buildings use mapped height, then floor count × 3 metres, then your fallback height. Flat roofs use the lowest point where the footprint meets the modeled terrain. Building rise follows the model scale without an added minimum, so small buildings may appear only in the surface color. Terrain vertical scale and building exaggeration have separate controls; the model status reports the resulting elevation range in millimetres.
 
 Inspect scale, minimum features, supports and colors in your slicer. These are simplified cartographic models, not survey data or detailed architectural replicas.
 

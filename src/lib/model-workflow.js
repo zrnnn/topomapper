@@ -21,7 +21,7 @@ export function initModelWorkflow(state,{runExportFlow,signal,onStatus=()=>{},on
     downloadLink.hidden=true;
   }
   const formatHelp={
-    '3mf':'Choose 3MF for multicolor printing. Assign a filament to each named map part in your slicer.',
+    '3mf':'3MF includes the map colors and named parts. Match the imported colors to your filaments in the slicer.',
     'stl':'Choose STL for a single fused mesh. The file contains geometry only.',
     'obj':'Choose OBJ for a single fused mesh to open in a 3D editor.'
   };

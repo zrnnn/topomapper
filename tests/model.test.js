@@ -19,6 +19,20 @@ test('STL and OBJ use the fused surface and 3MF preserves six aligned materials'
   const obj=await (await exportModel(model,'obj')).blob.text();assert.equal((obj.match(/^f /gm)||[]).length,model.triangles);
   const zip=await JSZip.loadAsync(await (await exportModel(model,'3mf')).blob.arrayBuffer());const xml=await zip.file('3D/3dmodel.model').async('string');assert.equal((xml.match(/<triangle /g)||[]).length,model.parts.reduce((n,p)=>n+p.mesh.t.length,0));
   assert.deepEqual(model.parts.map(p=>p.name),['Terrain','Green areas','Water','Rivers','Roads','Buildings']);
+  const palette=[...new Set(model.parts.map(part=>part.color))];
+  assert.deepEqual([...xml.matchAll(/<m:color color="([^"]+)"/g)].map(match=>match[1]),palette.map(color=>color+'FF'));
+  const colorGroup=model.parts.length+3;
+  const volumeConfig=await zip.file('Metadata/model_settings.config').async('string');
+  assert.match(await zip.file('_rels/.rels').async('string'), /Target="\/3D\/3dmodel\.model"/);
+  for(const [index,part] of model.parts.entries()){
+    const colorIndex=palette.indexOf(part.color);
+    const object=xml.slice(xml.indexOf(`<object id="${index+1}"`)).split('</object>')[0];
+    const faces=[...object.matchAll(/<triangle [^>]+ pid="(\d+)" p1="(\d+)"\/>/g)];
+    assert.equal(faces.length,part.mesh.t.length);
+    assert.ok(faces.every(match=>+match[1]===colorGroup && +match[2]===colorIndex));
+    assert.ok(volumeConfig.includes(`value="${part.name}"/><metadata key="extruder" value="${colorIndex+1}"/>`));
+  }
+
   const solids = model.parts.map(({name,mesh},index)=>{
     assert.ok(xml.includes(`name="${name}" type="model" pid="${model.parts.length+2}" pindex="${index}"`));
     closed(mesh);
@@ -81,7 +95,7 @@ test('Exported 3MF inlays stop 1 mm below the local surface and meet the ground 
     const parts=new Map();
     for(const match of xml.matchAll(/<object id="\d+" name="([^"]+)"[^>]*><mesh>([\s\S]*?)<\/mesh><\/object>/g)){
       const vertices=[...match[2].matchAll(/<vertex x="([^"]+)" y="([^"]+)" z="([^"]+)"\/>/g)].flatMap(v=>v.slice(1).map(Number));
-      const faces=[...match[2].matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"\/>/g)].flatMap(t=>t.slice(1).map(Number));
+      const faces=[...match[2].matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"[^>]*\/>/g)].flatMap(t=>t.slice(1).map(Number));
       parts.set(match[1],new engine.Manifold(new engine.Mesh({numProp:3,vertProperties:Float32Array.from(vertices),triVerts:Uint32Array.from(faces)})));
     }
     return parts;
@@ -124,4 +138,39 @@ test('Print-detail terrain keeps its physical size and a single flat base inside
   const flat=buildTerrainMesh(portrait,{resolution:600,targetHeight:0});
   closed(flat);assert.ok(flat.t.length<25);
   assert.throws(()=>modelInput(portrait,{...defaultModel(),width:110}),/fit this frame/);
+});
+
+test('Hillside roofs use the lowest local contact in both preview and 3MF',async()=>{
+  const {buildQuickModel}=await import('../src/lib/quick-model.js');
+  // A 100 m frame on a 100 mm print gives a scale of 1 mm/metre.
+  const east=100/6371008.8*180/Math.PI;
+  const plot=[[20,20],[40,20],[40,40],[20,40],[20,20]];
+  const hillside={
+    ...state,wMm:100,hMm:100,
+    renderBbox:{sw:{lat:-east/2,lng:0},ne:{lat:east/2,lng:east}},
+    terrainData:{cols:2,rows:2,h:[0,100,0,100],delta:100,source:'Uniform slope'},
+    osmData:{buildings:[{id:'slope',height:buildingHeight({height:'6'}),polygons:[[plot]]}]}
+  };
+  const settings={...defaultModel(),width:100,base:3,resolution:40,roads:false,water:false};
+  const preview=buildQuickModel(hillside,settings);
+  const roofTriangles=preview.mesh.t.filter((_,i)=>preview.mesh.colors[i]==='#DDA95E');
+  assert.ok(Math.abs(Math.max(...roofTriangles.flat().map(i=>preview.mesh.v[i][2]))-29)<1e-6);
+
+  const printable=await buildModel(engine,hillside,settings);
+  const part=printable.parts.find(part=>part.name==='Buildings');
+  closed(part.mesh);
+  assert.ok(Math.abs(Math.max(...part.mesh.v.map(v=>v[2]))-29)<1e-5);
+  const zip=await JSZip.loadAsync(await (await exportModel(printable,'3mf')).blob.arrayBuffer());
+  const xml=await zip.file('3D/3dmodel.model').async('string');
+  assert.match(xml,/<object [^>]*name="Buildings"[\s\S]*? z="29(?:\.0+)?"/);
+});
+
+test('Sub-layer building heights still respond to the multiplier and the fallback setting',async()=>{
+  const tiny={...state,osmData:{buildings:[{id:'a',height:buildingHeight({}),polygons:[[ring]]}]}};
+  const settings={...defaultModel(),width:100,terrain:false,resolution:40,roads:false,water:false,fallbackHeight:2,buildingScale:.1};
+  const model=await buildModel(engine,tiny,settings);
+  const roofs=model.parts.find(part=>part.name==='Buildings').mesh.v.map(v=>v[2]);
+  const expected=settings.base+settings.fallbackHeight*.1*terrainReliefHeight(state)/state.terrainData.delta;
+  assert.ok(Math.abs(Math.max(...roofs)-expected)<1e-5);
+  assert.equal(MODEL_PRESETS.city.buildingScale,1);
 });
